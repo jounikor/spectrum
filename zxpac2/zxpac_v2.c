@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
- //
-// Scoopex ZX Spectrum Cruncher v0.2 - ZXPac
-// (c) 2013-14 Jouni 'Mr.Spiv' Korhonen
+//
+// Scoopex ZX Spectrum Cruncher v0.21 - ZXPac
+// (c) 2013-14/21 Jouni 'Mr.Spiv' Korhonen
 // This code is for public domain (if you so insane to use it..), so don't
 // complain about my no-so-good algorithm and messy one file implementation.
 //
@@ -30,8 +30,8 @@
 ///        LZSS algorithm.
 ///
 /// \author Jouni Korhonen
-/// \copyright (c) 2009-14 Jouni Korhonen
-/// \version 2
+/// \copyright (c) 2009-14/21 Jouni Korhonen
+/// \version 0.21
 ///
 
 
@@ -44,6 +44,10 @@
 #include <errno.h>
 #include <getopt.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <ctype.h>
+
+#define VERSION "0.21"
 
 /// \struct hash
 /// \brief This structure contains one hash cell, which is actually represented as
@@ -98,9 +102,9 @@ struct om {
 // File Layout:
 //
 //                76543210 76543210
-// +------//-----+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
-// |crunched data|   LO   |   HI   | om0/1  | om2/3  | om4/5  | om6/7  | om8/9  | om10/11|om12/13 |om14/15 |
-// +------//-----+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+// +------//-----+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+// |crunched data|op LO-IP|op HI-IP|   LO   |   HI   | om0/1  | om2/3  | om4/5  | om6/7  | om8/9  | om10/11|om12/13 |om14/15 |
+// +------//-----+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
 //
 // Tags for the crunched data (read from end to beginning):
 //
@@ -203,8 +207,8 @@ static struct hash head[65536];
 static uint16_t next[WINSIZE+1];
 static uint16_t ring;
 static int greedy;
-static int debug = 0;
-
+static bool debug = false;
+static bool inplace = false;
 //
 
 static struct match matches[BUFSIZE];
@@ -405,7 +409,7 @@ static uint8_t *flushputbits( void ) {
         bb = 0x80;
     } else {
         bb &= (0xff << bc);
-        bb |= (0x80 >> 8-bc);
+        bb |= (0x80 >> (8-bc));
     }
     *bbyte++ = bb;
     return bbyte;
@@ -601,12 +605,15 @@ static int nonGreedy( int n, int nonmax, struct match *outm  ) {
 //
 
 int encode( uint8_t *b, int s, struct match *m, int n,
-            struct om *ot, uint8_t *ob, int orig ) {
+            struct om *ot, uint8_t *ob, int orig,
+            uint32_t *inplacebytes) {
 	
     int i, j, k, omidx;
     uint16_t tmp;
     uint8_t *sta = b;
     uint32_t realpos = 0;
+    uint32_t ipbytes = 0;
+    bool iptest = inplace;
 
     initputbits(b);
 
@@ -617,13 +624,20 @@ int encode( uint8_t *b, int s, struct match *m, int n,
     for (i = 0; i < n; i++) {
         if (m[i].len == 0) {
             putbyte(m[i].raw);  // [8]
-            putbits(0,1);       // tag 0
+
+            if (!iptest) {
+                putbits(0,1);       // tag 0
+            } else {
+                ++ipbytes;
+            }
+
             if (debug) {
                 printf("%04X (%5d) RAW %02X ('%c')\n",realpos,m[i].idx,m[i].raw,
                     isprint(m[i].raw) ? m[i].raw : '.');
             }
             ++realpos;
         } else {
+            iptest = false;
             omidx = m[i].omidx;
             // output length..
             j = encodelen(m[i].len,&tmp);
@@ -652,6 +666,11 @@ int encode( uint8_t *b, int s, struct match *m, int n,
         }
     }
     b = flushputbits();
+    // original length minus inplace bytes
+    if (inplace) {
+        *b++ = (orig - ipbytes);
+        *b++ = (orig - ipbytes) >> 8;
+    }
     // original length
     *b++ = orig;
     *b++ = orig >> 8;
@@ -660,6 +679,7 @@ int encode( uint8_t *b, int s, struct match *m, int n,
         *b++ = ob[i];
     }
     
+    *inplacebytes = ipbytes;
     return (int)(b-sta);
 }
 
@@ -671,7 +691,8 @@ static struct option longopts[] = {
 	{"lzy", no_argument, NULL, 'l'},
 	{"non", no_argument, NULL, 'n'},
 	{"debug", no_argument, NULL, 'D'},
-	{"len", required_argument, NULL, 'N'}
+	{"len", required_argument, NULL, 'N'},
+    {"inplace", no_argument, NULL, 'i'}
 };
 
 //
@@ -683,7 +704,8 @@ void usage( char *prg ) {
 				   "  --lzy     Selects lazy evaluation matching\n"
 				   "  --non     Selects non-greedy matching (defaults to %d)\n"
 				   "  --debug   Print debug output (will be plenty)\n"
-                   "  --len num Selects non-greedy matching with num distance\n", NONDEF);
+                   "  --len num Selects non-greedy matching with num distance\n"
+                   "  --inplace Ensure inplace decrunching\n",NONDEF);
 }
  
 //
@@ -697,7 +719,7 @@ int main( int argc, char **argv ) {
 	uint16_t hsh;
 	uint16_t nxt;
 
-	fprintf(stderr, "ZXPac v0.2 - (c) 2009-13 Mr.Spiv of Scoopex\n");
+	fprintf(stderr, "ZXPac v%s - (c) 2009-13/21 Mr.Spiv of Scoopex\n",VERSION);
 
 	// set up stuff
 	inf = NULL;
@@ -726,7 +748,10 @@ int main( int argc, char **argv ) {
                 greedy = NONDEF;
 				break;
             case 'D':
-                debug = 1;
+                debug = true;
+                break;
+            case 'i':
+                inplace = true;
                 break;
 			case '?':
 			case ':':
@@ -900,11 +925,16 @@ int main( int argc, char **argv ) {
     }
 
 	// Encode literals + matches
-	n = encode(buf,65536,matches,matchHead,omtable,outom,flen);
+
+    uint32_t ipbytes = 0;
+
+	n = encode(buf,65536,matches,matchHead,omtable,outom,flen,&ipbytes);
 
 	// encode original length
 
-	fprintf(stderr,"Crunched length: %d (%2.2f%%)\n",n,(float)(100.0 * (flen-n) / flen));
+	fprintf(stderr,"Crunched length: %d (%2.2f%%) (%d stored%s)\n",n,
+        (float)(100.0 * (flen-n) / flen),
+        ipbytes, ipbytes > 0 ? " - use inplace decrunching" : "");
 #if 1
 	flen = fwrite(buf,1,n,outf);
 

@@ -1,10 +1,8 @@
 ;
-; ZXPac v2 (c) 2014 Jouni 'Mr.Spiv' Korhonen
+; ZXPac v3 (c) 2014/21 Jouni 'Mr.Spiv' Korhonen
 ; Done for fun.. ;-) And definitely not the greatest.
 ;
-; Length 192 octets now.
-;
-; ZXPac v2 bit tag encoding is as follows:
+; ZXPac v3 bit tag encoding is as follows:
 ;
 ; [n]    means an arbitrary bit vector of length n
 ; [B]    means a complete byte in byte boundary
@@ -66,16 +64,18 @@
 ;
 ; The compressed file layout is roughly the following:
 ;
-; [data] + [optional last octet] + [2 octets original length] + [8 OM octets]
+; [data] + [optional 2 octets inplace length] + [2 octets original length] + [8 OM octets]
 ;
-;
+
+INPLACE     equ 1       ; MUST be 1 if the file was crunched with --inplace
 
 		org		$8000
 
 
 main:
 
-        ld      de,$4000
+        ;ld      de,$4000
+        ld      de,data
         ld      hl,dataend
         ld      b,$ff
         di
@@ -156,10 +156,19 @@ createomloop:
         dec     hl
         ld      c,(hl)
         ;
-        pop     de
-        ex      de,hl
-        add     hl,bc
-        ex      de,hl
+        ex      (sp),hl     ; HL   = destination
+                            ; (sp) = end of compressed data
+        add     hl,bc       ; HL   = end of destination
+        ex      (sp),hl     ; HL   = end of compressed data
+                            ; (sp) = end of destination
+        ; inplace length
+    IF INPLACE
+        dec     hl
+        ld      b,(hl)
+        dec     hl
+        ld      c,(hl)      ; inplace "original size"
+    ENDIF
+        pop     de          ; DE = end of destination
         ;
         ; HL = end of compressed data
         ; DE = end of destination 
@@ -309,7 +318,7 @@ mmCopy:
         jr      decompressmain
 
 data:
-        incbin  "scoopex_2.scr.pac"
+        incbin  "lzy.pac"
         ;
         ;
 dataend:

@@ -1,0 +1,17 @@
+
+zxpac2 v0.21
+
+CHANGES from v0.2
+* Inplace decrunching fix - added '--inplace' switch that adds extra information
+  into the crunched file that helps ensuring the inplace decrunching works.
+* The cruncher will inform you when inplace decrunching must be done
+* When the file is crunched with '--inplace' the INPLACE equ must be set 1 in the
+  supplied z80dec.asm decruncher code.
+* Inplace crunched files must be decrunched inplace as well if the cruncher so
+  informs after crunching.
+
+TODO:
+* New matching algorithm to replace the current non-greedy algorithm with something
+  better.
+* Add "exe decruncher" stub support.
+
