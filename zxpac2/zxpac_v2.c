@@ -47,6 +47,8 @@
 #include <stdbool.h>
 #include <ctype.h>
 
+#include "z80dec.h"
+
 #define VERSION "0.21"
 
 /// \struct hash
@@ -209,6 +211,12 @@ static uint16_t ring;
 static int greedy;
 static bool debug = false;
 static bool inplace = false;
+static bool exe = false;
+
+static uint32_t load_addr = 0x8000;
+static uint32_t jump_addr = 0x8000;
+static uint32_t page      = 0x7f;
+
 //
 
 static struct match matches[BUFSIZE];
@@ -692,7 +700,10 @@ static struct option longopts[] = {
 	{"non", no_argument, NULL, 'n'},
 	{"debug", no_argument, NULL, 'D'},
 	{"len", required_argument, NULL, 'N'},
-    {"inplace", no_argument, NULL, 'i'}
+    {"inplace", no_argument, NULL, 'i'},
+    
+    {"exe",required_argument, NULL, 'e'},
+    {0,0,0,0}
 };
 
 //
@@ -700,12 +711,13 @@ static struct option longopts[] = {
 void usage( char *prg ) {
 	fprintf(stderr,"Usage: %s [options] infile outfile\n",prg);
 	fprintf(stderr," Options:\n"
-				   "  --gry     Selects greedy matching\n"
-				   "  --lzy     Selects lazy evaluation matching\n"
-				   "  --non     Selects non-greedy matching (defaults to %d)\n"
-				   "  --debug   Print debug output (will be plenty)\n"
-                   "  --len num Selects non-greedy matching with num distance\n"
-                   "  --inplace Ensure inplace decrunching\n",NONDEF);
+				   "  --gry       Selects greedy matching\n"
+				   "  --lzy       Selects lazy evaluation matching\n"
+				   "  --non       Selects non-greedy matching (defaults to %d)\n"
+				   "  --debug     Print debug output (will be plenty)\n"
+                   "  --len num   Selects non-greedy matching with num distance\n"
+                   "  --exe load,jump,page Self-extracting decruncher parameters\n"
+                   "  --inplace   Ensure inplace decrunching\n",NONDEF);
 }
  
 //
@@ -729,7 +741,7 @@ int main( int argc, char **argv ) {
 	//
 	//
 
-	while ((n = getopt_long(argc, argv, "DlN:gn", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "DlN:gnie:", longopts, NULL)) != -1) {
 		switch (n) {
 			case 'l':
 				algo = ALGO_LZY;
@@ -750,6 +762,22 @@ int main( int argc, char **argv ) {
             case 'D':
                 debug = true;
                 break;
+            case 'e':
+                n = sscanf(optarg,"%x,%x,%x",&load_addr,&jump_addr,&page);
+
+                if (n != 3) {
+                    usage(argv[0]);
+                    exit(EXIT_FAILURE);
+                }
+                if (load_addr > 0xffff ||
+                    jump_addr > 0xffff ||
+                    page > 0xff) {
+                    fprintf(stderr,"--exe parameters out of range.\n");
+                    exit(EXIT_FAILURE);;
+                }
+
+                //printf("%04x, %04x, %02x\n",load_addr,jump_addr,page);
+                exe = true;
             case 'i':
                 inplace = true;
                 break;
@@ -757,32 +785,34 @@ int main( int argc, char **argv ) {
 			case ':':
 				usage(argv[0]);
 				exit(EXIT_FAILURE);
-				break;
 			default:
 				break;
 		}
 	}
 
 	if (argc - optind < 2) {
-	//if (argc - optind < 1) {
 		usage(argv[0]);
 		exit(EXIT_FAILURE);
 	}
+    
 	if ((inf = fopen(argv[optind], "r+b")) == NULL) {
 		fprintf(stderr, "**Error: fopen(%s) failed: %s\n",argv[optind],
 				strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+   
 	if ((outf = fopen(argv[optind+1], "wb")) == NULL) {
 		fclose(inf);
         fprintf(stderr, "**Error: fopen(%s) failed: %s\n",argv[optind+1],
 				strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+    
     if (greedy < 1) {
         fprintf(stderr,"**Warning: minimum non-greedy distance 1 set\n");
         greedy = 1;
     }
+    
     if (greedy > NONMAX) {
         fprintf(stderr,"**Warning: maximum non-greedy distance %d set\n",NONMAX);
         greedy = NONMAX;
@@ -932,16 +962,36 @@ int main( int argc, char **argv ) {
 
 	// encode original length
 
-	fprintf(stderr,"Crunched length: %d (%2.2f%%) (%d stored%s)\n",n,
-        (float)(100.0 * (flen-n) / flen),
+	fprintf(stderr,"Crunched %s file length: %d (%2.2f%%) (%d stored%s)\n",
+        exe ? "self-extracting" : "data",
+        n,(float)(100.0 * (flen-n) / flen),
         ipbytes, ipbytes > 0 ? " - use inplace decrunching" : "");
-#if 1
+
+    flen = 0;
+
+    if (exe) {
+        set_load_addr(load_addr);
+        set_jump_addr(jump_addr);
+        set_work_addr((page << 8) | WORKSIZE);
+        set_code_addr(load_addr+DECOMPRESS);
+        set_data_size(n);
+    
+        flen = fwrite(z80exedec,1,sizeof(z80exedec),outf);
+    
+        if (flen != sizeof(z80exedec)) {
+            goto file_error;
+        }
+
+        fprintf(stderr,"\tFinal length %d\n",n+flen);
+    }
+
 	flen = fwrite(buf,1,n,outf);
 
 	if (flen != n) {
+file_error:
 		fprintf(stderr,"** Error: fwrite() failed: %s\n", strerror(errno));
 	}
-#endif
+
 	fclose(inf);
 	fclose(outf);
 	exit(EXIT_SUCCESS);

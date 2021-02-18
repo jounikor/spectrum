@@ -31,22 +31,22 @@
 ;
 ; In the compressed bit stream OMs are indexed as:
 ; 
-;  100       -> OM index 0
-;  101       -> OM index 1
-;  1100      -> ..
-;  1101
-;  11100
-;  11101
-;  111100
-;  111101
-;  1111100
-;  1111101
-;  11111100
-;  11111101 
-;  111111100 
-;  111111101 
-;  111111110 
-;  111111111 -> OM index 15
+;  1+00       -> OM index 0
+;  1+01       -> OM index 1
+;  1+100      -> ..
+;  1+101
+;  1+1100
+;  1+1101
+;  1+11100
+;  1+11101
+;  1+111100
+;  1+111101
+;  1+1111100
+;  1+1111101 
+;  1+11111100 
+;  1+11111101 
+;  1+11111110 
+;  1+11111111 -> OM index 15
 ;
 ; The actul lengths OM index points at are precalculated before
 ; decompression into a table.
@@ -67,31 +67,36 @@
 ; [data] + [optional 2 octets inplace length] + [2 octets original length] + [8 OM octets]
 ;
 
-INPLACE     equ 1       ; MUST be 1 if the file was crunched with --inplace
-
-		org		$8000
+		org		$0
 
 
 main:
 
-        ;ld      de,$4000
-        ld      de,data
-        ld      hl,dataend
-        ld      b,$7f
-        di
-        exx
-        push    hl
-        exx
-        call    decompress
-		exx
-        pop     hl
-        exx
-        ei
-        ret
+; move decruncher code
+;
+smc_jump_addr:
+        ld      hl,$00
+        push    hl          ; HL = execution start address
+main_no_run:
+smc_work_addr:
+        ld      de,$0        ; E must be $20
+        ld      a,d         ; A = page number for the work area
+        push    de          ; DE = start of the decruncher
+smc_code_addr:
+        ld      hl,0
+_smc_code_size:
+        ld      bc,data-decompress
+        ldir                
+smc_load_addr:
+        ld      de,$0
+smc_data_size:
+        ld      bc,0
+        ret                 ; jump to decruncher
 ;
 ; DE = destination
-; HL = end of compressed data
-;  B = ptr to 256 octets aligned memory area for 32 octets
+; HL = start of compressed data
+; BC = size of compressed data
+;  A = ptr to 256 octets aligned memory area for 32 octets
 ;
 ; Uses:
 ;  A,BC,DE,HL,IX
@@ -102,7 +107,11 @@ main:
 ;
 
 decompress:
+        ; moves the crunched data for inplace decrunching
         push    de
+        ldir
+        ex      de,hl
+        ld      b,a
         ld      c,32
 createomloop:
         dec     hl
@@ -127,34 +136,11 @@ createomloop_nodec:
         dec     c
         ld      (bc),a  ; A = mm*2 + 1
         ;
-    IF 0
-        ld      a,00110000b
-        and     (hl)
-        rrca
-        rrca
-        rrca
-        ld      e,a
-        rrca
-        add     a,e
-        add     a,5
-        dec     c
-        ld      (bc),a  ; A = oo*3 +5
-
-        ld      a,11000000b
-        and     (hl)
-        rlca
-        rlca
-        rlca            ; Clears C-flag
-        inc     a
-        dec     c
-        ld      (bc),a
-    ELSE
         rrd
         ld      a,00000011b
         and     c
         jr nz,  createomloop_nodec
         xor     c
-    ENDIF
         jr      nz,createomloop
         ;
         ;dec     c
@@ -171,12 +157,10 @@ createomloop_nodec:
         ex      (sp),hl     ; HL   = end of compressed data
                             ; (sp) = end of destination
         ; inplace length
-    IF INPLACE
         dec     hl
         ld      b,(hl)
         dec     hl
         ld      c,(hl)      ; inplace "original size"
-    ENDIF
         pop     de          ; DE = end of destination
         ;
         ; HL = end of compressed data
@@ -328,9 +312,8 @@ mmCopy:
         jr      decompressmain
 
 data:
-        incbin  "tst.pac"
-        ;
-        ;
+        ;incbin  "tst.pac"
+        
 dataend:
 
 
