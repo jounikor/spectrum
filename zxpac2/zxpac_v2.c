@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 //
-// Scoopex ZX Spectrum Cruncher v0.21 - ZXPac
+// Scoopex ZX Spectrum Cruncher v0.22 - ZXPac
 // (c) 2013-14/21 Jouni 'Mr.Spiv' Korhonen
 // This code is for public domain (if you so insane to use it..), so don't
 // complain about my no-so-good algorithm and messy one file implementation.
@@ -31,7 +31,7 @@
 ///
 /// \author Jouni Korhonen
 /// \copyright (c) 2009-14/21 Jouni Korhonen
-/// \version 0.21
+/// \version 0.22
 ///
 
 
@@ -49,7 +49,7 @@
 
 #include "z80dec.h"
 
-#define VERSION "0.21"
+#define VERSION "0.22"
 
 /// \struct hash
 /// \brief This structure contains one hash cell, which is actually represented as
@@ -120,22 +120,22 @@ struct om {
 //
 // om indexes. These are actually a variation of Golomb codes.
 //
-//  100          om0
-//  101          om1
-//  1100         om2
-//  1101         om3
-//  11100        om4
-//  11101        om5
-//  111100       om6
-//  111101       om7
-//  1111100      om8
-//  1111101      om9
-//  11111100     om10
-//  11111101     om11
-//  111111100    om12
-//  111111101    om13
-//  111111110    om14
-//  111111111    om15
+//  1+00          om0
+//  1+01          om1
+//  1+100         om2
+//  1+101         om3
+//  1+1100        om4
+//  1+1101        om5
+//  1+11100       om6
+//  1+11101       om7
+//  1+111100      om8
+//  1+111101      om9
+//  1+1111100     om10
+//  1+1111101     om11
+//  1+11111100    om12
+//  1+11111101    om13
+//  1+11111110    om14
+//  1+11111111    om15
 //
 // 'om index' is used for a lookup into a file specific table that
 // contains offset + matchlen information.
@@ -937,7 +937,7 @@ int main( int argc, char **argv ) {
     //
 
     if (debug) {
-        printf("\n**** OM bit counts before softing *****\n\n");
+        printf("\n**** OM bit counts before sorting *****\n\n");
         for (o = 0; o < 16; o++) {
             printf("[%d]: %d -> %d \n",o,omtable[o].cnt,omtable[o].idx);
         }

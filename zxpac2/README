@@ -2,6 +2,8 @@
 zxpac2 v0.21
 
 CHANGES from v0.2
+* Self-extracting decruncher support, see '--exe' switch. The file has to loaded
+  into that memory address the file will be decrunched.
 * Inplace decrunching fix - added '--inplace' switch that adds extra information
   into the crunched file that helps ensuring the inplace decrunching works.
 * The cruncher will inform you when inplace decrunching must be done
@@ -13,5 +15,19 @@ CHANGES from v0.2
 TODO:
 * New matching algorithm to replace the current non-greedy algorithm with something
   better.
-* Add "exe decruncher" stub support.
 
+
+USAGE:
+Usage: zxpac2 [options] infile outfile
+ Options:
+  --gry       Selects greedy matching
+  --lzy       Selects lazy evaluation matching
+  --non       Selects non-greedy matching (defaults to 8)
+  --debug     Print debug output (will be plenty)
+  --len num   Selects non-greedy matching with num distance
+  --exe load,jump,page Self-extracting decruncher parameters
+  --inplace   Ensure inplace decrunching
+
+Note that 'load' and 'jump' are 16 bit hexadecimal numbers. 'page' is a 
+8 bit hexadecimal numner. Prefixes like '0x' or '$' are not needed.
+The '--exe' switch implicitly adds '--inplace'.
