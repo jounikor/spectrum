@@ -48,21 +48,10 @@
 #include <ctype.h>
 
 #include "z80dec.h"
+#include "zxpac_v2.h"
+#include "optimalish_parse.h"
 
-#define VERSION "0.22"
-
-/// \struct hash
-/// \brief This structure contains one hash cell, which is actually represented as
-///        a linked list node. \c next is an index to the next linked list node and
-///        \c last in an index to the last linked list node.
-///
-/// Note, the current design limits the sliding window to 64K
-///
-
-struct hash {
-	uint16_t next;
-	uint16_t last;
-};
+#define VERSION "0.23"
 
 /// \struct match
 /// \brief This structure contains \c off offset to the found match, \c len length
@@ -70,14 +59,6 @@ struct hash {
 ///        the file position.
 ///
 
-struct match {
-	uint16_t off;
-	short len;
-	uint8_t raw;
-    int8_t omidx;   // calculated om index from off & len
-    //short idx;      // file index of this match structure
-    int idx;
-};
 
 /// \struct om
 /// \brief This structure holds the offset and matchlength information
@@ -191,23 +172,52 @@ struct om {
 #define WINSIZE (OO4-1)
 
 
-#define NULLHSH 0
 
 // Other constants..
 
-#define ALGO_GDY 0  /// <greedy parsing
-#define ALGO_LZY 1  /// <lazy evaluation
-#define ALGO_NON 2  /// <nongreedy parsing
 #define NONMAX 32
-#define NONDEF 8
+#define NONDEF 0
+
+static int om_cost(uint8_t *buf, int pos, int len)
+{
+
+    return 0;
+}
+
+
+
+
+static struct compressor_setting {
+    lz_parser parser;
+    cost_function cost;
+    int min_match;
+    int mid_match;
+    int max_match;
+    int win_size;
+    int depth;
+} settings[] = {
+    {optimal_parser,om_cost,MM0,MM2,MM4,OO4,MM4},   // 0
+    {optimal_parser,om_cost,MM0,MM2,MM4,OO4,MM4},   // 1
+    {optimal_parser,om_cost,MM0,MM2,MM4,OO4,MM4},   // 2
+    {optimal_parser,om_cost,MM0,MM2,MM4,OO4,MM4},   // 3
+    {optimal_parser,om_cost,MM0,MM2,MM4,OO4,MM4},   // 4
+    {optimal_parser,om_cost,MM0,MM2,MM4,OO4,MM4},   // 5
+    {optimal_parser,om_cost,MM0,MM2,MM4,OO4,MM4},   // 6
+    {optimal_parser,om_cost,MM0,MM2,MM4,OO4,MM4},   // 7
+    {optimal_parser,om_cost,MM0,MM2,MM4,OO4,MM4},   // 8
+    {optimal_parser,om_cost,MM0,MM2,MM4,OO4,MM4},   // 9
+    {NULL,NULL,0,0,0,0,0}
+};
+
+
+
+
+
 
 //                       
 static struct om omtable[16] = {0};
 static uint8_t outom[8] = {0};
 
-static struct hash head[65536];
-static uint16_t next[WINSIZE+1];
-static uint16_t ring;
 static int greedy;
 static bool debug = false;
 static bool inplace = false;
@@ -259,6 +269,7 @@ static int encodeoff( int off, uint16_t *b ) {
         default:
             assert(0);
     }
+    return -1;
 }
 
 static int getmm( int len ) {
@@ -293,6 +304,7 @@ static int encodelen( int len, uint16_t *b ) {
         default:
             assert(0);
     }
+    return -1;
 }
 
 static void initom(void) {
@@ -320,8 +332,8 @@ static void prepareom( struct match* m, struct om *omtab, int num ) {
         if (m[n].len > 0) {
             // 76543210
             // ----mmoo
-            m[n].omidx = getmm(m[n].len) << 2 | getoo(m[n].off);
-            ++omtab[m[n].omidx].cnt;
+            //m[n].omidx = getmm(m[n].len) << 2 | getoo(m[n].off);
+            //++omtab[m[n].omidx].cnt;
         }
     }
 }
@@ -426,183 +438,6 @@ static uint8_t *flushputbits( void ) {
 
 //
 //
-//
-//
-
-static void initHash( void ) {
-	memset(head,0,sizeof(head));
-	memset(next,0,sizeof(next));
-	ring = 1;
-};
-
-//
-// Direct 16bits hash "function"
-
-static uint16_t calcHash( int n ) {
-	return buf[n] << 8 | buf[n+1];
-}
-
-//
-// Delete the first hash cell in the linked list of hash cells pointed
-// by our hash value. Return the index to the deleted hash cell.
-
-static int deleteHash( uint16_t hash ) {
-	// first delete an overwritte hash slot
-	uint16_t nxt = head[hash].next;
-
-	if ((head[hash].next = next[nxt]) == NULLHSH) {
-		head[hash].last = NULLHSH;
-	}
-	return head[hash].next;
-}
-
-
-static void insertHash( uint16_t hash ) {
-	// insert a new slot
-	next[ring] = NULLHSH;
-	
-	// update hash head table
-	next[head[hash].last] = ring;
-	head[hash].last = ring;
-
-	if (head[hash].next == NULLHSH) {
-		head[hash].next = ring;
-	}
-	if (++ring > WINSIZE) {
-		ring = 1;
-	}
-}
-
-static void insertHashDummy( void ) {
-	if (++ring > WINSIZE) {
-		ring = 1;
-	}
-}
-
-
-
-static void getMatch( int n, uint16_t nxt, struct match *mch, int end ) {
-	int len, off, fut, i;
-    float bbp = 32.0;
-
-	uint8_t *sp, *cp, *hp, *me, *bs;
-	len = MINMTCH-1;
-
-	// current search position.
-	sp = buf + n;
-	// Calculate search area end..
-	me = buf + end;
-
-	while (nxt) {
-        if (ring > nxt) {
-            fut = WINSIZE - ring + nxt;
-        } else {
-            fut = nxt - ring; 
-		}
-        //if ((fut = nxt - ring) < 0) {
-		//	fut += WINSIZE;
-		//}
-		if (n+fut >= end) {
-			break;
-			assert(n+fut < end);
-		}
-
-		// sp - current search position
-		// cp - copy of sp during string matching
-		// hp - ahead search position
-		// me - search area end
-
-		hp = sp + fut;
-		bs = hp;
-		cp = sp;
-
-		i = n+fut+MAXMTCH < end ? MAXMTCH : end-n-fut;
-
-		while (i-- > 0 && *cp == *hp) {
-			++cp; ++hp;
-		}
-
-		if ((hp - bs) > len) {
-            len = hp - bs;
-            off = fut;
-        }
-		if (len >= MAXMTCH) {
-			break;
-		}
-		nxt = next[nxt];
-	}
-
-    // discard pathetic matches..
-    if ((len == MINMTCH && off >= OO3) || len < MINMTCH) {
-        len = 0;
-    }
-
-	mch->raw = buf[n];
-	mch->len = len;
-	mch->off = off;
-}
-
-//
-// Parameters:
-//  n [in]   - Current file position
-//  end [in] - End of file
-//
-//  Note that 'end' must be calculated so that a lookup into the
-//  tables does not overflow!
-//
-// Returns:
-//  Next position in the file.
-//
-
-static int nonGreedy( int n, int nonmax, struct match *outm  ) {
-	int dlt, max ,j, r;
-
-	// The theory behind the non-greedy parsing has been
-	// explained nicely in Nigel Horspool's old paper 
-	// "The effect of non-greedy pasing in Ziv-Lempel
-	//  compression methods". Read that :)
-		
-	if (matches[n].len < MINMTCH) {
-		dlt = 1;
-    } else {
-		dlt = 0;
-        //max = matches[n].len-1 < nonmax ? matches[n].len-1 : nonmax;
-        max = matches[n].len < nonmax ? matches[n].len : nonmax;
-        //max = matches[n].len-1 < NONMAX ? matches[n].len-1 : NONMAX;
-        //if (n+max >= end) {
-		//	max = end-n-1;
-		//}
-		// for (j = 1; j < max; j++) {
-		for (j = 1; j < max; j++) {
-            if (matches[n+j].len > (matches[n+dlt].len+j)) {
-                dlt = j;
-                if (debug) {
-                    printf("** n: %d max: %d, dlt: %d, nonmax: %d\n",
-                        n, max,dlt,nonmax);
-                }
-			}
-		}
-	}
-    
-    *outm = matches[n];
-	
-    if (dlt == 0) {
-        // no changes..
-		r = matches[n].len;
-	} else {
-        if (dlt == 1) {
-		    r = 1;	
-            outm->len = 0;
-	    } else {
-            outm->len = dlt;
-		    r = dlt;
-	    }
-	}
-	return r;
-}
-
-//
-//
 // Parameters:
 //  sta [in] - Current file position
 //  end [in] - End of file
@@ -611,6 +446,8 @@ static int nonGreedy( int n, int nonmax, struct match *outm  ) {
 // Returns:
 //  Length of encoded data.
 //
+
+#if 0
 
 int encode( uint8_t *b, int s, struct match *m, int n,
             struct om *ot, uint8_t *ob, int orig,
@@ -691,17 +528,16 @@ int encode( uint8_t *b, int s, struct match *m, int n,
     return (int)(b-sta);
 }
 
+#endif
+
 //
 //
 
 static struct option longopts[] = {
-	{"gry", no_argument, NULL, 'g'},
-	{"lzy", no_argument, NULL, 'l'},
-	{"non", no_argument, NULL, 'n'},
 	{"debug", no_argument, NULL, 'D'},
-	{"len", required_argument, NULL, 'N'},
+	{"sec", required_argument, NULL, 's'},
+	{"lev", required_argument, NULL, 'L'},
     {"inplace", no_argument, NULL, 'i'},
-    
     {"exe",required_argument, NULL, 'e'},
     {0,0,0,0}
 };
@@ -711,11 +547,11 @@ static struct option longopts[] = {
 void usage( char *prg ) {
 	fprintf(stderr,"Usage: %s [options] infile outfile\n",prg);
 	fprintf(stderr," Options:\n"
-				   "  --gry       Selects greedy matching\n"
-				   "  --lzy       Selects lazy evaluation matching\n"
-				   "  --non       Selects non-greedy matching (defaults to %d)\n"
-				   "  --debug     Print debug output (will be plenty)\n"
-                   "  --len num   Selects non-greedy matching with num distance\n"
+				   "  --lev   n   Compression level, Where n is a number between\n"
+                   "              0 to 9 and 0 being fastest and 9 best compression\n"
+                   "              Default value is %d\n"
+                   "  --debug     Print debug output (will be plenty)\n"
+                   "  --sec num   Security distance of num bytes for inplace decompression\n"
                    "  --exe load,jump,page Self-extracting decruncher parameters\n"
                    "  --inplace   Ensure inplace decrunching\n",NONDEF);
 }
@@ -730,63 +566,64 @@ int main( int argc, char **argv ) {
 	int n, p, o;
 	uint16_t hsh;
 	uint16_t nxt;
+    int eff = NONDEF;
+    int sec = 0;
 
 	fprintf(stderr, "ZXPac v%s - (c) 2009-13/21 Mr.Spiv of Scoopex\n",VERSION);
 
 	// set up stuff
 	inf = NULL;
 	outf = NULL;
-	algo = ALGO_NON;
 
 	//
 	//
 
 	while ((n = getopt_long(argc, argv, "DlN:gnie:", longopts, NULL)) != -1) {
 		switch (n) {
-			case 'l':
-				algo = ALGO_LZY;
-                greedy = 2;
-				break;
-			case 'N':
-				algo = ALGO_NON;
-                greedy = atoi(optarg);
-				break;
-			case 'g':
-				algo = ALGO_GDY;
-                greedy = 1;
-				break;
-			case 'n':
-				algo = ALGO_NON;
-                greedy = NONDEF;
-				break;
-            case 'D':
-                debug = true;
-                break;
-            case 'e':
-                n = sscanf(optarg,"%x,%x,%x",&load_addr,&jump_addr,&page);
+        case 'L':
+            eff = atoi(optarg);
+            
+            if (eff < 0 || eff > 9) {
+                fprintf(stderr,"--level parameters out of range.\n");
+                exit(EXIT_FAILURE);;
+            }
+            break;
+        case 's':
+            sec = atoi(optarg);
+            
+            if (sec < 0) {
+                fprintf(stderr,"--sec parameters out of range.\n");
+                exit(EXIT_FAILURE);;
+            }
+            break;
+        case 'D':
+            debug = true;
+            break;
+        case 'e':
+            n = sscanf(optarg,"%x,%x,%x",&load_addr,&jump_addr,&page);
 
-                if (n != 3) {
-                    usage(argv[0]);
-                    exit(EXIT_FAILURE);
-                }
-                if (load_addr > 0xffff ||
-                    jump_addr > 0xffff ||
-                    page > 0xff) {
-                    fprintf(stderr,"--exe parameters out of range.\n");
-                    exit(EXIT_FAILURE);;
-                }
+            if (n != 3) {
+                usage(argv[0]);
+                exit(EXIT_FAILURE);
+            }
+            if (load_addr > 0xffff ||
+                jump_addr > 0xffff ||
+                page > 0xff) {
+                fprintf(stderr,"--exe parameters out of range.\n");
+                exit(EXIT_FAILURE);;
+            }
 
-                //printf("%04x, %04x, %02x\n",load_addr,jump_addr,page);
-                exe = true;
-            case 'i':
-                inplace = true;
-                break;
-			case '?':
-			case ':':
-				usage(argv[0]);
-				exit(EXIT_FAILURE);
-			default:
-				break;
+            //printf("%04x, %04x, %02x\n",load_addr,jump_addr,page);
+            exe = true;
+        case 'i':
+            inplace = true;
+            break;
+        case '?':
+        case ':':
+            usage(argv[0]);
+            exit(EXIT_FAILURE);
+        default:
+            break;
 		}
 	}
 
@@ -794,7 +631,9 @@ int main( int argc, char **argv ) {
 		usage(argv[0]);
 		exit(EXIT_FAILURE);
 	}
-    
+   
+    // check for parsers..
+
 	if ((inf = fopen(argv[optind], "r+b")) == NULL) {
 		fprintf(stderr, "**Error: fopen(%s) failed: %s\n",argv[optind],
 				strerror(errno));
@@ -808,22 +647,8 @@ int main( int argc, char **argv ) {
 		exit(EXIT_FAILURE);
 	}
     
-    if (greedy < 1) {
-        fprintf(stderr,"**Warning: minimum non-greedy distance 1 set\n");
-        greedy = 1;
-    }
-    
-    if (greedy > NONMAX) {
-        fprintf(stderr,"**Warning: maximum non-greedy distance %d set\n",NONMAX);
-        greedy = NONMAX;
-    }
-
 	//
 	//
-
-    if (debug) {
-        printf("nonGreedy queue length = %d\n",greedy);
-    }
 
 	flen = fread(buf,1,BUFSIZE,inf);
 
@@ -840,101 +665,19 @@ int main( int argc, char **argv ) {
 		exit(EXIT_FAILURE);
 	}
 
-	// Start compression..
-	//
-	
-	initHash();
+    //
 
-	// fill in the hash table for the amount of sliding window.
-	// note that if the actual input file is less that the
-	// window size, we need to fill the rest of the hash table
-	// with "dummy inserts".
+    lz_parser parser = settings[eff].parser;
+    int idx = parser(buf,1,NULL,2,
+                settings[eff].min_match,
+                settings[eff].mid_match,
+                settings[eff].max_match,
+                settings[eff].win_size,
+                settings[eff].depth,
+                settings[eff].cost);
 
-	for (p = n = 0; n < WINSIZE; n++) {
-		if (n < flen) {
-			insertHash(calcHash(p++));
-		} else {
-			// updates the hash table and sliding window internals..
-			insertHashDummy();
-		}
-	}
-
-    // 'p' must be preserved.. since the search routine uses it.
-
-    initmatches();
-
-    int matchQueue = 0;
-    int matchesToHash = 0;
-    int matchHead = 0;
-    int matchNext = 0;
-    int len;
-    int realPos = 0;
-
-    n = 0;
-
-    while (realPos < flen) {
-        while (matchQueue < greedy && n < flen) {
-            hsh = calcHash(n);
-            nxt = deleteHash(hsh);
-            getMatch(n, nxt, &matches[matchNext], flen);
-            matches[matchNext].idx = n; // debug
-            matchQueue++;
-            matchNext++;
-            n++;
-
-            if (p < flen) {
-                insertHash(calcHash(p++));
-            } else {
-                insertHashDummy();
-            }
-        }
-
-        assert(matchQueue == matchNext-matchHead);
-        assert(realPos == matches[matchHead].idx);
-        len = nonGreedy(matchHead,matchQueue,&matches[matchHead]);
-        
-        if (len > 1 && memcmp(&buf[realPos],&buf[matches[matchHead].off + realPos],len)) {
-            printf("mismatch at %04X -> %04X, off %d, len %d, mh %d, mq %d\n",
-                realPos, matches[matchHead].off + realPos, matches[matchHead].off, len,
-                matchHead,matchQueue);
-        }
-        
-        matchHead++;
-        realPos += len;
-        
-        if (len == 1) {
-            matchQueue--;
-        } else if (len < matchQueue) {
-            int i, j;
-
-            for (j = matchHead, i = matchHead+len-1; i < matchNext; i++) {
-                matches[j++] =matches[i];
-            }
-
-            matchNext = j;
-            matchQueue -= len;
-        } else /*(len >= matchQueue)*/ {
-            for (o = 0; o < len - matchQueue; o++) {
-                hsh = calcHash(n++);
-                nxt = deleteHash(hsh);
-                if (p < flen) {
-                    insertHash(calcHash(p++));
-                } else {
-                    insertHashDummy();
-                }
-            }
-            matchNext = matchHead;
-            matchQueue = 0;
-        }
-    }
 
     // calculate om..
-
-    initom();
-    prepareom(matches,omtable,matchHead);
-    calculateom(omtable,outom);
-
-    //
 
     if (debug) {
         printf("\n**** OM bit counts before sorting *****\n\n");
@@ -958,7 +701,7 @@ int main( int argc, char **argv ) {
 
     uint32_t ipbytes = 0;
 
-	n = encode(buf,65536,matches,matchHead,omtable,outom,flen,&ipbytes);
+	//n = encode(buf,65536,matches,matchHead,omtable,outom,flen,&ipbytes);
 
 	// encode original length
 
