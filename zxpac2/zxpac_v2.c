@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 //
-// Scoopex ZX Spectrum Cruncher v0.22 - ZXPac
-// (c) 2013-14/21 Jouni 'Mr.Spiv' Korhonen
+// Scoopex ZX Spectrum Cruncher v0.23 - ZXPac
+// (c) 2013-14/23 Jouni 'Mr.Spiv' Korhonen
 // This code is for public domain (if you so insane to use it..), so don't
 // complain about my no-so-good algorithm and messy one file implementation.
 //
@@ -31,7 +31,7 @@
 ///
 /// \author Jouni Korhonen
 /// \copyright (c) 2009-14/21 Jouni Korhonen
-/// \version 0.22
+/// \version 0.23
 ///
 
 
@@ -221,6 +221,8 @@ static uint32_t page      = 0x7f;
 
 static struct match matches[BUFSIZE];
 static uint8_t buf[BUFSIZE];
+
+static uint16_t raw_stats[256] = {0};
 
 static int encodeliteral(uint8_t lit, uint32_t *b ) {
     if (b) { *b = lit; }
@@ -642,6 +644,7 @@ int encode( uint8_t *b, int s, struct match *m, int n,
             if (debug) {
                 printf("%04X (%5d) RAW %02X ('%c')\n",realpos,m[i].idx,m[i].raw,
                     isprint(m[i].raw) ? m[i].raw : '.');
+                ++raw_stats[m[i].raw];
             }
             ++realpos;
         } else {
@@ -959,6 +962,26 @@ int main( int argc, char **argv ) {
     uint32_t ipbytes = 0;
 
 	n = encode(buf,65536,matches,matchHead,omtable,outom,flen,&ipbytes);
+
+    if (debug) {
+        int total = 0;
+        
+        printf("\n**** Raw literal counts ****\n\n");
+        
+        for (o = 0; o < 256;) {
+            printf("%02X ('%c'): %-5d %02X ('%c'): %-5d %02X ('%c'): %-5d %02X ('%c'): %-5d\n",
+                    o+0,isprint(o+0)?o+0:'.',raw_stats[o+0],
+                    o+1,isprint(o+1)?o+1:'.',raw_stats[o+1],
+                    o+2,isprint(o+2)?o+2:'.',raw_stats[o+2],
+                    o+3,isprint(o+3)?o+3:'.',raw_stats[o+3]);
+           
+            if (raw_stats[o++] > 0) { ++total; }
+            if (raw_stats[o++] > 0) { ++total; }
+            if (raw_stats[o++] > 0) { ++total; }
+            if (raw_stats[o++] > 0) { ++total; }
+        }
+        printf("Total %d different literals\n",total);
+    }
 
 	// encode original length
 
