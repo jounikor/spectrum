@@ -642,7 +642,7 @@ int encode( uint8_t *b, int s, struct match *m, int n,
             }
 
             if (debug) {
-                printf("%04X (%5d) RAW %02X ('%c')\n",realpos,m[i].idx,m[i].raw,
+                printf("%04X (%5d) RAW %-3d ('%c')\n",realpos,m[i].idx,m[i].raw,
                     isprint(m[i].raw) ? m[i].raw : '.');
                 ++raw_stats[m[i].raw];
             }
@@ -965,7 +965,8 @@ int main( int argc, char **argv ) {
 
     if (debug) {
         int total = 0;
-        
+        int sum = 0;
+
         printf("\n**** Raw literal counts ****\n\n");
         
         for (o = 0; o < 256;) {
@@ -975,12 +976,17 @@ int main( int argc, char **argv ) {
                     o+2,isprint(o+2)?o+2:'.',raw_stats[o+2],
                     o+3,isprint(o+3)?o+3:'.',raw_stats[o+3]);
            
+            sum += raw_stats[o];
             if (raw_stats[o++] > 0) { ++total; }
+            sum += raw_stats[o];
             if (raw_stats[o++] > 0) { ++total; }
+            sum += raw_stats[o];
             if (raw_stats[o++] > 0) { ++total; }
+            sum += raw_stats[o];
             if (raw_stats[o++] > 0) { ++total; }
         }
-        printf("Total %d different literals\n",total);
+        printf("Total %d different literals codes\n",total);
+        printf("Total %d literals sum\n",sum);
     }
 
 	// encode original length
