@@ -6,8 +6,8 @@ import sys
 
 
 
-if (sys.argv.__len__() < 4):
-    print(f"usage. {sys.argv[0]:} matches literals")
+if (sys.argv.__len__() < 2):
+    print(f"usage. {sys.argv[0]:} matches literals literal_runs")
     sys.exit(0)
 
 
@@ -17,14 +17,14 @@ sns.set_theme(style="ticks")
 # matches and offsets
 matches = pd.read_csv(sys.argv[1],header="infer")
 #sns.relplot(data=matches, x="Offset", y="Length")
-g = sns.jointplot(x="Offset", y="Length", data=matches,
-                  kind="reg", truncate=False,
-                  xlim=(0, 18000), ylim=(2, 172),
-                  color="m", height=7)
+#g = sns.jointplot(x="Offset", y="Length", data=matches,
+#                  kind="reg", truncate=False,
+#                  xlim=(0, 18000), ylim=(2, 172),
+#                  color="m", height=7)
 
-#g = sns.JointGrid(data=matches, x="Offset", y="Length")
-#g.plot_joint(sns.histplot)
-#g.plot_marginals(sns.boxplot)
+g = sns.histplot(x="Offset", data=matches,
+                hue="Length",multiple="stack",
+                log_scale=(False,2))
 
 
 # macth length histogram
