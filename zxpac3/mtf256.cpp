@@ -1,9 +1,10 @@
 /**
- * @file mtf.cpp
- * @version 0.1
+ * @file mtf256.cpp
+ * @version 0.2
  * @brief Implements a move to forward class.
  * @author Jouni 'Mr.Spiv' Korhonen
  * @date 29-Mar-2023
+ * @date 23-Jun-2023
  * @copyright The Unlicense
  *
  */
@@ -31,16 +32,31 @@
  *          is greater than 0 it means the escaped code is not moved 
  *          directly into the first slot of the mtf-array allowing slighly
  *          less aggressive insertion of new code points.
+ *          It is also possible to control the number of move-to-fronts steps
+ *          on each update using the @max_mtf parameter. Value 0 moves the
+ *          referenced value always to the first item in the mtf-array.
  *
  * @param[in] size The size of the MTF alphabet. Values between 2 to 256
  *                 are valid.
- * @param[in] encodeable
- * @param[in] insert 
- * @param[in] reserved
+ * @param[in] encodeable The number of values that can uniquely be encoded into
+ *                 the output stream. For example, 128 implies values 0 to 127
+ *                 can only be encoded into the output stream,
+ * @param[in] insert The position in the MTF array where to insert new escaped
+ *                 values. It has to be somewhere between 0 and
+ *                 @p size - @p encodeable - 1.
+ * @param[in] reserved The number of escape codes to insert new values into the
+                   MTF array. The larger @p reserved value the less overhead
+                   escape codes generate in the event there is multiple escapes
+                   in a row. Keep the value low.
+ * @param[in] max_mtf The number of MTF update steps each time a value is 
+ *                 references in the MTF array. 0 means move the referenced
+ *                 value always to the first element in the MTF array. The lower
+ *                 value the faster the update step is but with some efficiency
+ *                 penalty.
  *
- * @return
+ * @return    None.
  */
-mtf256::mtf256(int size, int encodeable, int insert, int reserved)
+mtf256::mtf256(int size, int encodeable, int insert, int reserved, int max_mtf)
     throw(std::invalid_argument,std::range_error,std::bad_alloc)
 {
     if ((size < 2 || insert < 0 || encodeable < 0 || reserved < 1)
@@ -49,17 +65,19 @@ mtf256::mtf256(int size, int encodeable, int insert, int reserved)
         throw std::invalid_argument("Invalid values.");
     }
 
+    m_max_mtf = max_mtf;
     m_size = size;
     m_insert = insert;
     m_escape = encodeable == size ? size : encodeable - reserved;
     m_reserved = reserved;
     m_encodeable = encodeable;
+    m_arr = new uint8_t[m_escape];
     reinit();
 }
 
 void mtf256::reinit(void)
 {
-    for (uint32_t n = 0; n < m_size; n++) {
+    for (uint32_t n = 0; n < m_escape; n++) {
         m_arr[n] = n;
     }
 
@@ -69,6 +87,7 @@ void mtf256::reinit(void)
 
 mtf256::~mtf256()
 {
+    delete[] m_arr;
 }
 
 void mtf256::update(int to_nth, int from_nth, uint8_t value)
@@ -81,23 +100,38 @@ void mtf256::update(int to_nth, int from_nth, uint8_t value)
     m_arr[from_nth] = value;
 }
 
-
-
-
 bool mtf_encode::update_mtf(uint8_t value, uint8_t *found) throw(std::out_of_range)
 {
     int from_nth = find_index(value);
     bool escaped = false;
     int to_nth;
 
-    *found = from_nth;
-
     update_total_bytes();
 
     if (from_nth < m_escape) {
-        to_nth = 0;
+        *found = from_nth;
+
+        if (m_max_mtf > 0) {
+            // Move the referenced value @ref mtf256::m_max_mtf steps
+            // toward to the front of the mtf-array.
+            to_nth = from_nth - m_max_mtf;
+        
+            if (to_nth < 0) {
+                to_nth = 0;
+            }
+        } else {
+            // Move the referenced value to the first element
+            // in the mof-array.
+            to_nth = 0;
+        }
     } else {
+        // In an case there is a need to escape a new value it will
+        // be encoded into the outout stream as the value itself not
+        // as the index into the mtf-array.
+        *found = value;
+
         to_nth = m_insert;
+        from_nth = m_escape - 1;
         escaped = true;
         update_escaped_bytes();
     }
@@ -112,22 +146,33 @@ bool mtf_encode::update_mtf(uint8_t value, uint8_t *found) throw(std::out_of_ran
 
 uint8_t mtf_decode::update_mtf(uint8_t index, bool after_escape) throw(std::out_of_range)
 {
-    uint8_t value = m_arr[index];
+    uint8_t value;
     int to_nth;
 
     update_total_bytes();
 
     if (after_escape) {
+        value = index;
+        index = m_escape - 1;
         to_nth = m_insert;
         update_escaped_bytes();
     } else {
-        to_nth = 0;
+        value = m_arr[index];
+
+        if (m_max_mtf > 0) {
+            to_nth = index - m_max_mtf;
+        
+            if (to_nth < 0) {
+                to_nth = 0;
+            }
+        } else {
+            to_nth = 0;
+        }
     }
     
     update(to_nth,index,value);
     return value;
 }
-
 
 
 /*
@@ -235,7 +280,11 @@ int main(int argc, char** argv)
     ifs.close();
     ofs.close();
 
-    printf("Total: %d, escaped: %d\n",E.get_total_bytes(),E.get_escaped_bytes());
+    if (decode) {
+        printf("Decoded total: %d, escaped: %d\n",D.get_total_bytes(),D.get_escaped_bytes());
+    } else {
+        printf("Encoded total: %d, escaped: %d\n",E.get_total_bytes(),E.get_escaped_bytes());
+    }
 
 
     return 0;
