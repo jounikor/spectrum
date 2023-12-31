@@ -1,0 +1,122 @@
+
+zxpac3 byte aligned encoding v1
+(c) 2023 Jouni 'Mr.Spiv' Korhonen
+
+
+
+Literals:
+
+  7 6 5 4 3 2 1 0
+ +-+-+-+-+-+-+-+-+
+ |0|L|L|L|L|L|L|L|  -> literal encoding using the 'MTF256' encoder
+ +-+-+-+-+-+-+-+-+ 
+
+Match length encoding:
+  
+  if (nnnn == 0) {
+    ML = readNextByte();
+  } else {
+    // 0 < nnnnn < 16
+    ML = nnnnn;
+  }
+  if (ML == 0) {
+    ML = 256;
+  }
+
+Repeast Offset Matches:
+
+  7 6 5 4 3 2 1 0
+ +-+-+-+-+-+-+-+-+
+ |1|0|P|P|n|n|n|n|  -> repeat offset match 'PP'
+ +-+-+-+-+-+-+-+-+ 
+
+    MML = 1;
+    offset = getPMR(PP);
+    updatePMR(PP,offset);
+
+    Note: ML==1 allows copying one "literal" without the
+          overhead of literal mtf256 encoder/decoder.
+
+Long offset with previous context:
+
+  7 6 5 4 3 2 1 0     7 6 5 4 3 2 1 0
+ +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
+ |1|1|0|0|n|n|n|n| + |       LO8     |
+ +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
+
+    MML = 2;    // ML += 1
+    offset = context << 8 | LO8;
+    updatePMR(-1,offset);
+
+Normal Offset match:
+
+  7 6 5 4 3 2 1 0
+ +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
+ |1|1|0|1|n|n|n|n| + |      LO8      |
+ +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
+
+    MML = 2;    // ML += 1
+    offset = LO8;
+    updatePMR(-1,offset);
+ 
+  7 6 5 4 3 2 1 0     7 6 5 4 3 2 1 0     7 6 5 4 3 2 1 0
+ +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
+ |1|1|1|0|n|n|n|n| + |      HI8      | + |      LO8      |
+ +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
+
+    MML = 3;    // ML += 2
+    offset = HI8 << 8 | LO8;
+    context = offset >> 8;
+    updatePMR(-1,offset);
+ 
+  7 6 5 4 3 2 1 0     7 6 5 4 3 2 1 0     7 6 5 4 3 2 1 0     7 6 5 4 3 2 1 0
+ +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
+ |1|1|1|0|n|n|n|n| + |      HI8      | + |      MI8      | + |       LO8     |
+ +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
+
+    MML = 4;    // ML += 3
+    offset = HI8 << 16 | MI8 << 8 | LO8;
+    context = offset >> 8;
+    updatePMR(-1,offset);
+
+Literals with 0-offset match:
+  
+    Any match length encoding with offset i.e. exclude PMRs and previous
+    context offset encodings. Copy ML literal bytes following the match
+    encoding.
+
+
+// some pseudo code functions.. from a decoder point of view
+
+static int32_t context = 0x100;
+static uint8_t pmrContext = 0xe4;       // 11100100b; 
+static int32_t PMR[4] = {4,8,12,16};    // could be zeroes as well
+
+int32_t getPMR(uint8_t pp)
+{
+    return PMR[pp];
+}
+
+
+void updatePMR(int pmr_index, int32_t offset) 
+{
+    if (offset == 0) {
+        return;
+    }
+    if (pmr_index >= 0) {
+        uint8_t slot = (pmrContext >> (pmr_index << 1)) & 3;
+        uint8_t movd  = pmrContext << 2 | pmr_index;
+        uint8_t mask = ~3 << (pmr_index << 1);
+        pmrContext = (pmrContext & mask) | (movd & ~mask);
+    } else {
+        uint8_t last = pmrContext >> 6;
+#if MTF_SECOND_LAST
+        uint8_t secondlast = (pmrContext >> 4) & 3;
+        PMR[last] = PMR[second_last];
+        PMR[lsecond_last] = offset;
+#else
+        PMR[last] = offset;
+#endif
+    }
+}
+
