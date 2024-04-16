@@ -13,18 +13,19 @@
 #include "pmr.h"
 
 
-pmr::pmr(int32_t p0, int32_t p1, int32_t p2, int32_t p3)
+pmr::pmr(pmr_ctx_t p0, pmr_ctx_t p1, pmr_ctx_t p2, pmr_ctx_t p3)
 {
-    reinit(p0,p1,p2,p3);
+    m_p0 = p0; m_p1 = p1; m_p2 = p2; m_p3 = p3;
+    reinit();
 }
 
-void pmr::reinit(int32_t p0=4, int32_t p1=8, int32_t p2=12, int32_t p3=16)
+void pmr::reinit(void)
 {
     m_context = 0xe4;   // 11 10 01 00
-    m_pmr[0] = p0;
-    m_pmr[1] = p1;
-    m_pmr[2] = p2;
-    m_pmr[3] = p3;
+    m_pmr[0] = m_p0;
+    m_pmr[1] = m_p1;
+    m_pmr[2] = m_p2;
+    m_pmr[3] = m_p3;
 }
 
 /*
@@ -34,7 +35,7 @@ void pmr::reinit(int32_t p0=4, int32_t p1=8, int32_t p2=12, int32_t p3=16)
  *
  */
 
-void pmr::update_pmr(int slot, int32_t offset)
+void pmr::update(int slot, pmr_ctx_t offset)
 {
     if (slot > 0) {
         // move to front
@@ -58,54 +59,75 @@ void pmr::update_pmr(int slot, int32_t offset)
     }
 }    
 
-void* pmr::state_save(void *ctx = NULL)
+pmr_ctx_t* pmr::state_save(pmr_ctx_t *ctx)
 {
-    int32_t* p;
+    pmr_ctx_t* p;
     int n;
 
     if (ctx == NULL) {
-        p = new (std::nothrow) int32_t[5];
+        p = m_pmr_saved;
     } else {
-        p = static_cast<int32_t*>(ctx);
+        p = ctx;
     }
 
     for (n = 0; n < 4; n++) {
         p[n] = m_pmr[n];
     }
-    p[n] = static_cast<int32_t>(m_context);
+    p[n] = m_context;
     
     return p;
 }
 
-void pmr::state_load(void *ctx)
+void pmr::state_load(pmr_ctx_t *ctx)
 {
-    int32_t *p = static_cast<int32_t*>(ctx);
+    pmr_ctx_t *p;
     int n;
+
+    if (ctx == NULL) {
+        p = m_pmr_saved;
+    } else {
+        p = ctx;
+    }
 
     for (n = 0; n < 4; n++) {
         m_pmr[n] = p[n];
     }
-    m_context = static_cast<uint8_t>(p[n]);
+    m_context = p[n];
 }
 
-int& pmr::get_pmr(int pp)
+pmr_ctx_t& pmr::get(int pp)
 {
     uint8_t slot = (m_context >> (pp << 1)) & 3;
     return m_pmr[slot];
 }
 
-int& pmr::operator[](int pp)
+pmr_ctx_t& pmr::operator[](int pp)
 {
-    return get_pmr(pp);
+    uint8_t slot = (m_context >> (pp << 1)) & 3;
+    return m_pmr[slot];
 }
 
 void pmr::dump(void) const
 {
-    ::printf("Context 0: %d, 1: %d, 2: %d, 3: %d\n",
+    ::printf("  PMR Context 0->3 = %d:%d:%d:%d\n",
         m_context&3, (m_context>>2)&3, (m_context>>4)&3, (m_context>>6)&3);
-    ::printf("PMR[0]=%6d, PMR[1]=%6d, PMR[2]=%6d, PMR[3]=%6d\n",
+    ::printf("  PMR[0]=%-d PMR[1]=%-d PMR[2]=%-d PMR[3]=%-d\n",
         m_pmr[0],m_pmr[1],m_pmr[2],m_pmr[3]);
 }
+
+
+int pmr::find_pmr_by_offset(pmr_ctx_t offset)
+{
+    for (int pmr_index = 0; pmr_index < PMR_MAX_NUM; pmr_index++) {
+        if (offset == get(pmr_index)) {
+            return pmr_index;
+        }
+    }
+
+    return -1;
+}
+
+
 
 
 #if 0

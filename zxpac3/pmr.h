@@ -13,30 +13,34 @@
 
 
 #define PMR_MTF_SECOND_LAST
+#define PMR_MAX_NUM 4 
+typedef int32_t pmr_ctx_t;
 
 // Used for reserving space if someone wants to save the
 // current context of the PMR object into external storage
 // within the same architecture (i.e. endianess is not taken
 // care of).
-#define PMR_CTX_SIZE 5*sizeof(int32_t)
+#define PMR_CTX_SIZE (PMR_MAX_NUM+1)
 
 class pmr {
-    int32_t m_pmr[4];
-    uint8_t m_context;
+    pmr_ctx_t m_pmr[PMR_MAX_NUM];
+    pmr_ctx_t m_pmr_saved[PMR_CTX_SIZE];
+    pmr_ctx_t m_context;
+    pmr_ctx_t m_p0,m_p1,m_p2,m_p3;
 public:
-    pmr(int32_t p0, int32_t p1, int32_t p2, int32_t p3);
+    pmr(pmr_ctx_t p0, pmr_ctx_t p1, pmr_ctx_t p2, pmr_ctx_t p3);
     ~pmr(void) {}
-    void reinit(int32_t p0, int32_t p1, int32_t p2, int32_t p3);
+    void reinit(void);
 
-    int& operator[](int pp);
-    int& get_pmr(int pp);
-    void update_pmr(int slot, int32_t offset=-1);
+    pmr_ctx_t& operator[](int pp);
+    pmr_ctx_t& get(int pp);
+    void update(int slot, pmr_ctx_t offset=-2);
 
-    void* state_save(void *ctx);
-    void state_load(void *ctx);
+    pmr_ctx_t* state_save(pmr_ctx_t *ctx=NULL);
+    void state_load(pmr_ctx_t *ctx=NULL);
 
     void dump(void) const;
-
+    int find_pmr_by_offset(pmr_ctx_t offset);
 };
 
 #endif // _PMR_H_INCLUDED

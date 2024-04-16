@@ -13,6 +13,12 @@ set (CMAKE_BUILD_TYPE RELEASE)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/build)
 set(CMAKE_INSTALL_PREFIX ${PROJECT_BINARY_DIR})
 
+# Debug mode?
+add_definitions(-DBFFP_DEBUG)
+#add_definitions(-DMTF_CTX_SAVING_ENABLED)
+#add_compile_options(-Wall -Wextra -Wpedantic)
+
+
 #
 if (DEFINED CMAKE_BUILD_TYPE)
 	if (CMAKE_BUILD_TYPE STREQUAL "")
@@ -36,20 +42,20 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 
 # Common files for the adftools
 set(COMMON_SRC  bffp_cost.cpp
+                bffp.cpp
                 mtf256.cpp
                 pmr.cpp
-                bffp.cpp
-                lz_utils.cpp
                 z_alg.cpp
+                hash.cpp
 
+                lz_util.h
                 bffp.h
                 bffp_cost.h
-                bffp_encoding.h
                 lz_base.h
-                lz_utils.h
                 z_alg.h
                 mtf256.h
                 pmr.h
+                hash.h
 )
 
 add_executable(${TARGET} ${COMMON_SRC})

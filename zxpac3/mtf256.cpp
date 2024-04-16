@@ -1,6 +1,6 @@
 /**
  * @file mtf256.cpp
- * @version 0.2
+ * @version 0.3
  * @brief Implements a move to forward class.
  * @author Jouni 'Mr.Spiv' Korhonen
  * @date 29-Mar-2023
@@ -57,7 +57,6 @@
  * @return    None.
  */
 mtf256::mtf256(int size, int encodeable, int insert, int reserved, int max_mtf)
-    throw(std::invalid_argument,std::range_error,std::bad_alloc)
 {
     if ((size < 2 || insert < 0 || encodeable < 0 || reserved < 1)
         || (size > 256) || (encodeable > size)
@@ -75,12 +74,17 @@ mtf256::mtf256(int size, int encodeable, int insert, int reserved, int max_mtf)
     reinit();
 }
 
-void mtf256::reinit(void)
+void mtf256::reinit(uint8_t *tab)
 {
-    for (uint32_t n = 0; n < m_escape; n++) {
-        m_arr[n] = n;
+    if (tab) {
+        for (uint32_t n = 0; n < m_escape; n++) {
+             m_arr[n] = tab[n];
+        }
+    } else {
+        for (uint32_t n = 0; n < m_escape; n++) {
+            m_arr[n] = n;
+        }
     }
-
     m_total_bytes = 0;
     m_escaped_bytes = 0;
 }
@@ -100,7 +104,18 @@ void mtf256::update(int to_nth, int from_nth, uint8_t value)
     m_arr[from_nth] = value;
 }
 
-bool mtf_encode::update_mtf(uint8_t value, uint8_t *found) throw(std::out_of_range)
+bool mtf256::would_escape(uint8_t value)
+{
+    int from_nth = find_index(value);
+
+    if (from_nth < m_escape) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+bool mtf_encode::update_mtf(uint8_t value, uint8_t *found)
 {
     int from_nth = find_index(value);
     bool escaped = false;
@@ -144,7 +159,7 @@ bool mtf_encode::update_mtf(uint8_t value, uint8_t *found) throw(std::out_of_ran
 
 
 
-uint8_t mtf_decode::update_mtf(uint8_t index, bool after_escape) throw(std::out_of_range)
+uint8_t mtf_decode::update_mtf(uint8_t index, bool after_escape)
 {
     uint8_t value;
     int to_nth;
@@ -175,6 +190,13 @@ uint8_t mtf_decode::update_mtf(uint8_t index, bool after_escape) throw(std::out_
 }
 
 
+void mtf256::state_load(void *ctx, int len)
+{
+}
+
+
+
+
 /*
  *
  *
@@ -182,6 +204,8 @@ uint8_t mtf_decode::update_mtf(uint8_t index, bool after_escape) throw(std::out_
 
 #define MAX_LIT 5
 
+
+#if 0
 
 
 int main(int argc, char** argv)
@@ -289,10 +313,4 @@ int main(int argc, char** argv)
 
     return 0;
 }
-
-
-
-
-
-
-
+#endif

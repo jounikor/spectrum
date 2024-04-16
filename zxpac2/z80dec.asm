@@ -67,7 +67,7 @@
 ; [data] + [optional 2 octets inplace length] + [2 octets original length] + [8 OM octets]
 ;
 
-INPLACE     equ 1       ; MUST be 1 if the file was crunched with --inplace
+INPLACE     equ 0       ; MUST be 1 if the file was crunched with --inplace
 
 		org		$8000
 

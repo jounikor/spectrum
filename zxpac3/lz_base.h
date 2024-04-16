@@ -13,14 +13,25 @@
 #ifndef _LZ_BASE_H_INCLUDED
 #define _LZ_BASE_H_INCLUDED
 
-#include "lz_utils.h"
+#include "lz_util.h"
 
-typedef struct cost_ {
+/**
+ * @brief A structure to hold match-length pairs for a LZ string matching engine.
+ * @struct match z_alg.h
+ */
+
+
+#define LZ_MAX_COST 0xffffffff
+
+struct cost_base {
+    int next;
     int tag;
-    int len;
-    int cost;
-} cost_t;
-
+    int offset;
+    char literal;
+    char escape;
+    uint16_t length;
+    uint32_t arrival_cost;
+};
 
 
 template <typename Derived> class lz_cost {
@@ -31,22 +42,24 @@ template <typename Derived> class lz_cost {
 public:
     lz_cost() {}
     virtual ~lz_cost() {}
-    int cost(int off, int len, cost_t& estimated_cost)
-    {
-        return impl().cost(off,len,estimated_cost);
+
+    int literal_cost(int pos, cost_base* c, const char* buf, int weight) {
+        return impl().impl_literal_cost(pos,c,buf,weight);
     }
-    void* state_save(void *ctx)
-    {
-        return impl().state_save(ctx);
+    int match_cost(int pos, match* m, int len, cost_base* c, uint8_t* buf) {
+        return impl().impl_matchl_cost(pos,m,len,c,buf);
     }
-    void *get_state(void) {
-        return impl().get_state();
+    int init_cost(cost_base* c, int sta, int len, bool initial) {
+        return impl().impl_init_cost(c,sta,len,initial);
     }
-    void state_load(void *ctx)
-    {
-        impl().state_load(ctx);
+    cost_base* alloc_cost(int len, int max_chain) {
+        return impl().impl_alloc_cost(len,max_chain);
+    }
+    int free_cost(cost_base* cost) {
+        return impl().impl_free_cost(cost);
     }
 };
+
 
 /**
  * @brief A CRTP base template class for a generic LZ string searching engine.
@@ -61,51 +74,28 @@ private:
         return *static_cast<Derived*>(this);
     }
 public:
-    lz_base() { }
+    lz_base(void) { }
     virtual ~lz_base(void) { }
 
     // The interface definition for the base LZ class..
-    void lz_match_init(const char* buf, int len)
-    {   
-        impl().lz_match_init(buf,len);
-    }
-    const matches& lz_forward_match(void)
+    int lz_search_macthes(const char* buf, int len, int interval)
     {
-        return impl().lz_forward_match();
+        return impl().lz_search_matches(buf,len,interval);
     }
-    const matches* lz_get_matches(void)
+    int lz_parse(const char* buf, int len, int interval)
     {
-        return impl().lz_get_matches();
+        return impl().lz_parse(buf,len,interval);
     }
-    void lz_reset_forward(void)
-    {
-        impl().lz_reset_forward();
+    const cost_base* lz_get_result(void) {
+        return impl().lz_get_result();
     }
-    int lz_move_forward(int steps)
-    {
-        return impl().lz_move_forward(steps);
+    cost_base* lz_cost_array_get(int len) {
+        return impl().lz_cost_array_get(len);
+    }
+    void lz_cost_array_done(void) {
+        return impl().lz_cost_array_done();
     }
 };
-
-/**
- * @brief A LZ parser base class and API
- *
- *
- *
- */
-template <typename Derived> class lz_parse {
-    Derived& impl(void) {
-        return *static_cast<Derived*>(this);
-    }
-public:
-    lz_parse(void) {}
-    virtual ~lz_parse(void) {}
-
-    // The interface definition
-
-
-};
-
 
 
 #endif  // _LZ_BASE_H_INCLUDED

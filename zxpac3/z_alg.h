@@ -13,8 +13,7 @@
 #ifndef _Z_ALG_H_INCLUDED
 #define _Z_ALG_H_INCLUDED
 
-#include "lz_utils.h"
-
+#include "lz_util.h"
 
 /**
  * @brief A class to create a Z-array for a LZ string matching engine.
@@ -29,20 +28,18 @@ class z_array {
     int m_len;          ///< Length of the Z-array
     int m_max;          ///< Maximum prefix length for matches
     int m_min;          ///< Minimum prefix length for matches
-    int m_num;          ///< Number of recorded matches
     int m_size;         ///< Size of the m_m array.
     match *m_m;         ///< Pointer to collected matches.. may be NULL
 public:
     virtual ~z_array();
     z_array(int window_len, int min_match, int max_match);
 
-    int find_matches(const char *, int, bool);
+    int find_matches(const char *buf, int pos, int len , bool);
     void init_get_matches(int, match *);
-    int get_num_found_matches(void) const;
     int get_window(void) const;
 
     // These could be protected
-    int& operator[](int);
+    int32_t& operator[](int);
     const int32_t& operator[](int) const;
     z_array& operator=(const z_array &) = delete;
 

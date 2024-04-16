@@ -1,7 +1,7 @@
 /**
  * @file z_alg.cpp
  * @brief A Z-array algorithm implemntation for LZ string matching.
- * @version 0.1
+ * @version 0.2
  * @author Jouni 'Mr.Spiv' Korhonen
  * @copyright The Unlicense
  * @date 11-Apr-2022
@@ -20,7 +20,6 @@
 #include <cstdlib>
 
 #include "z_alg.h"
-#include "lz_utils.h"
 
 /**
  * @brief Return the start of the Z-array for iterators use.
@@ -112,7 +111,6 @@ z_array::z_array(int len, int min, int max)
     m_len = len;
     m_max = max;
     m_min = min;
-    m_num = 0;
 }
 
 z_array::~z_array(void) 
@@ -135,23 +133,8 @@ z_array::~z_array(void)
 
 void z_array::init_get_matches(int max_matches, match *matches = NULL)
 {
-    //m_z[0] = 0;
-    m_num = 0;
     m_m = matches;
     m_size = max_matches;
-}
-
-/**
- * @brief The number of recorded matches in the match vector.
- * @param None.
- * @return The number of recorded matches.
- *
- * If the ptr to std::vector<match> passed to \ref z_array::init() was NULL
- * then matches are not recoreded and the function returns 0.
- */
-int z_array::get_num_found_matches(void) const
-{
-    return m_num;
 }
 
 int z_array::get_window(void) const
@@ -179,18 +162,17 @@ int z_array::get_window(void) const
  * @param[in] buf A ptr to the buffer to look for matches.
  * @param[in] len Length of the input buffer.
  *
- * @return 0 if no match was found, otherwise, index to the
- *         longest found match.
+ * @return 0 if no match was found, otherwise, number of found matches.
  *
  * @note This Z-array implementation is more or less a textbook example
  *       of a possible implementation.
  */
-int z_array::find_matches(const char *buf, int len, bool only_better_matches=false)
+int z_array::find_matches(const char *buf, int pos, int len, bool only_better_matches=false)
 {
     int max = m_min-1;
-    int idx = -1;
     int p, t, i, L=0, R=0;
     int mm = m_min-1;
+    int num = 0;
 
     /* If the length of the buffer is greater that the Z-array
      * shorten the search to Z-array length.
@@ -198,6 +180,8 @@ int z_array::find_matches(const char *buf, int len, bool only_better_matches=fal
     if (len > m_len) {
         len = m_len;
     }
+    
+    m_z[0] = 0;
 
     for (i = 1; i < len; i++) {
         p = 0;          // == R-L
@@ -205,7 +189,7 @@ int z_array::find_matches(const char *buf, int len, bool only_better_matches=fal
         if (i > R) {
             L = R = i;
             
-            while (R < len && p < m_max && buf[p] == buf[R]) {
+            while (R < len && p < m_max && buf[pos+p] == buf[pos+R]) {
                 ++R;
                 ++p;
             }
@@ -220,7 +204,7 @@ int z_array::find_matches(const char *buf, int len, bool only_better_matches=fal
             } else {
                 L = i;
                 
-                while (R < len && p < m_max && buf[p] == buf[R]) {
+                while (R < len && p < m_max && buf[pos+p] == buf[pos+R]) {
                     ++R;
                     ++p;
                 }
@@ -233,81 +217,24 @@ int z_array::find_matches(const char *buf, int len, bool only_better_matches=fal
         if (p > mm) {
             if (p > max) {
                 max = p;
-                idx = m_num;
 
                 if (only_better_matches) {
                     mm = max;
                 }
             }
-            if (m_m && m_num < m_size) {
-                m_m[m_num].pos = i;
-                m_m[m_num++].len = p;
+            if (m_m && num < m_size) {
+                m_m[num].offset = i;
+                m_m[num++].length = p;
 
                 // If number of recorded matches has been reached stop searching.
-                if (m_num == m_size) {
+                if (num == m_size) {
                     break;
                 }
             }
         }
     }
 
-    return idx;
+    return num;
 }
 
-/* testing stuff */
-
-#if 0
-#include "bffp.h"       // just for testing
-
-
-int main(int argc, char **argv)
-{
-    const char *buf = argv[1];
-    int len = ::strlen(buf);
-    int j, n,i;
-    int mmm = 3;
-
-    printf("min_match_length: %d\n",bffp::min_match_length_s);
-    printf("num_window_sizes: %d\n",bffp::num_window_sizes_s);
-    for (n = 0; n < bffp::num_window_sizes_s; n++) {
-        printf("> %d\n",bffp::window_sizes_s[n]);
-    }
-
-
-    matches all_matches(len,mmm);
-    match_head mh;
-    match *m;
-
-    z_array *lz = new z_array(50,2,6);
-
-    for (j = 0; j < len; j++) {
-        mh = all_matches[j];
-        m = mh.matches;
-
-        lz->init_get_matches(all_matches.get_max_matches(),m);
-        i = lz->find_matches(buf+j,len-j,true);
-
-        printf("%2d: '%c' ",j,buf[j]);
-
-        if (i > 0) {
-            printf("%2d num %2d\n",i,lz->get_num_matches());
-            for(int k = 0; k < lz->get_num_matches(); k++) {
-                printf("\tpos %d, len %d\n",m[k].pos,m[k].len);
-            }
-            mh.max_match_index = i;
-            mh.num_matches = lz->get_num_matches();
-        } else {
-            // Not matches.. offset = 0, length = 1 i.e. the current octet.
-            m[0].pos = 0;
-            m[0].len = 1;
-            mh.num_matches = 0;
-            printf("%2d %2d\n",i,0);
-        }
-    }
-
-    delete lz;
-    return 0;
-}
-
-#endif
 

@@ -1,5 +1,5 @@
 
-zxpac3 byte aligned encoding v1
+zxpac3 byte aligned encoding v2
 (c) 2023 Jouni 'Mr.Spiv' Korhonen
 
 
@@ -10,6 +10,25 @@ Literals:
  +-+-+-+-+-+-+-+-+
  |0|L|L|L|L|L|L|L|  -> literal encoding using the 'MTF256' encoder
  +-+-+-+-+-+-+-+-+ 
+
+  MTF decoding algorithm:
+    value = input();
+
+    if (value >= escape) {
+      queue_size = get_num_escaped(value);
+      value  = input();
+      got_escaped = true;
+    } else {
+      got_escaped = false;
+      queue_size = 0;
+    }
+
+    do {
+      result = update_mtf(value,got_escaped);
+      output(result);
+      value = input();
+    } while (queue_size-- > 0);
+
 
 Match length encoding:
   
@@ -22,6 +41,16 @@ Match length encoding:
   if (ML == 0) {
     ML = 256;
   }
+
+First control octet has invalid values that never occur:
+  7 6 5 4 3 2 1 0
+ +-+-+-+-+-+-+-+-+
+ |1|M|P|P|n|n|n|n| 
+ +-+-+-+-+-+-+-+-+ 
+  1 1 x x 0 0 0 1 i.e. 0xc1, 0xd1, 0xe1, 0xf1 are invalid
+                       as there is no MML1 for matches.  
+
+
 
 Repeast Offset Matches:
 
@@ -46,7 +75,7 @@ Long offset with previous context:
 
     MML = 2;    // ML += 1
     offset = context << 8 | LO8;
-    updatePMR(-1,offset);
+    updatePMR(-1,offset); <<<<< Is this needed??
 
 Normal Offset match:
 
@@ -56,6 +85,7 @@ Normal Offset match:
  +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
 
     MML = 2;    // ML += 1
+    LO8 is never 0x00;
     offset = LO8;
     updatePMR(-1,offset);
  
@@ -65,25 +95,25 @@ Normal Offset match:
  +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
 
     MML = 3;    // ML += 2
+    HI8 is never 0x00
     offset = HI8 << 8 | LO8;
     context = offset >> 8;
     updatePMR(-1,offset);
  
   7 6 5 4 3 2 1 0     7 6 5 4 3 2 1 0     7 6 5 4 3 2 1 0     7 6 5 4 3 2 1 0
  +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
- |1|1|1|0|n|n|n|n| + |      HI8      | + |      MI8      | + |       LO8     |
+ |1|1|1|1|n|n|n|n| + |      HI8      | + |      MI8      | + |       LO8     |
  +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+   +-+-+-+-+-+-+-+-+
 
     MML = 4;    // ML += 3
+    HI8 is never 0x00
     offset = HI8 << 16 | MI8 << 8 | LO8;
     context = offset >> 8;
     updatePMR(-1,offset);
 
 Literals with 0-offset match:
   
-    Any match length encoding with offset i.e. exclude PMRs and previous
-    context offset encodings. Copy ML literal bytes following the match
-    encoding.
+    Reserved for the time being. 
 
 
 // some pseudo code functions.. from a decoder point of view
@@ -97,6 +127,10 @@ int32_t getPMR(uint8_t pp)
     return PMR[pp];
 }
 
+int32_t getPMR_from_tag(uint8_t tag)
+{
+    return PMR[(tag >> 4) & 0x03];
+}
 
 void updatePMR(int pmr_index, int32_t offset) 
 {
@@ -106,7 +140,7 @@ void updatePMR(int pmr_index, int32_t offset)
     if (pmr_index >= 0) {
         uint8_t slot = (pmrContext >> (pmr_index << 1)) & 3;
         uint8_t movd  = pmrContext << 2 | pmr_index;
-        uint8_t mask = ~3 << (pmr_index << 1);
+        uint8_t mask = ~3 << (pmr_index << 1);      // FIX bugged here
         pmrContext = (pmrContext & mask) | (movd & ~mask);
     } else {
         uint8_t last = pmrContext >> 6;
