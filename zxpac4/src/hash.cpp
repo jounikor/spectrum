@@ -92,10 +92,12 @@ int hash3::find_matches(const char *buf, int pos, int len, bool only_better_matc
     int next   = m_head[head];
     const char* m;
     const char* n;
-    (void)len;
 
     if (low < 0) {
         low = 0;
+    }
+    if (len > m_max_match) {
+        len = m_max_match;
     }
 
     while (next >= low && found < m_max_chain) {
@@ -109,12 +111,7 @@ int hash3::find_matches(const char *buf, int pos, int len, bool only_better_matc
             }
         }
 
-        while (*m++ == *n++) {
-            ++length;
-            if (length >= m_good_match || length == m_max_match) {
-                break;
-            }
-        }
+        while (*m++ == *n++ && length++ < len);
         
         if (length >= m_min_match) {
             if (only_better_matches) {
@@ -128,7 +125,7 @@ int hash3::find_matches(const char *buf, int pos, int len, bool only_better_matc
             m_mtch[found].offset = pos-next;
             ++found;
 
-            if (length == m_max_match) {
+            if (length >= m_good_match || length == m_max_match) {
                 break;
             }
         }
