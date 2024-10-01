@@ -16,32 +16,32 @@ sns.set_theme(style="ticks")
 
 # matches and offsets
 matches = pd.read_csv(sys.argv[1],header="infer")
-#sns.relplot(data=matches, x="Offset", y="Length")
+sns.relplot(data=matches, x="Offset", y="Length")
 #g = sns.jointplot(x="Offset", y="Length", data=matches,
 #                  kind="reg", truncate=False,
 #                  xlim=(0, 18000), ylim=(2, 172),
 #                  color="m", height=7)
 
-g = sns.histplot(x="Offset", data=matches,
-                hue="Length",multiple="stack",
-                log_scale=(False,2))
+#g = sns.histplot(x="Offset", data=matches,
+#                hue="Length",multiple="stack",
+#                log_scale=(False,2))
 
 
 # macth length histogram
 
 arr = np.array(range(2,200,8))
 sns.displot(matches,x="Length",bins=arr,log_scale=(False,2))
-plt.xticks(arr)
+#plt.xticks(arr)
 
 #
 literals = pd.read_csv(sys.argv[2],header="infer")
 arr = np.array(range(0,256))
-sns.displot(literals,x="Literals",bins=arr,log_scale=(False,2))
+#sns.displot(literals,x="Literals",bins=arr,log_scale=(False,2))
 #plt.xticks(arr)
 
 literal_runs = pd.read_csv(sys.argv[3],header="infer")
 arr = np.array(range(0,100))
-sns.displot(literal_runs,x="Literal_runs",bins=arr,log_scale=(False,2))
+#sns.displot(literal_runs,x="Literal_runs",bins=arr,log_scale=(False,2))
 #plt.xticks(arr)
 
 
