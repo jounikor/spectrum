@@ -23,7 +23,7 @@
 #include <getopt.h>
 
 #include "zxpac4.h"
-#include "cost.h"
+#include "zxpac4b.h"
 #include "lz_util.h"
 #include "lz_base.h"
 
@@ -31,15 +31,16 @@
 //
 //
 
-#define DEF_MAX_CHAIN       16
-#define DEF_TARGET          "zx"
 #define DEF_ALGO            "zxpac4"
 #define DEF_OUTPUT_NAME     "zx.pac"
-#define DEF_BACKWARD_STEPS  0
-#define MAX_BACKWARD_STEPS  16
 #define MAX_CHAIN	        9999
+#define DEF_CHAIN           16
+#define MAX_BACKWARD_STEPS  16
+#define DEF_BACKWARD_STEPS  0
 
-#define DEF_GOOD_MATCH      32
+#define ZXPAC4              0
+#define ZXPAC4B             1
+
 
 // Did not want to "reinvent" a command line parser thus
 // we use the old trusty getopt..
@@ -55,7 +56,7 @@ static struct option longopts[] = {
 	{"reverse",     no_argument,        NULL, 'r'},
 	{"verbose",     no_argument,        NULL, 'v'},
 	{"debug",       no_argument,        NULL, 'd'},
-    {"target",      required_argument,  NULL, 't'},
+    {"algo",        required_argument,  NULL, 'a'},
     {"abs",         required_argument,  NULL, 'A'},
     {"exe",         no_argument,        NULL, 'X'},
     {"help",        no_argument,        NULL, 'h'},
@@ -63,24 +64,26 @@ static struct option longopts[] = {
 };
 
 void usage( char *prg ) {
-    std::cerr << "Usage: " << prg << " [options] infile [outfile]\n";
-	std::cerr << " Options:\n";
-    std::cerr << "  --max-chain,-c num    Maximum number of stored matches per position (default "
-              << DEF_MAX_CHAIN << ", min 1, max " << MAX_CHAIN << ").\n";
-    std::cerr << "  --good-match,-g num   match length that cuts further searches (default "
-              << DEF_GOOD_MATCH << ", min " << MATCH_MIN <<", max " << MATCH_MAX << ").\n";
-    std::cerr << "  --backward,-B num     Number of backward steps after a found match (default "
-              << DEF_BACKWARD_STEPS << ", min 0, max " << MAX_BACKWARD_STEPS << ").\n";
+    std::cerr << "Usage: " << prg << " target [options] infile [outfile]\n";
+	std::cerr << " Targets:\n";
+    std::cerr << "  bin - Binary data file\n"
+              << "  asc - 7bit ASCII data file\n"
+              << "  zx  - ZX Spectrum self executing TAP\n"
+              << "  bbc - BBC Micro self executing program\n"
+              << "  ami - Amiga self executing program\n";
+    std::cerr << " Options:\n";
+    std::cerr << "  --max-chain,-c num    Maximum number of stored matches per position "
+              << "(min 1, max " << MAX_CHAIN << ").\n";
+    std::cerr << "  --good-match,-g num   match length that cuts further searches.\n";
+    std::cerr << "  --backward,-B num     Number of backward steps after a found match "
+              << "(min 0, max " << MAX_BACKWARD_STEPS << ").\n";
     std::cerr << "  --only-better,-b      Further matches in the history must always be better than "
               << "previous matches for\n"
               << "                        the same position (default no).\n";
-    std::cerr << "  --pmr-offset,-p       Initial PMR offset between 1 and 127 (default " << INIT_PMR_OFFSET << ").\n";
+    std::cerr << "  --pmr-offset,-p       Initial PMR offset between 1 and 127 (default depends on the target).\n";
     std::cerr << "  --reverse,-r          Reverse the input file to allow end-to-start decompression "
               << "(default no reverse)\n";
-    std::cerr << "  --ascii,-a            The input file must be 7bit ASCII (default 8bit binary)\n";
-    std::cerr << "  --target,-t target    Select the target architecture. Supported are ZX Spectrum ('zx'),\n"
-                 "                        Amiga ('ami'), BBC C ('bbc') and PC Engine ('pc') (default "
-              << DEF_TARGET << "').\n";
+    std::cerr << "  --algo,-a             Select used algorithm (0=zxpac4, 1=xzpac4b) (default is " << ZXPAC4 << ").\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --exe,-X              Self-extracting decruncher (Amiga target).\n";
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr. With --verbose the\n"
@@ -91,114 +94,82 @@ void usage( char *prg ) {
     exit(EXIT_FAILURE); 
 }
 
-static bool s_debug_on = false;
-static bool s_verbose_on = false;
-static std::string s_infile_name;
-static std::string s_outfile_name(DEF_OUTPUT_NAME);
-static std::string s_target(DEF_TARGET);
-// default configs.. per target default can be added.
 
-typedef int (*func_t)(std::ofstream& ofs, ...);
+struct target;
+typedef int (*func_t)(std::ofstream& ofs, target& trg, ...);
 
-#if 1
-struct targets_ {
+struct target {
     const char* target_name;
-    lz_config defaults;
+    bool is_ascii;
     int max_file_size;
     func_t init_add_header;
     func_t post_header_fix;
     func_t post_trailer_fix;
-} targets[] = {
+} const targets[] = {
+    {   "asc",
+        true,
+        1<<24,
+        NULL,
+        NULL,
+        NULL
+    },
+    {   "bin",
+        false,
+        1<<24,
+        NULL,
+        NULL,
+        NULL
+    },
     {   "zx",
-        {   WINDOW_MAX,  DEF_MAX_CHAIN, MATCH_MIN, MATCH_MAX, MATCH_GOOD,
-            DEF_BACKWARD_STEPS, OFFSET_MATCH2_THRESHOLD, OFFSET_MATCH3_THRESHOLD,
-            INIT_PMR_OFFSET,
-            false,      // only_better_matches
-            false,      // is_ascii
-            false       // reversed_file
-        },
+        false,
         1<<16,
         NULL,
         NULL,
         NULL
     },
     {   "bbc",
-        {   WINDOW_MAX,  DEF_MAX_CHAIN, MATCH_MIN, MATCH_MAX, MATCH_GOOD,
-            DEF_BACKWARD_STEPS, OFFSET_MATCH2_THRESHOLD, OFFSET_MATCH3_THRESHOLD,
-            INIT_PMR_OFFSET,
-            false,      // only_better_matches
-            false,      // is_ascii
-            false       // reversed_file
-        },
-        1<<16,
-        NULL,
-        NULL,
-        NULL
-    },
-    {   "pce",
-        {   WINDOW_MAX,  DEF_MAX_CHAIN, MATCH_MIN, MATCH_MAX, MATCH_GOOD,
-            DEF_BACKWARD_STEPS, OFFSET_MATCH2_THRESHOLD, OFFSET_MATCH3_THRESHOLD,
-            INIT_PMR_OFFSET,
-            false,      // only_better_matches
-            false,      // is_ascii
-            false       // reversed_file
-        },
+        false,
         1<<16,
         NULL,
         NULL,
         NULL
     },
     {   "ami",
-        {   WINDOW_MAX,  DEF_MAX_CHAIN, MATCH_MIN, MATCH_MAX, MATCH_GOOD,
-            DEF_BACKWARD_STEPS, OFFSET_MATCH2_THRESHOLD, OFFSET_MATCH3_THRESHOLD,
-            INIT_PMR_OFFSET,
-            false,      // only_better_matches
-            false,      // is_ascii
-            false       // reversed_file
-        },
+        false,
         1<<24,
-        NULL,
-        NULL,
-        NULL
-    },
-    {   NULL,
-        {   0,0,0,0,0,0,0,0,0,
-            false, false, false
-        },
-        0,
         NULL,
         NULL,
         NULL
     }   
 };
-#endif
 
 
-const lz_config lz_defaults[] = {
-    {   WINDOW_MAX,  
-        DEF_MAX_CHAIN,
-        MATCH_MIN,
-        MATCH_MAX,
-        MATCH_GOOD,
-        DEF_BACKWARD_STEPS,
-        OFFSET_MATCH2_THRESHOLD,
-        OFFSET_MATCH3_THRESHOLD,
-        INIT_PMR_OFFSET,
+lz_config algos[] {
+    {   ZXPAC4_WINDOW_MAX,  DEF_CHAIN, ZXPAC4_MATCH_MIN, ZXPAC4_MATCH_MAX, ZXPAC4_MATCH_GOOD,
+        DEF_BACKWARD_STEPS, ZXPAC4_OFFSET_MATCH2_THRESHOLD, ZXPAC4_OFFSET_MATCH3_THRESHOLD,
+        ZXPAC4_INIT_PMR_OFFSET,
         false,      // only_better_matches
         false,      // is_ascii
         false       // reversed_file
     },
+    {   ZXPAC4B_WINDOW_MAX,  DEF_CHAIN, ZXPAC4B_MATCH_MIN, ZXPAC4B_MATCH_MAX, ZXPAC4B_MATCH_GOOD,
+        DEF_BACKWARD_STEPS, ZXPAC4B_OFFSET_MATCH2_THRESHOLD, ZXPAC4B_OFFSET_MATCH3_THRESHOLD,
+        ZXPAC4B_INIT_PMR_OFFSET,
+        false,      // only_better_matches
+        false,      // is_ascii
+        false       // reversed_file
+    }
 };
 
-#define LZ_CONFIG_SIZE (sizeof(lz_defaults)/sizeof(lz_config);
+#define LZ_TARGET_SIZE static_cast<int>((sizeof(targets)/sizeof(target)))
+#define LZ_ALGO_SIZE static_cast<int>((sizeof(algos)/sizeof(lz_config)))
 
 /**
  * @brief Driver function for a generic LZ compression..
  *
  *
  */
-template<typename L>
-int handle_file(lz_base<L>* lz, std::ifstream& ifs, std::ofstream& ofs, int len)
+int handle_file(lz_base* lz, std::ifstream& ifs, std::ofstream& ofs, int len)
 {
     (void)ofs;
 
@@ -259,70 +230,86 @@ int main(int argc, char** argv)
     std::ifstream ifs;
     std::ofstream ofs;
 
+    bool cfg_debug_on = false;
+    bool cfg_verbose_on = false;
+    std::string cfg_infile_name;
+    std::string cfg_outfile_name(DEF_OUTPUT_NAME);
+    int cfg_algo = ZXPAC4;
+    int cfg_good_match = -1;
+    int cfg_backward_steps = -1;
+    int cfg_initial_pmr_offset = -1;
+    int cfg_max_chain = -1;
+    bool cfg_only_better_matches = false;
+    bool cfg_reversed_file = false;
+    lz_base* lz = NULL;
 
-    // Supported algorithms..
-    zxpac4* lz = NULL;
+    target trg;
 
-    // Config - this should be tabled later on for defaults..
-    lz_config cfg;
+    // Check target..
 
-    cfg = lz_defaults[0];
+    for (n = 0; n < LZ_TARGET_SIZE; n++) {
+        if (!strcmp(argv[1],targets[n].target_name)) {
+            trg = targets[n];
+            break;
+        }
+    }
 
+    if (n == LZ_TARGET_SIZE) {
+        usage(argv[0]);
+    }
 
+    optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hvdat:X:Arb", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hvda:X:Arb:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'h':
                 usage(argv[0]);
                 break;
 			case 'd':   // --debug
-                s_debug_on = true;
-                std::cerr << "debug" << std::endl;
+                cfg_debug_on = true;
 				break;
 			case 'v':   // --verbose
-                s_verbose_on = true;
+                cfg_verbose_on = true;
 				break;
-            case 't':   // --target
-                if (std::strcmp(optarg,DEF_TARGET)) {
-                    std::cerr << "**Error: Only supported target is '" << DEF_TARGET << "'\n";
+            case 'a':   // --algo
+                cfg_algo = std::strtoul(optarg,&endptr,10);
+                if (*endptr != '\0' || cfg_algo < 0 || cfg_algo > LZ_ALGO_SIZE) {
+                    std::cerr << "**Error: Invalid parameter value '" << optarg << "'\n";
                     usage(argv[0]);
                 }
                 break;
             case 'r':   // --reverse
-                cfg.reversed_file = true;
-                break;
-            case 'a':   // --ascii
-                cfg.is_ascii = true;
+                cfg_reversed_file = true;
                 break;
             case 'b':   // --only-better
-                cfg.only_better_matches = true;
+                cfg_only_better_matches = true;
                 break;
             case 'p':   // --pmr-offset
-                cfg.initial_pmr_offset = std::strtoul(optarg,&endptr,10);
-                if (*endptr != '\0' || cfg.initial_pmr_offset > 127 || cfg.initial_pmr_offset < 1) {
-                    std::cerr << "**Error: Invalid parameter value '" << optarg << "\n";
+                cfg_initial_pmr_offset = std::strtoul(optarg,&endptr,10);
+                if (*endptr != '\0' || cfg_initial_pmr_offset > 127 || cfg_initial_pmr_offset < 1) {
+                    std::cerr << "**Error: Invalid parameter value '" << optarg << "'\n";
                     usage(argv[0]);
                 }
                 break;
             case 'c':   // --max-chain
-                cfg.max_chain = std::strtoul(optarg,&endptr,10);
-                if (*endptr != '\0' || cfg.max_chain > MAX_CHAIN || cfg.max_chain < 1) {
-                    std::cerr << "**Error: Invalid parameter value '" << optarg << "\n";
+                cfg_max_chain = std::strtoul(optarg,&endptr,10);
+                if (*endptr != '\0' || cfg_max_chain > MAX_CHAIN || cfg_max_chain < 1) {
+                    std::cerr << "**Error: Invalid parameter value '" << optarg << "'\n";
                     usage(argv[0]);
                 }
                 break;
             case 'g':   // --good-match
-                cfg.good_match = std::strtoul(optarg,&endptr,10);
-                if (*endptr != '\0' || cfg.good_match > MATCH_MAX || cfg.good_match < MATCH_MIN) {
-                    std::cerr << "**Error: Invalid parameter value '" << optarg << "\n";
+                cfg_good_match = std::strtoul(optarg,&endptr,10);
+                if (*endptr != '\0') {
+                    std::cerr << "**Error: Invalid parameter value '" << optarg << "'\n";
                     usage(argv[0]);
                 }
                 break;
             case 'B':   // --backsteps
-                cfg.backward_steps = std::strtoul(optarg,&endptr,10);
-                if (*endptr != '\0' || cfg.backward_steps > MAX_BACKWARD_STEPS || cfg.backward_steps < 0) {
-                    std::cerr << "**Error: Invalid parameter value '" << optarg << "\n";
+                cfg_backward_steps = std::strtoul(optarg,&endptr,10);
+                if (*endptr != '\0' || cfg_backward_steps > MAX_BACKWARD_STEPS || cfg_backward_steps < 0) {
+                    std::cerr << "**Error: Invalid parameter value '" << optarg << "'\n";
                     usage(argv[0]);
                 }
                 break;
@@ -361,19 +348,42 @@ int main(int argc, char** argv)
 		exit(EXIT_FAILURE);
 	}
 
+    // handle lz_config
+    lz_config cfg = algos[cfg_algo];
+    
+    if (cfg_good_match > -1) {
+        if (cfg_good_match > cfg.max_match) {
+            std::cerr << "**Error: Invalid parameter value '" << cfg_good_match  << "'\n";
+            usage(argv[0]);
+        }
+        cfg.good_match = cfg_good_match;
+    }
+    if (cfg_backward_steps > -1) {
+        cfg.backward_steps = cfg_backward_steps;
+    }
+    if (cfg_initial_pmr_offset > -1) {
+        cfg.initial_pmr_offset = cfg_initial_pmr_offset;
+    }
+    if (cfg_max_chain > -1) {
+        cfg.max_chain = cfg_max_chain;
+    }
+    cfg.only_better_matches = cfg_only_better_matches;
+    cfg.reversed_file = cfg_reversed_file;
+    cfg.is_ascii = trg.is_ascii;
+
     // The following stuff is horrible.. Needs to be hidden under
     // multiple functions to avoid recurring cleanup due initialization
     // failures..
 
-    s_infile_name  = std::string(argv[optind++]);
+    cfg_infile_name  = std::string(argv[optind++]);
 
     if (argc - optind >= 1) {
-        s_outfile_name = std::string(argv[optind++]);
+        cfg_outfile_name = std::string(argv[optind++]);
     }
 
-    ifs.open(s_infile_name,std::ios::binary|std::ios::in|std::ios::ate);
+    ifs.open(cfg_infile_name,std::ios::binary|std::ios::in|std::ios::ate);
     if (ifs.is_open() == false) {
-        std::cerr << "**Error: failed to open input file '" << s_infile_name << "'\n";
+        std::cerr << "**Error: failed to open input file '" << cfg_infile_name << "'\n";
         goto error_exit;
     }
 
@@ -381,20 +391,26 @@ int main(int argc, char** argv)
     ifs.seekg(0);
 
     if (file_len < 0) {
-        std::cerr << "**Error: getting file length  of '" << s_infile_name 
+        std::cerr << "**Error: getting file length  of '" << cfg_infile_name 
             << "' failed" << std::endl;
         goto error_exit;
     }
-    if (file_len > ((1 << 24) - 1)) {
-        std::cerr << "**Error: maximum file length is " << (1 << 24) - 1 
+    if (file_len > trg.max_file_size) {
+        std::cerr << "**Error: maximum file length is " << trg.max_file_size
             << " bytes" << std::endl;
         goto error_exit;
     }
 
     try {
-        lz = new zxpac4(&cfg);
-        lz->enable_debug(s_debug_on);
-        lz->enable_verbose(s_verbose_on);
+        switch (cfg_algo) {
+        case ZXPAC4B:
+            lz = new zxpac4b(&cfg);
+            break;
+        case ZXPAC4:
+        default:
+            lz = new zxpac4(&cfg);
+            break;
+        }
     } catch (std::exception& e) {
         std::cerr << "**Error1: " << e.what() << "\n";
         lz = NULL;
@@ -407,12 +423,16 @@ int main(int argc, char** argv)
         goto error_exit;
     }
     
-    if (s_verbose_on) {
-        std::cout << "Loading from file '" << s_infile_name << "'\n";
-        std::cout << "Saving to file '" << s_outfile_name << "'\n";
+    lz->enable_debug(cfg_debug_on);
+    lz->enable_verbose(cfg_verbose_on);
+    
+    if (cfg_verbose_on) {
+        std::cout << "Loading from file '" << cfg_infile_name << "'\n";
+        std::cout << "Saving to file '" << cfg_outfile_name << "'\n";
+        std::cout << "Using target '" << trg.target_name << "' and algorith " << cfg_algo << "\n";
     }
 
-    ofs.open(s_outfile_name,std::ios::binary|std::ios::out);
+    ofs.open(cfg_outfile_name,std::ios::binary|std::ios::out);
     if (ofs.is_open()) {
         compressed_len = handle_file(lz,ifs,ofs,file_len);
         
@@ -425,7 +445,7 @@ int main(int argc, char** argv)
         std::cout << "Original: " << file_len << ", compressed: " << std::setprecision(4)
                   << compressed_len << ", gained: " << gain*100 << "%\n";
 
-        if (s_verbose_on) {
+        if (cfg_verbose_on) {
             std::cout << "Number of literals: " << lz->get_num_literals() << std::endl;
             std::cout << "Number of matched bytes: " << lz->get_num_matched_bytes() << std::endl;
             std::cout << "Number of matches: " << lz->get_num_matches() << std::endl;
@@ -435,7 +455,7 @@ int main(int argc, char** argv)
 
 
     } else {
-        std::cerr << "**Error: opening output file '" << s_outfile_name << "' failed\n";
+        std::cerr << "**Error: opening output file '" << cfg_outfile_name << "' failed\n";
     }
 
 error_exit:

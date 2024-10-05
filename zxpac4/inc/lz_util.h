@@ -143,11 +143,21 @@ public:
  *
  *
  */
-class lz_match {
+template<typename derived> class lz_match {
+    derived& impl(void) {
+        return *static_cast<derived*>(this);
+    }
 public:
     virtual ~lz_match(void) {}
-    virtual int find_matches(const char *buf, int pos, int len , bool only_better) = 0;
-    virtual void init_get_matches(int len, match *matches) = 0;
+    int find_matches(const char *buf, int pos, int len , bool only_better) {
+        return impl().impl_find_matches(buf,pos,len,only_better);
+    }
+    void init_get_matches(int len, match *matches) {
+        impl().impl_init_get_matches(len,matches);
+    }
+    void reinit(void) {
+        impl().impl_reinit();
+    }
 };
 
 

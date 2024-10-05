@@ -17,20 +17,31 @@
 #include "lz_util.h"
 
 /**
- * \def LZ_MAX_COST Maximum cost for LZ cost calculations. Used to initialize
- *                  cost array.
+ * \def LZ_MAX_COST     Maximum cost for LZ cost calculations. Used to initialize
  */
-#define LZ_MAX_COST 0x7fffffff
+#define LZ_MAX_COST             0x7fffffff
+
+/**
+ *
+ */
+
+
 
 /**
  * @struct cost lz_base.h inc/lz_base.h
  * @brief A structure to hold match-length pairs for a LZ string matching engine.
  */
+
 struct cost {
-    int next;
-    int offset;
-    int length;
+    int32_t next;
+    int32_t offset;
+    int32_t length;
     uint32_t arrival_cost;
+    int32_t pmr_offset;         ///< tbd
+    int16_t num_matches;        ///< Number of matches in @p matches array
+    int16_t num_literals;       ///< Number of consequtive literal up to this match node.
+    match *matches;         ///< An array of matches
+    bool last_was_literal;
 };
 
 /**
@@ -74,11 +85,11 @@ public:
     const lz_config* lz_get_config(void) {
         return m_lz_config;
     }
-    int literal_cost(int pos, cost* c, const char* buf, int weight) {
-        return impl().impl_literal_cost(pos,c,buf,weight);
+    int literal_cost(int pos, cost* c, const char* buf) {
+        return impl().impl_literal_cost(pos,c,buf);
     }
-    int match_cost(int pos, match* m, int len, cost* c, uint8_t* buf) {
-        return impl().impl_matchl_cost(pos,m,len,c,buf);
+    int match_cost(int pos, cost* c, const char* buf) {
+        return impl().impl_match_cost(pos,c,buf);
     }
     int init_cost(cost* c, int sta, int len, int pmr) {
         return impl().impl_init_cost(c,sta,len,pmr);
@@ -110,8 +121,8 @@ public:
     int get_length_tag(int length, int& bit_tag) {
         return impl().impl_get_length_tag(length,bit_tag);
     }
-    int get_literal_tag(char literal, bool is_ascii, char& byte_tag, int& bit_tag) {
-        return impl().impl_get_literal_tag(literal,is_ascii,byte_tag,bit_tag);
+    int get_literal_tag(const char* literals, int length, bool is_ascii, char& byte_tag, int& bit_tag) {
+        return impl().impl_get_literal_tag(literals,length,is_ascii,byte_tag,bit_tag);
     }
 };
 
@@ -122,12 +133,7 @@ public:
  *
  * Trying the "Curiously recurring template pattern" (CRTP).
  */
-template <typename Derived> class lz_base {
-private:
-    // This indirection gets inlined by the compiler anyway..
-    Derived& impl(void) {
-        return *static_cast<Derived*>(this);
-    }
+class lz_base {
 protected:
     // statistics
     int m_num_literals;
@@ -147,26 +153,12 @@ public:
     const lz_config* lz_get_config(void) {
         return m_lz_config;
     }
-    int lz_search_matches(const char* buf, int len, int interval)
-    {
-        return impl().impl_search_matches(buf,len,interval);
-    }
-    int lz_parse(const char* buf, int len, int interval)
-    {
-        return impl().impl_parse(buf,len,interval);
-    }
-    const cost* lz_get_result(void) {
-        return impl().impl_get_result();
-    }
-    const cost* lz_cost_array_get(int len) {
-        return impl().impl_cost_array_get(len);
-    }
-    void lz_cost_array_done(void) {
-        return impl().impl_cost_array_done();
-    }
-    int lz_encode(const char* buf, int len, std::ofstream& ofs) {
-        return impl().impl_encode(buf,len,ofs);
-    }
+    virtual int lz_search_matches(const char* buf, int len, int interval) = 0;
+    virtual int lz_parse(const char* buf, int len, int interval) = 0;
+    virtual const cost* lz_get_result(void) = 0;
+    virtual const cost* lz_cost_array_get(int len) = 0;
+    virtual void lz_cost_array_done(void) = 0;
+    virtual int lz_encode(const char* buf, int len, std::ofstream& ofs) = 0;
     void enable_debug(bool enable) {
         m_debug = enable;
     }

@@ -42,7 +42,7 @@ public:
     
     int impl_get_offset_tag(int offset, char& byte_tag, int& bit_tag);
     int impl_get_length_tag(int length, int& bit_tag);
-    int impl_get_literal_tag(char literal, bool is_ascii, char& byte_tag, int& bit_tag);
+    int impl_get_literal_tag(const char* literals, int length, bool is_ascii, char& byte_tag, int& bit_tag);
     
     void impl_enable_debug(bool enable) {
         m_debug = enable;

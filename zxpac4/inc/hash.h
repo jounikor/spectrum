@@ -23,7 +23,7 @@
 #define HASH_MASK  (HASH_SIZE-1)
 
 
-class hash3 : public lz_match {
+class hash3 : public lz_match<hash3> {
     int* m_head;
     int* m_next;
     match* m_mtch;
@@ -53,8 +53,8 @@ public:
         int mm3_thres_offset);
     ~hash3(void);
     
-    void init_get_matches(int max_matches, match *matches = NULL);
-    int find_matches(const char *buf, int pos, int len, bool only_better_matches);
-    void reinit(void);
+    void impl_init_get_matches(int max_matches, match *matches = NULL);
+    int impl_find_matches(const char *buf, int pos, int len, bool only_better_matches);
+    void impl_reinit(void);
 };
 #endif

@@ -45,7 +45,7 @@ hash3::hash3(int window_size, int min_match, int max_match,
     reinit();
 }
 
-void hash3::reinit(void)
+void hash3::impl_reinit(void)
 {
     int n;
 
@@ -65,7 +65,7 @@ hash3::~hash3(void)
     }
 }
 
-void hash3::init_get_matches(int max_matches, match *matches)
+void hash3::impl_init_get_matches(int max_matches, match *matches)
 {
     m_mtch = matches;
     m_max_chain = max_matches;
@@ -78,7 +78,7 @@ void hash3::init_get_matches(int max_matches, match *matches)
  * @return Number of found matches or 0.
  */
 
-int hash3::find_matches(const char *buf, int pos, int len, bool only_better_matches=false)
+int hash3::impl_find_matches(const char *buf, int pos, int len, bool only_better_matches=false)
 {
     int length;
     int best   = m_min_match - 1;

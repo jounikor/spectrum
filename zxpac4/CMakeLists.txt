@@ -48,20 +48,20 @@ include_directories(inc)
 #set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 
 # Common files for the adftools
-set(COMMON_SRC  src/cost.cpp
+set(COMMON_SRC  src/cost4.cpp
+                src/cost4b.cpp
                 src/zxpac4.cpp
-                #src/z_alg.cpp
+                src/zxpac4b.cpp
                 src/hash.cpp
                 src/main.cpp
-                #src/mtf256.cpp
 
                 inc/lz_util.h
                 inc/zxpac4.h
-                inc/cost.h
+                inc/cost4.h
+                inc/zxpac4b.h
+                inc/cost4b.h
                 inc/lz_base.h
-                #inc/z_alg.h
                 inc/hash.h
-                #inc/mtf256.h
 )
 
 add_executable(${TARGET} ${COMMON_SRC})

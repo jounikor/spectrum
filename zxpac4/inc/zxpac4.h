@@ -17,9 +17,8 @@
 #include <cstdint>
 #include "lz_base.h"
 #include "lz_util.h"
-//#include "z_alg.h"
 #include "hash.h"
-#include "cost.h"
+#include "cost4.h"
 
 /**
  The binary encoding of zxpac4 format:
@@ -67,27 +66,14 @@
 
 */
 
-#define OFFSET_MATCH2_THRESHOLD     1024
-#define OFFSET_MATCH3_THRESHOLD     4096
-#define WINDOW_MAX                  131072
-
-#define MATCH_MIN                   2
-#define MATCH_MAX                   255
-#define MATCH_GOOD                  63
-#define INIT_PMR_OFFSET             5   // To be moved into lz_config
-
-#define MTF256_MAX_QUEUE            1   // Deprecated
-#define ZXPAC4_HEADER_SIZE          4
-
-struct cost_with_ctx : public cost {
-    int pmr_offset;         ///< tbd
-    int num_matches;        ///< Number of matches in @p matches array
-    int num_literals;       ///< Number of consequtive literal up to this match node.
-    bool last_was_literal;
-    match *matches;         ///< An array of matches
-
-};
-
+#define ZXPAC4_INIT_PMR_OFFSET         5 
+#define ZXPAC4_MATCH_MIN               2
+#define ZXPAC4_MATCH_MAX               255
+#define ZXPAC4_MATCH_GOOD              63
+#define ZXPAC4_OFFSET_MATCH2_THRESHOLD 1024
+#define ZXPAC4_OFFSET_MATCH3_THRESHOLD 4096
+#define ZXPAC4_WINDOW_MAX              131072
+#define ZXPAC4_HEADER_SIZE      4
 
 /**
  * @class matches utils.h
@@ -96,11 +82,10 @@ struct cost_with_ctx : public cost {
  *
  */
 
-class zxpac4 : public lz_base<zxpac4> {
-    lz_match *m_lz;
-    cost_with_ctx* m_cost_array;
+class zxpac4 : public lz_base {
+    hash3 m_lz;
+    cost* m_cost_array;
     int m_alloc_len;
-    //mtf_encode m_mtf;               ///< MTF256 object for literal encoding
     zxpac4_cost m_cost;
 private:
     int encode_history(putbits* pb, const char* buf, char* out, int len, int pos);
@@ -108,13 +93,13 @@ private:
 public:
     zxpac4(const lz_config* cfg, int ins=-1, int max=-1);
     ~zxpac4();
-    int impl_search_matches(const char* buf, int len, int interval);
-    int impl_parse(const char* buf, int len, int interval);
-    int impl_encode(const char* buf, int len, std::ofstream& ofs);
+    int lz_search_matches(const char* buf, int len, int interval);
+    int lz_parse(const char* buf, int len, int interval);
+    int lz_encode(const char* buf, int len, std::ofstream& ofs);
 
-    const cost* impl_get_result(void) { return m_cost_array; }
-    const cost* impl_cost_array_get(int len);
-    void impl_cost_array_done(void);
+    const cost* lz_get_result(void) { return m_cost_array; }
+    const cost* lz_cost_array_get(int len);
+    void lz_cost_array_done(void);
     bool is_ascii(void) { return m_lz_config->is_ascii; }
     bool only_better(void) { return m_lz_config->only_better_matches; }
 };

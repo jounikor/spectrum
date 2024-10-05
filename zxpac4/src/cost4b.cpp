@@ -40,7 +40,6 @@
 zxpac4b_cost::zxpac4b_cost(
     const lz_config* p_cfg, int ins, int max): 
     lz_cost(p_cfg)
-    //m_mtf(256,129,p_cfg->mtf_insert_pos,1,p_cfg->mtf_num_steps)
 {
     (void)ins;
     (void)max;
@@ -153,13 +152,15 @@ int zxpac4b_cost::impl_get_length_tag(int length, int& bit_tag)
     return bits;
 }
 
-int zxpac4b_cost::impl_get_literal_tag(char literal, bool is_ascii, char& byte_tag, int& bit_tag)
+int zxpac4b_cost::impl_get_literal_tag(const char* literals, int length, bool is_ascii, char& byte_tag, int& bit_tag)
 {
+    (void)length;
+
     if (is_ascii) {
-        byte_tag = literal << 1;
+        byte_tag = *literals << 1;
         return 0;
     } else {
-        byte_tag = literal;
+        byte_tag = *literals;
         bit_tag = 0;
         return 1;
     }

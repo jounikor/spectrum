@@ -23,35 +23,22 @@
 
 zxpac4::zxpac4(const lz_config* p_cfg, int ins, int max) :
     lz_base(p_cfg),
-    m_lz(NULL),
+    m_lz(p_cfg->window_size,
+        p_cfg->min_match,
+        p_cfg->max_match,
+        p_cfg->good_match,
+        p_cfg->min_match2_threshold,
+        p_cfg->min_match3_threshold),  // may throw exception
     m_cost_array(NULL),
-    //m_mtf(256,129,ins,1,max),
     m_cost(p_cfg)
 {
     (void)ins;
     (void)max;
-
-    try {
-        m_lz = new hash3(p_cfg->window_size,
-            p_cfg->min_match,
-            p_cfg->max_match,
-            p_cfg->good_match,
-            p_cfg->min_match2_threshold,
-            p_cfg->min_match3_threshold);  // may throw exception
-    }
-    catch (std::exception &e) {
-        m_lz = NULL;
-        throw e;
-    }
-
     m_alloc_len  = 0;
 }
 
 zxpac4::~zxpac4(void)
 {
-    if (m_lz) {
-        delete m_lz;
-    }
     if (m_cost_array) {
         lz_cost_array_done();
     }
@@ -59,7 +46,7 @@ zxpac4::~zxpac4(void)
 
 
 
-int zxpac4::impl_search_matches(const char* buf, int len, int interval)
+int zxpac4::lz_search_matches(const char* buf, int len, int interval)
 {
     int pos = 0;
     int num;
@@ -85,11 +72,11 @@ int zxpac4::impl_search_matches(const char* buf, int len, int interval)
     }
 
     while (pos < len) {
-        m_lz->init_get_matches(m_lz_config->max_chain,m_cost_array[pos].matches);
+        m_lz.init_get_matches(m_lz_config->max_chain,m_cost_array[pos].matches);
             
         // Find all matches at this position. Returned 'num' is the
         // the number of found matches.
-        num = m_lz->find_matches(buf,pos,len-pos,m_lz_config->only_better_matches);
+        num = m_lz.find_matches(buf,pos,len-pos,m_lz_config->only_better_matches);
         m_cost_array[pos].num_matches = num;
 
         if (m_debug && m_verbose) {
@@ -115,7 +102,7 @@ int zxpac4::impl_search_matches(const char* buf, int len, int interval)
 }
 
 
-int zxpac4::impl_parse(const char* buf, int len, int interval)
+int zxpac4::lz_parse(const char* buf, int len, int interval)
 {
     int length;
     int offset;
@@ -142,11 +129,11 @@ int zxpac4::impl_parse(const char* buf, int len, int interval)
 
     for (pos = 0; pos < len; pos++) {
         // always do literal cost calculation
-        m_cost.impl_literal_cost(pos,m_cost_array,buf);
+        m_cost.literal_cost(pos,m_cost_array,buf);
         
         // match cost calculation if not at the end of file and there was a match
-        if (pos < (len - MATCH_MIN)) {
-            m_cost.impl_match_cost(pos,m_cost_array,buf);
+        if (pos < (len - ZXPAC4_MATCH_MIN)) {
+            m_cost.match_cost(pos,m_cost_array,buf);
         }        
     }
 
@@ -265,7 +252,7 @@ int zxpac4::impl_parse(const char* buf, int len, int interval)
 }
 
 
-const cost* zxpac4::impl_cost_array_get(int len)
+const cost* zxpac4::lz_cost_array_get(int len)
 {
     if (len < 1) {
        return NULL;
@@ -273,16 +260,16 @@ const cost* zxpac4::impl_cost_array_get(int len)
     if (len < m_alloc_len && m_cost_array) {
         return m_cost_array;
     } else {
-        impl_cost_array_done();
+        lz_cost_array_done();
     }
 
-    m_cost_array = static_cast<cost_with_ctx*>(m_cost.alloc_cost(len,m_lz_config->max_chain)); 
+    m_cost_array = m_cost.alloc_cost(len,m_lz_config->max_chain); 
     m_alloc_len = len;
 
     return m_cost_array;
 }
 
-void zxpac4::impl_cost_array_done(void)
+void zxpac4::lz_cost_array_done(void)
 {
     m_cost.free_cost(m_cost_array); 
     m_alloc_len = 0;
@@ -549,7 +536,7 @@ int zxpac4::encode_forward(putbits* pb, const char* buf, char* p_out, int len, i
 
 
 
-int zxpac4::impl_encode(const char* buf, int len, std::ofstream& ofs)
+int zxpac4::lz_encode(const char* buf, int len, std::ofstream& ofs)
 {
     int n;
     char* p_out;
