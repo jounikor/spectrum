@@ -542,17 +542,8 @@ int zxpac4::lz_encode(const char* buf, int len, std::ofstream& ofs)
     char* p_out;
     putbits* pb;
 
-    n = m_cost_array[len].arrival_cost;
-    n = n + m_num_literals;
-
-    assert(n < LZ_MAX_COST);
-    n = (n + 7) / 8;
-    
-    if (n >= len) {
+    if (( p_out = new(std::nothrow) char[len+ZXPAC4_HEADER_SIZE]) == NULL) {
         return -1;
-    }
-    if (( p_out = new(std::nothrow) char[n+ZXPAC4_HEADER_SIZE]) == NULL) {
-        return -2;
     }
     
     pb = new putbits_history(p_out);

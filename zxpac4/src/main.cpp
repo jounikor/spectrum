@@ -447,8 +447,8 @@ int main(int argc, char** argv)
 
         if (cfg_verbose_on) {
             std::cout << "Number of literals: " << lz->get_num_literals() << std::endl;
-            std::cout << "Number of matched bytes: " << lz->get_num_matched_bytes() << std::endl;
             std::cout << "Number of matches: " << lz->get_num_matches() << std::endl;
+            std::cout << "Number of matched bytes: " << lz->get_num_matched_bytes() << std::endl;
             std::cout << "Number of PMR matches: " << lz->get_num_pmr_matches() << std::endl; 
             std::cout << "Number of PMR literals: " << lz->get_num_pmr_literals() << std::endl;
         }

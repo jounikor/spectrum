@@ -146,7 +146,6 @@ int zxpac4b::lz_parse(const char* buf, int len, int interval)
     num_literals = 1;
 
     // Fix the links of selected cost nodes
-    // Also substitute PMRs for the forward parser
     while (pos > 0) {
         length = m_cost_array[pos].length;
         offset = m_cost_array[pos].offset;
@@ -284,6 +283,7 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
     int length;
     int offset;
     int n;
+    int run_length;
 
     // Build header at the beginning of the file.. max 16M files supported.
     if (m_lz_config->is_ascii) {
@@ -294,27 +294,10 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
     pb->byte(len >> 16);
     pb->byte(len >> 8);
     pb->byte(len >> 0);
-    
-    // Always send first literal (which cannot be compressed without a tag..
-    pos = m_cost_array[0].next;
-    literal = buf[0];
+    last_literal_ptr = NULL;
 
-    // store compressed file..
-    if (m_lz_config->is_ascii) {
-        last_literal_ptr = pb->byte(literal<<1);
-        if (m_debug && m_verbose) {
-            std::cerr << "O: Initial literal -> last_ptr = " 
-                << last_literal_ptr - p_out << " -> " << literal << "\n";
-        }
-    } else {
-        pb->byte(literal);
-        last_literal_ptr = NULL;
-        
-        if (m_debug && m_verbose) {
-            std::cerr << "O: Initial literal -> last_ptr = NULL -> " 
-                << literal << "\n";
-        }
-    }
+    // Always send first literal (which cannot be compressed without a tag..
+    pos = 0;
     
     while ((pos = m_cost_array[pos].next)) {
         length = m_cost_array[pos].length;
@@ -322,62 +305,65 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
         literal = buf[pos-1];
 
         if (offset == 0 && length == 1) {
-            // encode raw literal
-            if (m_debug && m_verbose) {
-                std::cerr << "O: Literal ";
-            }
-            if (m_lz_config->is_ascii && last_literal_ptr) {
-                // Unnecessary..
-                if (m_debug && m_verbose) {
-                    std::cerr << "last_ptr = " << std::dec << last_literal_ptr-p_out;
-                }
-                *last_literal_ptr &= 0xfe;
-            } else {
-                pb->bits(0,1);
+            // encode raw literal run
+            run_length = m_cost_array[pos].num_literals;
+            n = m_cost.impl_get_length_tag(run_length,tag);
 
-                if (m_debug && m_verbose) {
-                    std::cerr << "bits(0,1)";
-                }
+            if (m_debug && m_verbose) {
+                std::cerr << "O: Literal run of " << run_length;
+            }
+            pb->bits(0,1);
+            pb->bits(tag,n);
+
+            if (m_debug && m_verbose) {
+                std::cerr << ", bits(0,1)";
+            }
+            if (m_debug && m_verbose) {
+                std::cerr << ", bits(" << std::hex << tag << "," << std::dec << n << ")";
+            }
+            for (n = 0; n < run_length-1; n++) {
+                pb->byte(buf[pos-1]);
+                ++pos;
             }
             if (m_lz_config->is_ascii) {
-                last_literal_ptr = pb->byte(literal<<1);
+                last_literal_ptr = pb->byte(buf[pos-1] << 1);
             } else {
-                pb->byte(literal);
+                pb->byte(buf[pos-1]);
             }
             if (m_debug && m_verbose) {
                 std::cerr << " -> " << std::hex << literal << "\n";
             }
         } else {
-            if (m_debug && m_verbose) {
-                if (m_debug) {
-                    std::cerr << "O: Match ";
+            if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
+                tag = 0;
+                if (m_debug && m_verbose) {
+                    std::cerr << "O: PMR Match, ";
                 }
-            }
+            } else {
+                tag = 1;
+                if (m_debug && m_verbose) {
+                    std::cerr << "O: Match, ";
+                }
+            }   
             if (m_lz_config->is_ascii && last_literal_ptr) {
                 if (m_debug && m_verbose) {
                     std::cerr << "last_ptr = " << std::dec << last_literal_ptr-p_out;
                 }
-                
-                *last_literal_ptr |= 0x01;
+                *last_literal_ptr |= tag;
             } else {
                 if (m_debug && m_verbose) {
-                    std::cerr << "bits(1,1)";
+                    std::cerr << "bits("<< tag << ",1)";
                 }
-
-                pb->bits(1,1);
+                pb->bits(tag,1);
             }
-            if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
+            //if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
+            if (tag == 0) {
                 // encode match PMR or literal PMR
-                if (m_debug && m_verbose) {
-                    std::cerr << ", PMR bits(1,1) Length " << length;
-                }
-
-                pb->bits(1,1);
                 n = m_cost.get_length_tag(length,tag);
                 pb->bits(tag,n);
             
                 if (m_debug && m_verbose) {
-                    std::cerr << ", bits " << n << "\n";
+                    std::cerr << ", length " << length << ", bits " << n << "\n";
                 }
             } else {
                 // encode match
@@ -385,7 +371,6 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
                     std::cerr << std::dec << ", Offset " << offset << ", Length " << length;
                 }
                 
-                pb->bits(0,1);
                 int m = m_cost.get_offset_tag(offset,literal,tag);
                 pb->byte(literal);
 
@@ -396,7 +381,7 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
                 pb->bits(tag,n);
                 
                 if (m_debug && m_verbose) {
-                    std::cerr << ", bits " << m+n+8+1 << "\n";
+                    std::cerr << ", bits " << m+n+8 << "\n";
                 }
             }
             last_literal_ptr = NULL;
@@ -410,128 +395,21 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
 
 int zxpac4b::encode_forward(putbits* pb, const char* buf, char* p_out, int len, int pos)
 {
-    char* last_literal_ptr;
-    char literal;
-    int tag;
-    int length;
-    int offset;
-    int n;
+    //char* last_literal_ptr;
+    //char literal;
+    //int tag;
+    //int length;
+    //int offset;
+    //int n;
+
+    (void)pb;
+    (void)buf;
+    (void)p_out;
+    (void)len;
+    (void)pos;
 
     assert(false);
-
-    pos = m_cost_array[0].next;
-    
-    while ((pos = m_cost_array[pos].next)) {
-        length = m_cost_array[pos].length;
-        offset = m_cost_array[pos].offset;
-        literal = buf[pos-1];
-
-        if (offset == 0 && length == 1) {
-            // encode raw literal
-            if (m_debug && m_verbose) {
-                std::cerr << "O: Literal ";
-            }
-            if (m_lz_config->is_ascii && last_literal_ptr) {
-                // Unnecessary..
-                if (m_debug && m_verbose) {
-                    std::cerr << "last_ptr = " << std::dec << last_literal_ptr-p_out;
-                }
-                ////*last_literal_ptr &= 0xfe;
-            } else {
-                pb->bits(0,1);
-
-                if (m_debug && m_verbose) {
-                    std::cerr << "bits(0,1)";
-                }
-            }
-            if (m_lz_config->is_ascii) {
-                last_literal_ptr = pb->byte(literal<<1);
-            } else {
-                pb->byte(literal);
-            }
-            if (m_debug && m_verbose) {
-                std::cerr << " -> " << std::hex << literal << "\n";
-            }
-        } else {
-            if (m_debug && m_verbose) {
-                if (m_debug) {
-                    std::cerr << "O: Match ";
-                }
-            }
-            if (m_lz_config->is_ascii && last_literal_ptr) {
-                if (m_debug && m_verbose) {
-                    std::cerr << "last_ptr = " << std::dec << last_literal_ptr-p_out;
-                }
-
-                ///*last_literal_ptr |= 0x01;
-            } else {
-                if (m_debug && m_verbose) {
-                    std::cerr << "bits(1,1)";
-                }
-
-                pb->bits(1,1);
-            }
-            if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
-                // encode match or literal PMR
-                if (m_debug && m_verbose) {
-                    std::cerr << ", PMR bits(1,1) Length " << length;
-                }
-
-                pb->bits(1,1);
-                n = m_cost.get_length_tag(length,tag);
-                pb->bits(tag,n);
-            
-                if (m_debug && m_verbose) {
-                    std::cerr << ", bits " << n << "\n";
-                }
-            } else {
-                // encode match
-                if (m_debug && m_verbose) {
-                    std::cerr << std::dec << ", Offset " << offset << ", Length " << length;
-                }
-                
-                pb->bits(0,1);
-                int m = m_cost.get_offset_tag(offset,literal,tag);
-                pb->byte(literal);
-
-                if (m > 0) {
-                    pb->bits(tag,m);
-                }
-                n = m_cost.get_length_tag(length-1,tag);
-                pb->bits(tag,n);
-                
-                if (m_debug && m_verbose) {
-                    std::cerr << ", bits " << m+n+8+1 << "\n";
-                }
-            }
-            last_literal_ptr = NULL;
-        }
-    }
-
-    // Always send first literal (which cannot be compressed without a tag..
-    pos = m_cost_array[0].next;
-    literal = buf[0];
-
-    // store compressed file..
-    if (m_lz_config->is_ascii) {
-        last_literal_ptr = pb->byte(literal<<1);
-    } else {
-        pb->byte(literal);
-        last_literal_ptr = NULL;
-    }
-
-
-    // Build header at the end of the file.. max 16M files supported.
-    if (m_lz_config->is_ascii) {
-        pb->byte(static_cast<char>(0x80));
-    } else {
-        pb->byte(0x00);
-    }
-    pb->byte(len >> 16);
-    pb->byte(len >> 8);
-    pb->byte(len >> 0);
-    n = pb->flush() - p_out;
-    return n;
+    return -1;
 }
 
 

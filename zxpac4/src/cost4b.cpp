@@ -154,16 +154,11 @@ int zxpac4b_cost::impl_get_length_tag(int length, int& bit_tag)
 
 int zxpac4b_cost::impl_get_literal_tag(const char* literals, int length, bool is_ascii, char& byte_tag, int& bit_tag)
 {
-    (void)length;
-
-    if (is_ascii) {
-        byte_tag = *literals << 1;
-        return 0;
-    } else {
-        byte_tag = *literals;
-        bit_tag = 0;
-        return 1;
-    }
+    (void)literals;
+    (void)is_ascii;
+    (void)byte_tag;
+    assert(length < 256);
+    return impl_get_length_tag(length,bit_tag);
 }
 
 int zxpac4b_cost::impl_get_offset_bits(int offset)
@@ -227,12 +222,8 @@ int zxpac4b_cost::impl_get_length_bits(int length)
 int zxpac4b_cost::impl_get_literal_bits(char literal, bool is_ascii)
 {
     (void)literal;
-
-    if (is_ascii) {
-        return 7;
-    } else {
-        return 8;
-    }
+    (void)is_ascii;
+    return 8;
 }
 
 /**
@@ -255,17 +246,28 @@ int zxpac4b_cost::impl_literal_cost(int pos, cost* c, const char* buf)
     cost* p_ctx = &c[pos];
     uint32_t new_cost = p_ctx->arrival_cost;
     int offset = p_ctx->offset;
+    int num_literals = p_ctx->num_literals;
 
     if (buf[pos-p_ctx->pmr_offset] == buf[pos]) {
+        // PMR of length 1 
         offset = p_ctx->pmr_offset;
-        new_cost += 2;
+        num_literals = 1;
     } else {
-        new_cost = new_cost + get_literal_bits(buf[pos],m_lz_config->is_ascii);
+        // literal run
+        if (num_literals > 0) {
+            new_cost -= impl_get_length_bits(num_literals);
+        }
+        ++num_literals;
+        new_cost += 8;
         offset = 0;
     }
-    if (m_lz_config->is_ascii == false || p_ctx->last_was_literal == false) {
+    if ((m_lz_config->is_ascii == false || p_ctx->last_was_literal == false) && num_literals == 1) {
+        // tag of 1bit
         new_cost = new_cost + 1;
     }
+    
+    new_cost += impl_get_length_bits(num_literals);
+
     if (p_ctx[1].arrival_cost > new_cost) {
         p_ctx[1].arrival_cost = new_cost;
         p_ctx[1].length = 1;
@@ -274,8 +276,10 @@ int zxpac4b_cost::impl_literal_cost(int pos, cost* c, const char* buf)
 
         if (offset == 0) {
             p_ctx[1].last_was_literal = true;
+            p_ctx[1].num_literals = num_literals;
         } else {
             p_ctx[1].last_was_literal = false;    
+            p_ctx[1].num_literals = 0;
         }
     }
 
@@ -309,7 +313,7 @@ int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf)
     for (int n = 0; n < p_ctx->num_matches; n++) {
         int offset = p_ctx->matches[n].offset;
         int length = p_ctx->matches[n].length;
-        uint32_t new_cost = p_ctx->arrival_cost + 1;
+        uint32_t new_cost = p_ctx->arrival_cost;
         int pmr_offset = p_ctx->pmr_offset; 
         int encode_length;
 
@@ -336,12 +340,13 @@ int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf)
         new_cost += get_offset_bits(offset);
         new_cost += get_length_bits(encode_length);
             
-        if (p_ctx[length].arrival_cost > new_cost) {
+        if (p_ctx[length].arrival_cost >= new_cost) {
             p_ctx[length].offset       = offset;
             p_ctx[length].pmr_offset   = pmr_offset;
             p_ctx[length].arrival_cost = new_cost;
             p_ctx[length].length       = length;
             p_ctx[length].last_was_literal = false;
+            p_ctx[length].num_literals = 0;
         }
     }
     return 0;
@@ -359,6 +364,7 @@ int zxpac4b_cost::impl_init_cost(cost* p_ctx, int sta, int len, int pmr)
 
     for (int n = sta+1; n < len+1; n++) {
         p_ctx[n].arrival_cost = LZ_MAX_COST;
+        p_ctx[n].num_literals = 0;
     }
     return 0;
 }
