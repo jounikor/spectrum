@@ -78,6 +78,14 @@ template <typename Derived> class lz_cost {
     }
 protected:
     const lz_config* m_lz_config;
+    int m_max_len;
+
+    int check_match(const char* s, const char* d, int max) {
+        int len = 0;
+        while (*s++ == *d++ && len++ < max); 
+        return len;
+    }
+
 public:
     lz_cost(const lz_config* p_cfg): m_lz_config(p_cfg) {}
     virtual ~lz_cost() {}

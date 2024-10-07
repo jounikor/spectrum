@@ -268,7 +268,7 @@ int zxpac4b_cost::impl_literal_cost(int pos, cost* c, const char* buf)
     
     new_cost += impl_get_length_bits(num_literals);
 
-    if (p_ctx[1].arrival_cost > new_cost) {
+    if (p_ctx[1].arrival_cost >= new_cost) {
         p_ctx[1].arrival_cost = new_cost;
         p_ctx[1].length = 1;
         p_ctx[1].offset = offset;
@@ -306,37 +306,38 @@ int zxpac4b_cost::impl_literal_cost(int pos, cost* c, const char* buf)
 int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf)
 {
     cost* p_ctx = &c[pos];
+    bool pmr_found = false;
+    int offset;
+    int length;
+    int pmr_offset; 
+    uint32_t new_cost;
+    int encode_length;
+    int tag_cost;
+    int n;
+    
+    if (m_lz_config->is_ascii == false || p_ctx->last_was_literal == false) {
+        tag_cost = 1;
+    } else {
+        tag_cost = 0;
+    }
 
-    // Unused at the moment..
-    (void)buf;
-
-    for (int n = 0; n < p_ctx->num_matches; n++) {
-        int offset = p_ctx->matches[n].offset;
-        int length = p_ctx->matches[n].length;
-        uint32_t new_cost = p_ctx->arrival_cost;
-        int pmr_offset = p_ctx->pmr_offset; 
-        int encode_length;
-
-        if (m_lz_config->is_ascii == false || p_ctx->last_was_literal == false) {
-            new_cost = new_cost + 1;
-        }
+    for (n = 0; n < p_ctx->num_matches; n++) {
+        offset = p_ctx->matches[n].offset;
+        length = p_ctx->matches[n].length;
+        pmr_offset = p_ctx->pmr_offset; 
+        new_cost = p_ctx->arrival_cost + tag_cost;
+        
         if (offset == pmr_offset) {
-            // encoding as a PMR and in that case minimum length is 1
             offset = 0;
             encode_length = length;
-            assert(encode_length > 0);
+            pmr_found = true;
         } else {
-            // encoding as a match and in that case minimum length is 2
             pmr_offset = offset;
             encode_length = length - 1;
-            assert(encode_length > 0);
         }
-
-        // Check for PMR and offset cost.. 
-        if (offset >= 131072) {
-            std::cerr << "**Error: " << pos << ", " << offset << ":" << length << std::endl;
-            assert(offset < 131072);
-        }
+        
+        assert(encode_length > 0);
+        assert(offset < 131072);
         new_cost += get_offset_bits(offset);
         new_cost += get_length_bits(encode_length);
             
@@ -347,6 +348,28 @@ int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf)
             p_ctx[length].length       = length;
             p_ctx[length].last_was_literal = false;
             p_ctx[length].num_literals = 0;
+        }
+    }
+    
+    pmr_offset = p_ctx->pmr_offset;
+
+    if (pmr_found == false && pos >= pmr_offset) {
+        n = pos < m_max_len-255 ? 255 : m_max_len+ - pos;
+        length = check_match(&buf[pos],&buf[pos-pmr_offset],n);
+        assert(length < 256);
+
+        if (length >= 2) {
+            new_cost = p_ctx->arrival_cost + tag_cost;
+            new_cost += get_length_bits(length);
+            
+            if (p_ctx[length].arrival_cost >= new_cost) {
+                p_ctx[length].offset       = 0;
+                p_ctx[length].pmr_offset   = pmr_offset;
+                p_ctx[length].arrival_cost = new_cost;
+                p_ctx[length].length       = length;
+                p_ctx[length].last_was_literal = false;
+                p_ctx[length].num_literals = 0;
+            }
         }
     }
     return 0;
@@ -375,6 +398,8 @@ cost* zxpac4b_cost::impl_alloc_cost(int len, int max_chain)
     match* mm;
     int n;
 
+    m_max_len = len;
+    
     try {
         cc = new cost[len+1];
     } catch (...) {
