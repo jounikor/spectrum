@@ -25,7 +25,9 @@
  *
  */
 
-
+#define DEBUG_LEVEL_NONE    0
+#define DEBUG_LEVEL_NORMAL  1
+#define DEBUG_LEVEL_EXTRA   2
 
 /**
  * @struct cost lz_base.h inc/lz_base.h
@@ -62,7 +64,6 @@ struct lz_config {
     //
     bool only_better_matches;
     bool is_ascii;
-    //bool forward_parse;       // DEPRECATED
     bool reversed_file;
 };
 
@@ -129,8 +130,8 @@ public:
     int get_length_tag(int length, int& bit_tag) {
         return impl().impl_get_length_tag(length,bit_tag);
     }
-    int get_literal_tag(const char* literals, int length, bool is_ascii, char& byte_tag, int& bit_tag) {
-        return impl().impl_get_literal_tag(literals,length,is_ascii,byte_tag,bit_tag);
+    int get_literal_tag(const char* literals, int length, char& byte_tag, int& bit_tag) {
+        return impl().impl_get_literal_tag(literals,length,byte_tag,bit_tag);
     }
 };
 
@@ -151,10 +152,12 @@ protected:
     int m_num_pmr_matches;
     // debugs and configs
     const lz_config* m_lz_config;
-    bool m_debug;
+    int m_debug_level;
     bool m_verbose;
 public:
-    lz_base(const lz_config* p_cfg): m_lz_config(p_cfg), m_debug(false), m_verbose(false) { }
+    lz_base(const lz_config* p_cfg): m_lz_config(p_cfg), 
+        m_debug_level(DEBUG_LEVEL_NONE), 
+        m_verbose(false) { }
     virtual ~lz_base(void) { }
 
     // The interface definition for the base LZ class..
@@ -167,14 +170,14 @@ public:
     virtual const cost* lz_cost_array_get(int len) = 0;
     virtual void lz_cost_array_done(void) = 0;
     virtual int lz_encode(const char* buf, int len, std::ofstream& ofs) = 0;
-    void enable_debug(bool enable) {
-        m_debug = enable;
+    void set_debug_level(int level) {
+        m_debug_level = level;
+    }
+    int get_debug_level(void) {
+        return m_debug_level;
     }
     void enable_verbose(bool enable) {
         m_verbose = enable;
-    }
-    bool debug(void) {
-        return m_debug;
     }
     bool verbose(void) {
         return m_verbose;

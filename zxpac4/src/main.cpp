@@ -55,6 +55,7 @@ static struct option longopts[] = {
     // generic parameters
 	{"reverse",     no_argument,        NULL, 'r'},
 	{"verbose",     no_argument,        NULL, 'v'},
+	{"DEBUG",       no_argument,        NULL, 'D'},
 	{"debug",       no_argument,        NULL, 'd'},
     {"algo",        required_argument,  NULL, 'a'},
     {"abs",         required_argument,  NULL, 'A'},
@@ -86,8 +87,8 @@ void usage( char *prg ) {
     std::cerr << "  --algo,-a             Select used algorithm (0=zxpac4, 1=xzpac4b) (default is " << ZXPAC4 << ").\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --exe,-X              Self-extracting decruncher (Amiga target).\n";
-    std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr. With --verbose the\n"
-                 "                        debug outout is even more.\n";
+    std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
+    std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
     std::cerr << "  --verbose,-v          Output some additional information to stdout.\n";
     std::cerr << "  --help,-h             Print this output ;)\n";
     std::cerr << std::flush;
@@ -230,7 +231,7 @@ int main(int argc, char** argv)
     std::ifstream ifs;
     std::ofstream ofs;
 
-    bool cfg_debug_on = false;
+    int cfg_debug_level = DEBUG_LEVEL_NONE;
     bool cfg_verbose_on = false;
     std::string cfg_infile_name;
     std::string cfg_outfile_name(DEF_OUTPUT_NAME);
@@ -261,13 +262,16 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hvda:X:Arb:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hvdDa:X:Arb:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'h':
                 usage(argv[0]);
                 break;
 			case 'd':   // --debug
-                cfg_debug_on = true;
+                cfg_debug_level = DEBUG_LEVEL_NORMAL;
+				break;
+			case 'D':   // --DEBUG
+                cfg_debug_level = DEBUG_LEVEL_EXTRA;
 				break;
 			case 'v':   // --verbose
                 cfg_verbose_on = true;
@@ -422,8 +426,8 @@ int main(int argc, char** argv)
         std::cerr << "**Error2: " << e.what() << "\n";
         goto error_exit;
     }
-    
-    lz->enable_debug(cfg_debug_on);
+   
+    lz->set_debug_level(cfg_debug_level);
     lz->enable_verbose(cfg_verbose_on);
     
     if (cfg_verbose_on) {

@@ -152,10 +152,9 @@ int zxpac4b_cost::impl_get_length_tag(int length, int& bit_tag)
     return bits;
 }
 
-int zxpac4b_cost::impl_get_literal_tag(const char* literals, int length, bool is_ascii, char& byte_tag, int& bit_tag)
+int zxpac4b_cost::impl_get_literal_tag(const char* literals, int length, char& byte_tag, int& bit_tag)
 {
     (void)literals;
-    (void)is_ascii;
     (void)byte_tag;
     assert(length < 256);
     return impl_get_length_tag(length,bit_tag);
