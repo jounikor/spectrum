@@ -259,7 +259,6 @@ const cost* zxpac4::lz_cost_array_get(int len)
     if (len < 1) {
        return NULL;
     }
-    
     lz_cost_array_done();
     m_cost_array = m_cost.alloc_cost(len,m_lz_config->max_chain); 
     m_alloc_len = len;
@@ -269,7 +268,9 @@ const cost* zxpac4::lz_cost_array_get(int len)
 
 void zxpac4::lz_cost_array_done(void)
 {
-    m_cost.free_cost(m_cost_array); 
+    if (m_alloc_len > 0) {
+        m_cost.free_cost(m_cost_array); 
+    }
     m_alloc_len = 0;
     m_cost_array = NULL;
 }
@@ -434,7 +435,7 @@ int zxpac4::encode_forward(putbits* pb, const char* buf, char* p_out, int len, i
                 if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "last_ptr = " << std::dec << last_literal_ptr-p_out;
                 }
-                ////*last_literal_ptr &= 0xfe;
+                *last_literal_ptr &= 0xfe;
             } else {
                 pb->bits(0,1);
 
