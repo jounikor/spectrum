@@ -23,6 +23,7 @@
 #include <getopt.h>
 
 #include "zxpac4.h"
+#include "zxpac4_32k.h"
 #include "zxpac4b.h"
 #include "lz_util.h"
 #include "lz_base.h"
@@ -38,8 +39,11 @@
 #define MAX_BACKWARD_STEPS  16
 #define DEF_BACKWARD_STEPS  0
 
+// Algorithms
 #define ZXPAC4              0
 #define ZXPAC4B             1
+#define ZXPAC4_32K          2
+#define ZXPAC_DEFAULT       ZXPAC4
 
 
 // Did not want to "reinvent" a command line parser thus
@@ -84,7 +88,8 @@ void usage( char *prg ) {
     std::cerr << "  --pmr-offset,-p       Initial PMR offset between 1 and 127 (default depends on the target).\n";
     std::cerr << "  --reverse,-r          Reverse the input file to allow end-to-start decompression "
               << "(default no reverse)\n";
-    std::cerr << "  --algo,-a             Select used algorithm (0=zxpac4, 1=xzpac4b) (default is " << ZXPAC4 << ").\n";
+    std::cerr << "  --algo,-a             Select used algorithm (0=zxpac4, 1=xzpac4b, 2=zxpac4_32k). \n"
+              << "                        (default depends on the target)\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --exe,-X              Self-extracting decruncher (Amiga target).\n";
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
@@ -103,6 +108,7 @@ struct target {
     const char* target_name;
     bool is_ascii;
     int max_file_size;
+    int algorithm;
     func_t init_add_header;
     func_t post_header_fix;
     func_t post_trailer_fix;
@@ -110,6 +116,7 @@ struct target {
     {   "asc",
         true,
         1<<24,
+        ZXPAC4,
         NULL,
         NULL,
         NULL
@@ -117,6 +124,7 @@ struct target {
     {   "bin",
         false,
         1<<24,
+        ZXPAC4,
         NULL,
         NULL,
         NULL
@@ -124,6 +132,7 @@ struct target {
     {   "zx",
         false,
         1<<16,
+        ZXPAC4_32K,
         NULL,
         NULL,
         NULL
@@ -131,6 +140,7 @@ struct target {
     {   "bbc",
         false,
         1<<16,
+        ZXPAC4_32K,
         NULL,
         NULL,
         NULL
@@ -138,6 +148,7 @@ struct target {
     {   "ami",
         false,
         1<<24,
+        ZXPAC4,
         NULL,
         NULL,
         NULL
@@ -146,6 +157,7 @@ struct target {
 
 
 lz_config algos[] {
+    // ZXPAC4
     {   ZXPAC4_WINDOW_MAX,  DEF_CHAIN, ZXPAC4_MATCH_MIN, ZXPAC4_MATCH_MAX, ZXPAC4_MATCH_GOOD,
         DEF_BACKWARD_STEPS, ZXPAC4_OFFSET_MATCH2_THRESHOLD, ZXPAC4_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4_INIT_PMR_OFFSET,
@@ -153,13 +165,22 @@ lz_config algos[] {
         false,      // is_ascii
         false       // reversed_file
     },
+    // ZXPAC4B
     {   ZXPAC4B_WINDOW_MAX,  DEF_CHAIN, ZXPAC4B_MATCH_MIN, ZXPAC4B_MATCH_MAX, ZXPAC4B_MATCH_GOOD,
         DEF_BACKWARD_STEPS, ZXPAC4B_OFFSET_MATCH2_THRESHOLD, ZXPAC4B_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4B_INIT_PMR_OFFSET,
         false,      // only_better_matches
         false,      // is_ascii
         false       // reversed_file
-    }
+    },
+    // ZXPAC4_32K - max 32K window
+    {   ZXPAC4_32K_WINDOW_MAX,  DEF_CHAIN, ZXPAC4_32K_MATCH_MIN, ZXPAC4_32K_MATCH_MAX, ZXPAC4_32K_MATCH_GOOD,
+        DEF_BACKWARD_STEPS, ZXPAC4_32K_OFFSET_MATCH2_THRESHOLD, ZXPAC4_32K_OFFSET_MATCH3_THRESHOLD,
+        ZXPAC4_32K_INIT_PMR_OFFSET,
+        false,      // only_better_matches
+        false,      // is_ascii
+        false       // reversed_file
+    },
 };
 
 #define LZ_TARGET_SIZE static_cast<int>((sizeof(targets)/sizeof(target)))
@@ -235,7 +256,7 @@ int main(int argc, char** argv)
     bool cfg_verbose_on = false;
     std::string cfg_infile_name;
     std::string cfg_outfile_name(DEF_OUTPUT_NAME);
-    int cfg_algo = ZXPAC4;
+    int cfg_algo = ZXPAC_DEFAULT;
     int cfg_good_match = -1;
     int cfg_backward_steps = -1;
     int cfg_initial_pmr_offset = -1;
@@ -248,6 +269,10 @@ int main(int argc, char** argv)
 
     // Check target..
 
+    if (argc < 2) {
+        usage(argv[0]);
+    }
+
     for (n = 0; n < LZ_TARGET_SIZE; n++) {
         if (!strcmp(argv[1],targets[n].target_name)) {
             trg = targets[n];
@@ -259,6 +284,8 @@ int main(int argc, char** argv)
         usage(argv[0]);
     }
 
+    // target specific default algo
+    cfg_algo = trg.algorithm;
     optind = 2;
 
     // 
@@ -409,6 +436,9 @@ int main(int argc, char** argv)
         switch (cfg_algo) {
         case ZXPAC4B:
             lz = new zxpac4b(&cfg);
+            break;
+        case ZXPAC4_32K:
+            lz = new zxpac4_32k(&cfg);
             break;
         case ZXPAC4:
         default:

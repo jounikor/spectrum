@@ -400,6 +400,14 @@ int zxpac4::encode_history(putbits* pb, const char* buf, char* p_out, int len, i
         }
     }
 
+    if (m_lz_config->is_ascii && last_literal_ptr) {
+        // Unnecessary..
+        if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+            std::cerr << "Last literal preshifted\n";
+        }
+        *last_literal_ptr >>= 1;
+    }
+    
     n = pb->flush() - p_out;
     return n;
 }

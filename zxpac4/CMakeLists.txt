@@ -49,15 +49,19 @@ include_directories(inc)
 
 # Common files for the adftools
 set(COMMON_SRC  src/cost4.cpp
+                src/cost4_32k.cpp
                 src/cost4b.cpp
                 src/zxpac4.cpp
+                src/zxpac4_32k.cpp
                 src/zxpac4b.cpp
                 src/hash.cpp
                 src/main.cpp
 
                 inc/lz_util.h
                 inc/zxpac4.h
+                inc/zxpac4_32k.h
                 inc/cost4.h
+                inc/cost4_32k.h
                 inc/zxpac4b.h
                 inc/cost4b.h
                 inc/lz_base.h

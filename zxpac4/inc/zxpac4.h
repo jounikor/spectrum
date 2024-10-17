@@ -51,17 +51,32 @@
   1111111 + [7] = 128 -> 255            // 1n1n1n1n1n1n1n
 
  offset
-  0       + [0]  = 1 -> 127             // 0+nnnnnnn
-  100     + [0]  = 128 -> 255           // 1+nnnnnnn+00
-  101     + [1]  = 256 -> 511           // 1+nnnnnnn+01+n
-  1100    + [2]  = 512 -> 1023          // 1+nnnnnnn+100+nn
-  1101    + [3]  = 1024 -> 2047         // 1+nnnnnnn+101+nnn
-  11100   + [4]  = 2048 -> 4095         // 1+nnnnnnn+1100+nnnn
-  11101   + [5]  = 4096 -> 8191         // 1+nnnnnnn+1101+nnnnn
-  111100  + [6]  = 8192 -> 16383        // 1+nnnnnnn+11100+nnnnnn
-  111101  + [7]  = 16384 -> 32767       // 1+nnnnnnn+11101+nnnnnnn
-  111110  + [8]  = 32768 -> 65535       // 1+nnnnnnn+11110+nnnnnnnn
-  111111  + [9]  = 65536 -> 131071      // 1+nnnnnnn+11111+nnnnnnnnn
+  0       + [0]  = 1 -> 127             // 0+nnnnnnn                    8
+  100     + [0]  = 128 -> 255           // 1+nnnnnnn+00                 10
+  101     + [1]  = 256 -> 511           // 1+nnnnnnn+01+n               11
+  1100    + [2]  = 512 -> 1023          // 1+nnnnnnn+100+nn             13
+  1101    + [3]  = 1024 -> 2047         // 1+nnnnnnn+101+nnn            14
+  11100   + [4]  = 2048 -> 4095         // 1+nnnnnnn+1100+nnnn          16
+  11101   + [5]  = 4096 -> 8191         // 1+nnnnnnn+1101+nnnnn         17
+  111100  + [6]  = 8192 -> 16383        // 1+nnnnnnn+11100+nnnnnn       19
+  111101  + [7]  = 16384 -> 32767       // 1+nnnnnnn+11101+nnnnnnn      20
+  111110  + [8]  = 32768 -> 65535       // 1+nnnnnnn+11110+nnnnnnnn     22
+  111111  + [9]  = 65536 -> 131071      // 1+nnnnnnn+11111+nnnnnnnnn    24
+
+  0+nnnnnnnn                        8
+  1+nnnnnnnn + 0                    9
+  1+nnnnnnnn + 1n0                  11
+  1+nnnnnnnn + 1n1n0                13
+  1+nnnnnnnn + 1n1n1n0              16
+  1+nnnnnnnn + 1n1n1n1n0            17
+  1+nnnnnnnn + 1n1n1n1n1n0          18
+  1+nnnnnnnn + 1n1n1n1n1n1n0        21
+  1+nnnnnnnn + 1n1n1n1n1n1n1n0      23
+  1+nnnnnnnn + 1n1n1n1n1n1n1n1n0    25
+  1+nnnnnnnn + 1n1n1n1n1n1n1n1n1n0  27
+
+
+
 @endverbatim
 
 */

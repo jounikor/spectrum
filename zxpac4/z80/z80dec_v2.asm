@@ -4,12 +4,15 @@
 ; Z80 decompressor for zxpac4
 ;
 ; Use e.g. following to assemble:
-;  pasmo --tapbas --alocal -1 z80/z80dec.asm z80/z80.tap z80/z80.map   
+;  pasmo --tapbas --alocal -1 z80/z80dec_v2.asm z80/tap.tap
 ;
 ;
 
-ASCII_LITERALS  equ 1
-MAX32K_WIN      equ 1
+ASCII_LITERALS  equ 1   ; 1 assumes 7bit ascii
+MAX32K_WIN      equ 1   ; 1 assumes max 32768 bytes sliding window
+MUTABLE_SOURCE  equ 1   ; 1 will change the source compressed file
+                        ; during decompression. The file can be
+                        ; used for decomporession only once!!
 
 
 GETBIT  MACRO
@@ -28,14 +31,16 @@ not_empty:
 
 
 ; Inputs:
-;  DE = destination address
-;  HL = start of compressed file
+;   DE = destination address
+;   HL = start of compressed file
 ;
 ; Returns:
-;
-;
+;   Nothing meaningful..
+;   BC = 0
+;   DE = PTR to the first memory location after the decompressed file
+;   
 ; Trashes:
-;
+;   A, A', BC, DE, HL, IX
 ;
 ;
 ;
@@ -85,19 +90,27 @@ _tag_literal:
         ; 'x' is the next tag bit allowing to skip GETBIT macro..
         ;
         ; The last byte of the compressed file, if a literal ASCII, must
-        ; be in format '0LLLLLLL'.
+        ; be in a preshifted format '0LLLLLLL'.
         ;
+    IF MUTABLE_SOURCE
+        ; This solution alters the source file by doing the shift before
+        ; moving the data. Another side effect is that the preshifting
+        ; of the last literal shall not be done in this case.
+        srl     (hl)
+    ENDIF
         ldi
         ret po
     IF ASCII_LITERALS
-        ; This is sad piece of code but could not figure out any
+        ; This is a sad piece of code but could not figure out any
         ; better solution that would not a) use IX/IY or b) put anything
         ; into the stack before the conditional return.
+    IF !MUTABLE_SOURCE
         ex      de,hl
         dec     hl
         srl     (hl)
         inc     hl
         ex      de,hl   ; 9b / 56t
+    ENDIF
         jr nc,  _tag_literal
     ELSE
         jr      _main_loop
@@ -196,7 +209,11 @@ _last_byte_copy:
         ldi
         pop     hl
         ret po
+    IF ASCII_LITERALS && !MUTABLE_SOURCE
         jp      _main_loop
+    ELSE
+        jr      _main_loop
+    ENDIF
         ;
 
 file:
