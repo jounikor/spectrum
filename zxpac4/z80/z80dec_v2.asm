@@ -92,7 +92,7 @@ _tag_literal:
         ; The last byte of the compressed file, if a literal ASCII, must
         ; be in a preshifted format '0LLLLLLL'.
         ;
-    IF MUTABLE_SOURCE
+    IF MUTABLE_SOURCE && ASCII_LITERALS
         ; This solution alters the source file by doing the shift before
         ; moving the data. Another side effect is that the preshifting
         ; of the last literal shall not be done in this case.
