@@ -93,7 +93,7 @@ z80rdec: ;
         pop     hl
         pop     de
         srl     b
-        rr      b
+        rr      c
 _reverse:
         ld      a,(de)
         ex      af,af'
