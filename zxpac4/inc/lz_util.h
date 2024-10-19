@@ -1,3 +1,13 @@
+/**
+ * @file lz_util.h
+ *
+ *
+ *
+ *
+ *
+ *
+ */
+
 #ifndef _LZ_UTIL_NOT_INCLUDED
 #define _LZ_UTIL_NOT_INCLUDED
 
@@ -13,16 +23,28 @@ struct match {
 };
 
 
-class putbits {
+
+
+// *FIX* make this a template..
+template<typename derived> class putbits {
+    derived& impl(void) {
+        return *static_cast<derived*>(this);
+    }
 public:
-    virtual ~putbits(void) { }
-    virtual char* bits(int value, int num_bits) = 0;
-    virtual char* flush(void) = 0;
-    virtual char* byte(int byte) = 0;
+    ~putbits(void) { }
+    char* bits(int value, int num_bits) {
+        return impl().impl_bits(value,num_bits);
+    }
+    char* flush(void) {
+        return impl().impl_flush();
+    }
+    char* byte(int byte) {
+        return impl().impl_byte(byte);
+    }
 };
 
 
-class putbits_history : public putbits {
+class putbits_history : public putbits<putbits_history> {
     int m_bb;
     int m_bc;
     char* m_bitbuf_tag_ptr;
@@ -34,8 +56,8 @@ public:
         m_bitbuf_tag_ptr = NULL;
         m_bitbuf_ptr = p_buf;
     }
-    ~putbits_history(void) { flush();  }
-    char* bits(int value, int num_bits) {
+    ~putbits_history(void) { impl_flush();  }
+    char* impl_bits(int value, int num_bits) {
         int t;
 
         if (m_bitbuf_tag_ptr == NULL) {
@@ -65,7 +87,7 @@ public:
         m_bc -= num_bits;
         return p_old_pos;
     }
-    char* flush(void) {
+    char* impl_flush(void) {
         char* p_old_pos = m_bitbuf_ptr;
         if (m_bc < 8) {
             *m_bitbuf_tag_ptr = m_bb << m_bc;
@@ -74,64 +96,12 @@ public:
         }
         return p_old_pos;
     }
-    char* byte(int byte) {
+    char* impl_byte(int byte) {
         char* p_old_pos = m_bitbuf_ptr;
         *m_bitbuf_ptr++ = byte & 0xff;
         return p_old_pos;
     }
 };
-
-#if 1
-
-class putbits_forward : public putbits {
-    int m_bb;
-    int m_bc;
-    char* m_bitbuf_ptr;
-public:
-    putbits_forward(char* p_buf) {
-        m_bb = 0;
-        m_bc = 8;
-        m_bitbuf_ptr = p_buf;
-    }
-    ~putbits_forward(void) {
-        flush();
-    }
-    char* bits(int value, int num_bits) {
-        if (num_bits > 8) {
-            // put low 8 bits
-            bits(value & 0xff,8);
-            // and then high order remaining bits
-            num_bits -= 8;
-            value >>= 8;
-        }
-        
-        char* p_old_pos = m_bitbuf_ptr;
-        m_bb = (m_bb << num_bits) | value;
-
-        if (num_bits >= m_bc) {
-            num_bits -= m_bc;
-            *m_bitbuf_ptr++ = m_bb >> num_bits;
-            m_bc = 8;
-        }
-          
-        m_bc -= num_bits;
-        return p_old_pos;
-    }
-    char* flush(void) {
-        char* p_old_pos = m_bitbuf_ptr;
-        if (m_bc < 8) {
-            *m_bitbuf_ptr++ = m_bb << m_bc;
-            m_bc = 8;
-        }
-        return p_old_pos;
-    }
-    char* byte(int byte) {
-        char* p_old_pos = m_bitbuf_ptr;
-        *m_bitbuf_ptr++ = byte & 0xff;
-        return p_old_pos;
-    }
-};
-#endif
 
 
 /**

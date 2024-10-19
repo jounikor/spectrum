@@ -96,14 +96,13 @@ class zxpac4b : public lz_base {
     int m_alloc_len;
     zxpac4b_cost m_cost;
 private:
-    int encode_history(putbits* pb, const char* buf, char* out, int len, int pos);
-    int encode_forward(putbits* pb, const char* buf, char* out, int len, int pos);
+    int encode_history(const char* buf, char* out, int len, int pos);
 public:
     zxpac4b(const lz_config* cfg, int ins=-1, int max=-1);
     ~zxpac4b();
     int lz_search_matches(const char* buf, int len, int interval);
     int lz_parse(const char* buf, int len, int interval);
-    int lz_encode(const char* buf, int len, std::ofstream& ofs);
+    int lz_encode(char* buf, int len, std::ofstream& ofs);
 
     const cost* lz_get_result(void) { return m_cost_array; }
     const cost* lz_cost_array_get(int len);

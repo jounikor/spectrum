@@ -157,7 +157,7 @@ int zxpac4_cost::impl_get_literal_tag(const char* literals, int length, char& by
 {
     assert(length == 1);
 
-    if (m_lz_config->is_ascii) {
+    if (lz_get_config()->is_ascii) {
         byte_tag = *literals << 1;
         return 0;
     } else {
@@ -261,10 +261,10 @@ int zxpac4_cost::impl_literal_cost(int pos, cost* c, const char* buf)
         offset = p_ctx->pmr_offset;
         new_cost += 2;
     } else {
-        new_cost = new_cost + get_literal_bits(buf[pos],m_lz_config->is_ascii);
+        new_cost = new_cost + get_literal_bits(buf[pos],lz_get_config()->is_ascii);
         offset = 0;
     }
-    if (m_lz_config->is_ascii == false || p_ctx->last_was_literal == false) {
+    if (lz_get_config()->is_ascii == false || p_ctx->last_was_literal == false) {
         new_cost = new_cost + 1;
     }
     if (p_ctx[1].arrival_cost >= new_cost) {
@@ -312,7 +312,7 @@ int zxpac4_cost::impl_match_cost(int pos, cost* c, const char* buf)
     int tag_cost;
     int n;
         
-    if (m_lz_config->is_ascii == false || p_ctx->last_was_literal == false) {
+    if (lz_get_config()->is_ascii == false || p_ctx->last_was_literal == false) {
         tag_cost = 1+1;
     } else {
         tag_cost = 0+1;

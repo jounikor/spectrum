@@ -273,7 +273,7 @@ void zxpac4b::lz_cost_array_done(void)
     m_cost_array = NULL;
 }
 
-int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, int pos)
+int zxpac4b::encode_history(const char* buf, char* p_out, int len, int pos)
 {
     char* last_literal_ptr;
     char literal;
@@ -282,16 +282,17 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
     int offset;
     int n;
     int run_length;
+    putbits_history pb(p_out);
 
     // Build header at the beginning of the file.. max 16M files supported.
     if (m_lz_config->is_ascii) {
-        pb->byte(static_cast<char>(0x80 | m_lz_config->initial_pmr_offset));
+        pb.byte(static_cast<char>(0x80 | m_lz_config->initial_pmr_offset));
     } else {
-        pb->byte(m_lz_config->initial_pmr_offset);
+        pb.byte(m_lz_config->initial_pmr_offset);
     }
-    pb->byte(len >> 16);
-    pb->byte(len >> 8);
-    pb->byte(len >> 0);
+    pb.byte(len >> 16);
+    pb.byte(len >> 8);
+    pb.byte(len >> 0);
     last_literal_ptr = NULL;
 
     // Always send first literal (which cannot be compressed without a tag..
@@ -310,8 +311,8 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
             if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "O: Literal run of " << run_length;
             }
-            pb->bits(0,1);
-            pb->bits(tag,n);
+            pb.bits(0,1);
+            pb.bits(tag,n);
 
             if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                 std::cerr << ", bits(0,1)";
@@ -320,13 +321,13 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
                 std::cerr << ", bits(" << std::hex << tag << "," << std::dec << n << ")";
             }
             for (n = 0; n < run_length-1; n++) {
-                pb->byte(buf[pos-1]);
+                pb.byte(buf[pos-1]);
                 ++pos;
             }
             if (m_lz_config->is_ascii) {
-                last_literal_ptr = pb->byte(buf[pos-1] << 1);
+                last_literal_ptr = pb.byte(buf[pos-1] << 1);
             } else {
-                pb->byte(buf[pos-1]);
+                pb.byte(buf[pos-1]);
             }
             if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                 std::cerr << " -> " << std::hex << literal << "\n";
@@ -352,13 +353,13 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
                 if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "bits("<< tag << ",1)";
                 }
-                pb->bits(tag,1);
+                pb.bits(tag,1);
             }
             //if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
             if (tag == 0) {
                 // encode match PMR or literal PMR
                 n = m_cost.get_length_tag(length,tag);
-                pb->bits(tag,n);
+                pb.bits(tag,n);
             
                 if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", length " << length << ", bits " << n << "\n";
@@ -370,13 +371,13 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
                 }
                 
                 int m = m_cost.get_offset_tag(offset,literal,tag);
-                pb->byte(literal);
+                pb.byte(literal);
 
                 if (m > 0) {
-                    pb->bits(tag,m);
+                    pb.bits(tag,m);
                 }
                 n = m_cost.get_length_tag(length-1,tag);
-                pb->bits(tag,n);
+                pb.bits(tag,n);
                 
                 if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", bits " << m+n+8 << "\n";
@@ -386,72 +387,51 @@ int zxpac4b::encode_history(putbits* pb, const char* buf, char* p_out, int len, 
         }
     }
 
-    n = pb->flush() - p_out;
+    n = pb.flush() - p_out;
     return n;
 }
 
 
-int zxpac4b::encode_forward(putbits* pb, const char* buf, char* p_out, int len, int pos)
-{
-    //char* last_literal_ptr;
-    //char literal;
-    //int tag;
-    //int length;
-    //int offset;
-    //int n;
-
-    (void)pb;
-    (void)buf;
-    (void)p_out;
-    (void)len;
-    (void)pos;
-
-    assert(false);
-    return -1;
-}
-
-
-
-int zxpac4b::lz_encode(const char* buf, int len, std::ofstream& ofs)
+int zxpac4b::lz_encode(char* buf, int len, std::ofstream& ofs)
 {
     int n;
     char* p_out;
-    putbits* pb;
 
-    n = m_cost_array[len].arrival_cost;
-    n = n + m_num_literals;
-
-    assert(n < LZ_MAX_COST);
-    n = (n + 7) / 8;
-    
-    if (n >= len) {
+    if (( p_out = new(std::nothrow) char[len+ZXPAC4B_HEADER_SIZE]) == NULL) {
+        std::cerr << "**Error: Allocating memory for the file failed" << std::endl;
         return -1;
     }
-    if (( p_out = new(std::nothrow) char[n+ZXPAC4B_HEADER_SIZE]) == NULL) {
-        return -2;
+    if (verbose()) {
+        std::cout << "Encoding the compressed file" << std::endl;
     }
-    
-    pb = new putbits_history(p_out);
-    
     if (m_lz_config->reversed_file) {
         if (verbose()) {
-            std::cout << "Either reversed file or forward encoding engaged" << std::endl;
+            std::cout << "Reversing the file for backward decompression" << std::endl;
         }
-        n = encode_forward(pb,buf,p_out,len,0) + 4;
+        reverse_buffer(buf,len);
+    }
+    
+    n = encode_history(buf,p_out,len,0);
+
+    if (n > 0) {
+        if (m_lz_config->reversed_file) {
+            if (verbose()) {
+                std::cout << "Reversing the encoded file.." << std::endl;
+            }
+            reverse_buffer(p_out,n);
+        } 
+        if (verbose()) {
+            std::cout << "Compressed length: " << n << std::endl;
+        }
+
+        ofs.write(p_out,n);
     } else {
         if (verbose()) {
-            std::cout << "History encoding engaged" << std::endl;
+            std::cout << "Compression failed.." << std::endl;
         }
-        n = encode_history(pb,buf,p_out,len,0);
-    }
-    if (verbose()) {
-        std::cout << "Compressed length: " << n << std::endl;
     }
 
-    ofs.write(p_out,n);
-    delete pb;
     delete[] p_out;
-
     return n;
 }
 

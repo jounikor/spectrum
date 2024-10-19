@@ -275,7 +275,7 @@ void zxpac4_32k::lz_cost_array_done(void)
     m_cost_array = NULL;
 }
 
-int zxpac4_32k::encode_history(putbits* pb, const char* buf, char* p_out, int len, int pos)
+int zxpac4_32k::encode_history(const char* buf, char* p_out, int len, int pos)
 {
     char* last_literal_ptr;
     char literal;
@@ -283,16 +283,17 @@ int zxpac4_32k::encode_history(putbits* pb, const char* buf, char* p_out, int le
     int length;
     int offset;
     int n;
+    putbits_history pb(p_out);
 
     // Build header at the beginning of the file.. max 16M files supported.
     if (m_lz_config->is_ascii) {
-        pb->byte(static_cast<char>(0x80 | m_lz_config->initial_pmr_offset));
+        pb.byte(static_cast<char>(0x80 | m_lz_config->initial_pmr_offset));
     } else {
-        pb->byte(m_lz_config->initial_pmr_offset);
+        pb.byte(m_lz_config->initial_pmr_offset);
     }
-    pb->byte(len >> 16);
-    pb->byte(len >> 8);
-    pb->byte(len >> 0);
+    pb.byte(len >> 16);
+    pb.byte(len >> 8);
+    pb.byte(len >> 0);
     
     // Always send first literal (which cannot be compressed without a tag..
     pos = m_cost_array[0].next;
@@ -300,13 +301,13 @@ int zxpac4_32k::encode_history(putbits* pb, const char* buf, char* p_out, int le
 
     // store compressed file..
     if (m_lz_config->is_ascii) {
-        last_literal_ptr = pb->byte(literal<<1);
+        last_literal_ptr = pb.byte(literal<<1);
         if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
             std::cerr << "O: Initial literal -> last_ptr = " 
                 << last_literal_ptr - p_out << " -> " << literal << "\n";
         }
     } else {
-        pb->byte(literal);
+        pb.byte(literal);
         last_literal_ptr = NULL;
         
         if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
@@ -332,16 +333,16 @@ int zxpac4_32k::encode_history(putbits* pb, const char* buf, char* p_out, int le
                 }
                 *last_literal_ptr &= 0xfe;
             } else {
-                pb->bits(0,1);
+                pb.bits(0,1);
 
                 if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "bits(0,1)";
                 }
             }
             if (m_lz_config->is_ascii) {
-                last_literal_ptr = pb->byte(literal<<1);
+                last_literal_ptr = pb.byte(literal<<1);
             } else {
-                pb->byte(literal);
+                pb.byte(literal);
             }
             if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                 std::cerr << " -> " << std::hex << literal << "\n";
@@ -361,7 +362,7 @@ int zxpac4_32k::encode_history(putbits* pb, const char* buf, char* p_out, int le
                     std::cerr << "bits(1,1)";
                 }
 
-                pb->bits(1,1);
+                pb.bits(1,1);
             }
             if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
                 // encode match PMR or literal PMR
@@ -369,9 +370,9 @@ int zxpac4_32k::encode_history(putbits* pb, const char* buf, char* p_out, int le
                     std::cerr << ", PMR bits(1,1) Length " << length;
                 }
 
-                pb->bits(1,1);
+                pb.bits(1,1);
                 n = m_cost.get_length_tag(length,tag);
-                pb->bits(tag,n);
+                pb.bits(tag,n);
             
                 if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", bits " << n << "\n";
@@ -382,15 +383,15 @@ int zxpac4_32k::encode_history(putbits* pb, const char* buf, char* p_out, int le
                     std::cerr << std::dec << ", Offset " << offset << ", Length " << length;
                 }
                 
-                pb->bits(0,1);
+                pb.bits(0,1);
                 int m = m_cost.get_offset_tag(offset,literal,tag);
-                pb->byte(literal);
+                pb.byte(literal);
 
                 if (m > 0) {
-                    pb->bits(tag,m);
+                    pb.bits(tag,m);
                 }
                 n = m_cost.get_length_tag(length-1,tag);
-                pb->bits(tag,n);
+                pb.bits(tag,n);
                 
                 if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", bits " << m+n+8+1 << "\n";
@@ -399,178 +400,58 @@ int zxpac4_32k::encode_history(putbits* pb, const char* buf, char* p_out, int le
             last_literal_ptr = NULL;
         }
     }
-    if (m_lz_config->is_ascii && last_literal_ptr) {
-        // Unnecessary..
+    if (m_lz_config->preshift_last_ascii_literal && last_literal_ptr) {
         if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
             std::cerr << "Last literal preshifted\n";
         }
         *last_literal_ptr >>= 1;
     }
 
-    n = pb->flush() - p_out;
-    return n;
-}
-
-/* 
- * Forward encoding is broken at the moment..
- */
-int zxpac4_32k::encode_forward(putbits* pb, const char* buf, char* p_out, int len, int pos)
-{
-    char* last_literal_ptr;
-    char literal;
-    int tag;
-    int length;
-    int offset;
-    int n;
-
-    assert(false);
-
-    pos = m_cost_array[0].next;
-    
-    while ((pos = m_cost_array[pos].next)) {
-        length = m_cost_array[pos].length;
-        offset = m_cost_array[pos].offset;
-        literal = buf[pos-1];
-
-        if (offset == 0 && length == 1) {
-            // encode raw literal
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
-                std::cerr << "O: Literal ";
-            }
-            if (m_lz_config->is_ascii && last_literal_ptr) {
-                // Unnecessary..
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
-                    std::cerr << "last_ptr = " << std::dec << last_literal_ptr-p_out;
-                }
-                *last_literal_ptr &= 0xfe;
-            } else {
-                pb->bits(0,1);
-
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
-                    std::cerr << "bits(0,1)";
-                }
-            }
-            if (m_lz_config->is_ascii) {
-                last_literal_ptr = pb->byte(literal<<1);
-            } else {
-                pb->byte(literal);
-            }
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
-                std::cerr << " -> " << std::hex << literal << "\n";
-            }
-        } else {
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
-                std::cerr << "O: Match ";
-            }
-            if (m_lz_config->is_ascii && last_literal_ptr) {
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
-                    std::cerr << "last_ptr = " << std::dec << last_literal_ptr-p_out;
-                }
-
-                *last_literal_ptr |= 0x01;
-            } else {
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
-                    std::cerr << "bits(1,1)";
-                }
-
-                pb->bits(1,1);
-            }
-            if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
-                // encode match or literal PMR
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
-                    std::cerr << ", PMR bits(1,1) Length " << length;
-                }
-
-                pb->bits(1,1);
-                n = m_cost.get_length_tag(length,tag);
-                pb->bits(tag,n);
-            
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
-                    std::cerr << ", bits " << n << "\n";
-                }
-            } else {
-                // encode match
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
-                    std::cerr << std::dec << ", Offset " << offset << ", Length " << length;
-                }
-                
-                pb->bits(0,1);
-                int m = m_cost.get_offset_tag(offset,literal,tag);
-                pb->byte(literal);
-
-                if (m > 0) {
-                    pb->bits(tag,m);
-                }
-                n = m_cost.get_length_tag(length-1,tag);
-                pb->bits(tag,n);
-                
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
-                    std::cerr << ", bits " << m+n+8+1 << "\n";
-                }
-            }
-            last_literal_ptr = NULL;
-        }
-    }
-
-    // Always send first literal (which cannot be compressed without a tag..
-    pos = m_cost_array[0].next;
-    literal = buf[0];
-
-    // store compressed file..
-    if (m_lz_config->is_ascii) {
-        last_literal_ptr = pb->byte(literal<<1);
-    } else {
-        pb->byte(literal);
-        last_literal_ptr = NULL;
-    }
-
-
-    // Build header at the end of the file.. max 16M files supported.
-    if (m_lz_config->is_ascii) {
-        pb->byte(static_cast<char>(0x80));
-    } else {
-        pb->byte(0x00);
-    }
-    pb->byte(len >> 16);
-    pb->byte(len >> 8);
-    pb->byte(len >> 0);
-    n = pb->flush() - p_out;
+    n = pb.flush() - p_out;
     return n;
 }
 
 
-
-int zxpac4_32k::lz_encode(const char* buf, int len, std::ofstream& ofs)
+int zxpac4_32k::lz_encode(char* buf, int len, std::ofstream& ofs)
 {
     int n;
     char* p_out;
-    putbits* pb;
 
     if (( p_out = new(std::nothrow) char[len+ZXPAC4_32K_HEADER_SIZE]) == NULL) {
+        std::cerr << "**Error: Allocating memory for the file failed" << std::endl;
         return -1;
     }
-    
-    pb = new putbits_history(p_out);
-    
+    if (verbose()) {
+        std::cout << "Encoding the compressed file" << std::endl;
+    }
     if (m_lz_config->reversed_file) {
         if (verbose()) {
-            std::cout << "Either reversed file or forward encoding engaged" << std::endl;
+            std::cout << "Reversing the file for backward decompression" << std::endl;
         }
-        n = encode_forward(pb,buf,p_out,len,0) + 4;
+        reverse_buffer(buf,len);
+    }
+    
+    n = encode_history(buf,p_out,len,0);
+
+    if (n > 0) {
+        if (m_lz_config->reversed_file) {
+            if (verbose()) {
+                std::cout << "Reversing the encoded file.." << std::endl;
+            }
+            reverse_buffer(p_out,n);
+        } 
+        if (verbose()) {
+            std::cout << "Compressed length: " << n << std::endl;
+        }
+
+        ofs.write(p_out,n);
     } else {
         if (verbose()) {
-            std::cout << "History encoding engaged" << std::endl;
+            std::cout << "Compression failed.." << std::endl;
         }
-        n = encode_history(pb,buf,p_out,len,0);
-    }
-    if (verbose()) {
-        std::cout << "Compressed length: " << n << std::endl;
     }
 
-    ofs.write(p_out,n);
-    delete pb;
     delete[] p_out;
-
     return n;
 }
 

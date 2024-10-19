@@ -32,7 +32,6 @@
 //
 //
 
-#define DEF_ALGO            "zxpac4"
 #define DEF_OUTPUT_NAME     "zx.pac"
 #define MAX_CHAIN	        9999
 #define DEF_CHAIN           16
@@ -90,6 +89,7 @@ void usage( char *prg ) {
               << "(default no reverse)\n";
     std::cerr << "  --algo,-a             Select used algorithm (0=zxpac4, 1=xzpac4b, 2=zxpac4_32k). \n"
               << "                        (default depends on the target)\n";
+    std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --exe,-X              Self-extracting decruncher (Amiga target).\n";
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
@@ -162,24 +162,27 @@ lz_config algos[] {
         DEF_BACKWARD_STEPS, ZXPAC4_OFFSET_MATCH2_THRESHOLD, ZXPAC4_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4_INIT_PMR_OFFSET,
         false,      // only_better_matches
+        false,      // reversed_file
         false,      // is_ascii
-        false       // reversed_file
+        false
     },
     // ZXPAC4B
     {   ZXPAC4B_WINDOW_MAX,  DEF_CHAIN, ZXPAC4B_MATCH_MIN, ZXPAC4B_MATCH_MAX, ZXPAC4B_MATCH_GOOD,
         DEF_BACKWARD_STEPS, ZXPAC4B_OFFSET_MATCH2_THRESHOLD, ZXPAC4B_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4B_INIT_PMR_OFFSET,
         false,      // only_better_matches
+        false,      // reversed_file
         false,      // is_ascii
-        false       // reversed_file
+        false
     },
     // ZXPAC4_32K - max 32K window
     {   ZXPAC4_32K_WINDOW_MAX,  DEF_CHAIN, ZXPAC4_32K_MATCH_MIN, ZXPAC4_32K_MATCH_MAX, ZXPAC4_32K_MATCH_GOOD,
         DEF_BACKWARD_STEPS, ZXPAC4_32K_OFFSET_MATCH2_THRESHOLD, ZXPAC4_32K_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4_32K_INIT_PMR_OFFSET,
         false,      // only_better_matches
+        false,      // reversed_file
         false,      // is_ascii
-        false       // reversed_file
+        false,
     },
 };
 
@@ -193,8 +196,6 @@ lz_config algos[] {
  */
 int handle_file(lz_base* lz, std::ifstream& ifs, std::ofstream& ofs, int len)
 {
-    (void)ofs;
-
     // extra 2 characters to avoid buffer overrun with 3 byte hash function..
     char* buf = new (std::nothrow) char[len+2];
     int n = 0;
@@ -221,18 +222,7 @@ int handle_file(lz_base* lz, std::ifstream& ifs, std::ofstream& ofs, int len)
             }
         }
     }
-    if (lz->lz_get_config()->reversed_file) {
-        if (lz->verbose()) {
-            std::cout << "Reversing the file for backward decompression" << std::endl;
-        }
-
-        for (n = 0; n < (len-n-1); n++) {
-            char t = buf[n];
-            buf[n] = buf[len-n-1];
-            buf[len-n-1] = t;
-        }
-    }
-
+    
     lz->lz_search_matches(buf,len,0); 
     lz->lz_parse(buf,len,0); 
     n = lz->lz_encode(buf,len,ofs); 
@@ -253,6 +243,7 @@ int main(int argc, char** argv)
     std::ofstream ofs;
 
     int cfg_debug_level = DEBUG_LEVEL_NONE;
+    bool cfg_preshift = false; 
     bool cfg_verbose_on = false;
     std::string cfg_infile_name;
     std::string cfg_outfile_name(DEF_OUTPUT_NAME);
@@ -289,11 +280,18 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hvdDa:X:Arb:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hPvdDa:X:Arb:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'h':
                 usage(argv[0]);
                 break;
+			case 'P':   // --preshift
+                if (trg.is_ascii == true) { 
+                    cfg_preshift = true;
+                } else {
+                    usage(argv[0]);
+                }
+				break;
 			case 'd':   // --debug
                 cfg_debug_level = DEBUG_LEVEL_NORMAL;
 				break;
@@ -398,6 +396,8 @@ int main(int argc, char** argv)
     if (cfg_max_chain > -1) {
         cfg.max_chain = cfg_max_chain;
     }
+    
+    cfg.preshift_last_ascii_literal = cfg_preshift;
     cfg.only_better_matches = cfg_only_better_matches;
     cfg.reversed_file = cfg_reversed_file;
     cfg.is_ascii = trg.is_ascii;

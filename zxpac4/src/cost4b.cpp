@@ -260,7 +260,7 @@ int zxpac4b_cost::impl_literal_cost(int pos, cost* c, const char* buf)
         new_cost += 8;
         offset = 0;
     }
-    if ((m_lz_config->is_ascii == false || p_ctx->last_was_literal == false) && num_literals == 1) {
+    if ((lz_get_config()->is_ascii == false || p_ctx->last_was_literal == false) && num_literals == 1) {
         // tag of 1bit
         new_cost = new_cost + 1;
     }
@@ -314,7 +314,7 @@ int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf)
     int tag_cost;
     int n;
     
-    if (m_lz_config->is_ascii == false || p_ctx->last_was_literal == false) {
+    if (lz_get_config()->is_ascii == false || p_ctx->last_was_literal == false) {
         tag_cost = 1;
     } else {
         tag_cost = 0;

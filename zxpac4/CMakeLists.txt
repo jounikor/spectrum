@@ -19,9 +19,7 @@ set(CMAKE_INSTALL_PREFIX ${PROJECT_BINARY_DIR})
 add_compile_options(-Wall -Wextra -Wpedantic)
 
 # Own configurations
-#add_definitions(-DFORWARD_PARSER)
 add_definitions(-DWINDOW_IS_POWER_OF_TWO)
-#add_definitions(-DDEBUG_COST)
 
 #
 if (DEFINED CMAKE_BUILD_TYPE)

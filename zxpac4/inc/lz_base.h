@@ -62,9 +62,10 @@ struct lz_config {
     int min_match3_threshold;   // currently not used
     int initial_pmr_offset;
     //
-    bool only_better_matches;
-    bool is_ascii;
-    bool reversed_file;
+    bool only_better_matches:1;
+    bool reversed_file:1;
+    bool is_ascii:1;
+    bool preshift_last_ascii_literal:1;
 };
 
 /**
@@ -77,8 +78,10 @@ template <typename Derived> class lz_cost {
     Derived& impl(void) {
         return *static_cast<Derived*>(this);
     }
-protected:
+    int m_debug_level;
+    bool m_verbose;
     const lz_config* m_lz_config;
+protected:
     int m_max_len;
 
     int check_match(const char* s, const char* d, int max) {
@@ -88,7 +91,10 @@ protected:
     }
 
 public:
-    lz_cost(const lz_config* p_cfg): m_lz_config(p_cfg) {}
+    lz_cost(const lz_config* p_cfg):
+        m_debug_level(DEBUG_LEVEL_NONE), 
+        m_verbose(false),
+        m_lz_config(p_cfg) {}
     virtual ~lz_cost() {}
 
     const lz_config* lz_get_config(void) {
@@ -109,12 +115,6 @@ public:
     int free_cost(cost* cost) {
         return impl().impl_free_cost(cost);
     }
-    void enable_debug(bool enable) {
-        impl().impl_enable_debug(enable);
-    }
-    void enable_verbose(bool enable) {
-        impl().impl_enable_verbose(enable);
-    }
     int get_offset_bits(int offset) {
         return impl().impl_get_offset_bits(offset);
     }
@@ -132,6 +132,20 @@ public:
     }
     int get_literal_tag(const char* literals, int length, char& byte_tag, int& bit_tag) {
         return impl().impl_get_literal_tag(literals,length,byte_tag,bit_tag);
+    }
+    
+    // Implementation within the base class
+    void set_debug_level(int level) {
+        m_debug_level = level;
+    }
+    int get_debug_level(void) {
+        return m_debug_level;
+    }
+    void enable_verbose(bool enable) {
+        m_verbose = enable;
+    }
+    bool verbose(void) {
+        return m_verbose;
     }
 };
 
@@ -154,6 +168,15 @@ protected:
     const lz_config* m_lz_config;
     int m_debug_level;
     bool m_verbose;
+protected:
+    void reverse_buffer(char* p_buf, int len, int skip_bytes=0) {
+        char t;
+        for (int n = skip_bytes; n < (len-n-1); n++) {
+            t = p_buf[n];
+            p_buf[n] = p_buf[len-n-1];
+            p_buf[len-n-1] = t;
+        }
+    }
 public:
     lz_base(const lz_config* p_cfg): m_lz_config(p_cfg), 
         m_debug_level(DEBUG_LEVEL_NONE), 
@@ -169,7 +192,9 @@ public:
     virtual const cost* lz_get_result(void) = 0;
     virtual const cost* lz_cost_array_get(int len) = 0;
     virtual void lz_cost_array_done(void) = 0;
-    virtual int lz_encode(const char* buf, int len, std::ofstream& ofs) = 0;
+    virtual int lz_encode(char* buf, int len, std::ofstream& ofs) = 0;
+    
+    // Methods implemented within the base class
     void set_debug_level(int level) {
         m_debug_level = level;
     }
@@ -182,8 +207,6 @@ public:
     bool verbose(void) {
         return m_verbose;
     }
-
-    // Simple statistics
     int get_num_literals(void) const {
         return m_num_literals;
     }
