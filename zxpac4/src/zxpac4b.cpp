@@ -46,7 +46,7 @@ zxpac4b::~zxpac4b(void)
 
 
 
-int zxpac4b::lz_search_matches(const char* buf, int len, int interval)
+int zxpac4b::lz_search_matches(char* buf, int len, int interval)
 {
     int pos = 0;
     int num;
@@ -63,6 +63,12 @@ int zxpac4b::lz_search_matches(const char* buf, int len, int interval)
 
     if (verbose()) {
         std::cout << "Finding all matches" << std::endl;
+    }
+    if (m_lz_config->reversed_file) {
+        if (verbose()) {
+            std::cout << "Reversing the file for backwards decompression" << std::endl;
+        }
+        reverse_buffer(buf,len);
     }
 
     // find matches..
@@ -392,7 +398,7 @@ int zxpac4b::encode_history(const char* buf, char* p_out, int len, int pos)
 }
 
 
-int zxpac4b::lz_encode(char* buf, int len, std::ofstream& ofs)
+int zxpac4b::lz_encode(const char* buf, int len, std::ofstream& ofs)
 {
     int n;
     char* p_out;
@@ -403,12 +409,6 @@ int zxpac4b::lz_encode(char* buf, int len, std::ofstream& ofs)
     }
     if (verbose()) {
         std::cout << "Encoding the compressed file" << std::endl;
-    }
-    if (m_lz_config->reversed_file) {
-        if (verbose()) {
-            std::cout << "Reversing the file for backward decompression" << std::endl;
-        }
-        reverse_buffer(buf,len);
     }
     
     n = encode_history(buf,p_out,len,0);

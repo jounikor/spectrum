@@ -169,9 +169,9 @@ protected:
     int m_debug_level;
     bool m_verbose;
 protected:
-    void reverse_buffer(char* p_buf, int len, int skip_bytes=0) {
+    void reverse_buffer(char* p_buf, int len) {
         char t;
-        for (int n = skip_bytes; n < (len-n-1); n++) {
+        for (int n = 0; n < len/2; n++) {
             t = p_buf[n];
             p_buf[n] = p_buf[len-n-1];
             p_buf[len-n-1] = t;
@@ -187,12 +187,12 @@ public:
     const lz_config* lz_get_config(void) {
         return m_lz_config;
     }
-    virtual int lz_search_matches(const char* buf, int len, int interval) = 0;
+    virtual int lz_search_matches(char* buf, int len, int interval) = 0;
     virtual int lz_parse(const char* buf, int len, int interval) = 0;
     virtual const cost* lz_get_result(void) = 0;
     virtual const cost* lz_cost_array_get(int len) = 0;
     virtual void lz_cost_array_done(void) = 0;
-    virtual int lz_encode(char* buf, int len, std::ofstream& ofs) = 0;
+    virtual int lz_encode(const char* buf, int len, std::ofstream& ofs) = 0;
     
     // Methods implemented within the base class
     void set_debug_level(int level) {

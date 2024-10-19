@@ -222,7 +222,7 @@ int handle_file(lz_base* lz, std::ifstream& ifs, std::ofstream& ofs, int len)
             }
         }
     }
-    
+
     lz->lz_search_matches(buf,len,0); 
     lz->lz_parse(buf,len,0); 
     n = lz->lz_encode(buf,len,ofs); 

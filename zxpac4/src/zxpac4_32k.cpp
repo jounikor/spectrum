@@ -46,7 +46,7 @@ zxpac4_32k::~zxpac4_32k(void)
 
 
 
-int zxpac4_32k::lz_search_matches(const char* buf, int len, int interval)
+int zxpac4_32k::lz_search_matches(char* buf, int len, int interval)
 {
     int pos = 0;
     int num;
@@ -61,10 +61,16 @@ int zxpac4_32k::lz_search_matches(const char* buf, int len, int interval)
     m_num_matched_bytes = 0;
     m_num_pmr_matches = 0;
 
+    if (m_lz_config->reversed_file) {
+        if (verbose()) {
+            std::cout << "Reversing the file for backwards decompression" << std::endl;
+        }
+        reverse_buffer(buf,len);
+    }
     if (verbose()) {
         std::cout << "Finding all matches" << std::endl;
     }
-
+    
     // find matches..
     if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
         std::cerr << ">- Match debugging phase --------------------------------------------------------\n";
@@ -112,14 +118,6 @@ int zxpac4_32k::lz_parse(const char* buf, int len, int interval)
 
     // Unused at the moment..
     (void)interval;
-
-    if (verbose()) {
-        if (m_lz_config->reversed_file) {
-            std::cout << "Reversed file parsing engaged" << std::endl;
-        } else {
-            std::cout << "History parsing engaged" << std::endl;
-        }
-    }
 
     if (verbose()) {
         std::cout << "Calculating arrival costs" << std::endl;
@@ -412,7 +410,7 @@ int zxpac4_32k::encode_history(const char* buf, char* p_out, int len, int pos)
 }
 
 
-int zxpac4_32k::lz_encode(char* buf, int len, std::ofstream& ofs)
+int zxpac4_32k::lz_encode(const char* buf, int len, std::ofstream& ofs)
 {
     int n;
     char* p_out;
@@ -424,13 +422,6 @@ int zxpac4_32k::lz_encode(char* buf, int len, std::ofstream& ofs)
     if (verbose()) {
         std::cout << "Encoding the compressed file" << std::endl;
     }
-    if (m_lz_config->reversed_file) {
-        if (verbose()) {
-            std::cout << "Reversing the file for backward decompression" << std::endl;
-        }
-        reverse_buffer(buf,len);
-    }
-    
     n = encode_history(buf,p_out,len,0);
 
     if (n > 0) {

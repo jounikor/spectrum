@@ -106,9 +106,9 @@ class zxpac4 : public lz_base {
 public:
     zxpac4(const lz_config* cfg, int ins=-1, int max=-1);
     ~zxpac4();
-    int lz_search_matches(const char* buf, int len, int interval);
+    int lz_search_matches(char* buf, int len, int interval);
     int lz_parse(const char* buf, int len, int interval);
-    int lz_encode(char* buf, int len, std::ofstream& ofs);
+    int lz_encode(const char* buf, int len, std::ofstream& ofs);
 
     const cost* lz_get_result(void) { return m_cost_array; }
     const cost* lz_cost_array_get(int len);
