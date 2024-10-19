@@ -289,6 +289,7 @@ int main(int argc, char** argv)
                 if (trg.is_ascii == true) { 
                     cfg_preshift = true;
                 } else {
+                    std::cerr << "**Error: preshift applies only to ASCII files" << std::endl;
                     usage(argv[0]);
                 }
 				break;

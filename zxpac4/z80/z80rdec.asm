@@ -10,9 +10,10 @@
 
 ASCII_LITERALS  equ 1   ; 1 assumes 7bit ascii
 MAX32K_WIN      equ 1   ; 1 assumes max 32768 bytes sliding window
-MUTABLE_SOURCE  equ 0   ; 1 will change the source compressed file
+INPLACE         equ 1   ; 1 will change the source compressed file
                         ; during decompression. The file can be
-                        ; used for decomporession only once!!
+                        ; used for decomporession only once!! This
+                        ; would be usable with inplace decompression.
 
 
 GETBIT  MACRO
@@ -32,7 +33,7 @@ not_empty:
 
 ; Inputs:
 ;   DE = destination address
-;   HL = end of compressed file minus 1
+;   HL = end of compressed file minus
 ;
 ; Returns:
 ;   Nothing meaningful..
@@ -99,7 +100,7 @@ _tag_literal:
         ; The last byte of the compressed file, if a literal ASCII, must
         ; be in a preshifted format '0LLLLLLL'.
         ;
-    IF MUTABLE_SOURCE && ASCII_LITERALS
+    IF INPLACE && ASCII_LITERALS
         ; This solution alters the source file by doing the shift before
         ; moving the data. Another side effect is that the preshifting
         ; of the last literal shall not be done in this case.
@@ -111,7 +112,7 @@ _tag_literal:
         ; This is a sad piece of code but could not figure out any
         ; better solution that would not a) use IX/IY or b) put anything
         ; into the stack before the conditional return.
-    IF !MUTABLE_SOURCE
+    IF !INPLACE
         ex      de,hl
         inc     hl
         srl     (hl)
