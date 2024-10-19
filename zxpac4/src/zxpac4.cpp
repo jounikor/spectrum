@@ -61,7 +61,7 @@ int zxpac4::lz_search_matches(char* buf, int len, int interval)
     m_num_matched_bytes = 0;
     m_num_pmr_matches = 0;
 
-    if (m_lz_config->reversed_file) {
+    if (m_lz_config->reverse_file) {
         if (verbose()) {
             std::cout << "Reversing the file for backwards decompression" << std::endl;
         }
@@ -120,13 +120,12 @@ int zxpac4::lz_parse(const char* buf, int len, int interval)
     (void)interval;
 
     if (verbose()) {
-        if (m_lz_config->reversed_file) {
+        if (m_lz_config->reverse_file) {
             std::cout << "Reversed file parsing engaged" << std::endl;
         } else {
             std::cout << "History parsing engaged" << std::endl;
         }
     }
-
     if (verbose()) {
         std::cout << "Calculating arrival costs" << std::endl;
     }
@@ -434,7 +433,7 @@ int zxpac4::lz_encode(const char* buf, int len, std::ofstream& ofs)
     n = encode_history(buf,p_out,len,0);
 
     if (n > 0) {
-        if (m_lz_config->reversed_file) {
+        if (m_lz_config->reverse_encoded) {
             if (verbose()) {
                 std::cout << "Reversing the encoded file" << std::endl;
             }

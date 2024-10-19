@@ -56,7 +56,8 @@ static struct option longopts[] = {
 	{"only-better", no_argument,        NULL, 'b'},
     {"pmr-offset",  required_argument,  NULL, 'p'},
     // generic parameters
-	{"reverse",     no_argument,        NULL, 'r'},
+	{"reverse-file",no_argument,        NULL, 'R'},
+	{"reverse-encoded",no_argument,        NULL, 'r'},
 	{"verbose",     no_argument,        NULL, 'v'},
 	{"DEBUG",       no_argument,        NULL, 'D'},
 	{"debug",       no_argument,        NULL, 'd'},
@@ -81,12 +82,13 @@ void usage( char *prg ) {
     std::cerr << "  --good-match,-g num   match length that cuts further searches.\n";
     std::cerr << "  --backward,-B num     Number of backward steps after a found match "
               << "(min 0, max " << MAX_BACKWARD_STEPS << ").\n";
-    std::cerr << "  --only-better,-b      Further matches in the history must always be better than "
-              << "previous matches for\n"
-              << "                        the same position (default no).\n";
+    std::cerr << "  --only-better,-b      Further matches in the history must always be better than previous\n"
+              << "                        matches for the same position (default no).\n";
     std::cerr << "  --pmr-offset,-p       Initial PMR offset between 1 and 127 (default depends on the target).\n";
-    std::cerr << "  --reverse,-r          Reverse the input file to allow end-to-start decompression "
-              << "(default no reverse)\n";
+    std::cerr << "  --reverse-encoded,-r  Reverse the encoded file to allow end-to-start decompression\n"
+              << "                        (default no reverse)\n";
+    std::cerr << "  --reverse-file,-R     Reverse the input file to allow end-to-start decompression. This \n"
+              << "                        setting will enable '--reverse-encoded' as well (default no reverse)\n";
     std::cerr << "  --algo,-a             Select used algorithm (0=zxpac4, 1=xzpac4b, 2=zxpac4_32k). \n"
               << "                        (default depends on the target)\n";
     std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).\n";
@@ -162,7 +164,8 @@ lz_config algos[] {
         DEF_BACKWARD_STEPS, ZXPAC4_OFFSET_MATCH2_THRESHOLD, ZXPAC4_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4_INIT_PMR_OFFSET,
         false,      // only_better_matches
-        false,      // reversed_file
+        false,      // reverse_file
+        false,      // reverse_encoded
         false,      // is_ascii
         false
     },
@@ -171,7 +174,8 @@ lz_config algos[] {
         DEF_BACKWARD_STEPS, ZXPAC4B_OFFSET_MATCH2_THRESHOLD, ZXPAC4B_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4B_INIT_PMR_OFFSET,
         false,      // only_better_matches
-        false,      // reversed_file
+        false,      // reverse_file
+        false,      // reverse_encoded
         false,      // is_ascii
         false
     },
@@ -180,7 +184,8 @@ lz_config algos[] {
         DEF_BACKWARD_STEPS, ZXPAC4_32K_OFFSET_MATCH2_THRESHOLD, ZXPAC4_32K_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4_32K_INIT_PMR_OFFSET,
         false,      // only_better_matches
-        false,      // reversed_file
+        false,      // reverse_file
+        false,      // reverse_encoded
         false,      // is_ascii
         false,
     },
@@ -253,7 +258,8 @@ int main(int argc, char** argv)
     int cfg_initial_pmr_offset = -1;
     int cfg_max_chain = -1;
     bool cfg_only_better_matches = false;
-    bool cfg_reversed_file = false;
+    bool cfg_reverse_file = false;
+    bool cfg_reverse_encoded = false;
     lz_base* lz = NULL;
 
     target trg;
@@ -280,7 +286,7 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hPvdDa:X:Arb:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hPvdDa:X:ArRb:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'h':
                 usage(argv[0]);
@@ -309,8 +315,12 @@ int main(int argc, char** argv)
                     usage(argv[0]);
                 }
                 break;
-            case 'r':   // --reverse
-                cfg_reversed_file = true;
+            case 'r':   // --reverse-encoded
+                cfg_reverse_encoded = true;
+                break;
+            case 'R':   // --reverse-file
+                cfg_reverse_encoded = true;
+                cfg_reverse_file = true;
                 break;
             case 'b':   // --only-better
                 cfg_only_better_matches = true;
@@ -400,7 +410,8 @@ int main(int argc, char** argv)
     
     cfg.preshift_last_ascii_literal = cfg_preshift;
     cfg.only_better_matches = cfg_only_better_matches;
-    cfg.reversed_file = cfg_reversed_file;
+    cfg.reverse_file = cfg_reverse_file;
+    cfg.reverse_encoded = cfg_reverse_encoded;
     cfg.is_ascii = trg.is_ascii;
 
     // The following stuff is horrible.. Needs to be hidden under

@@ -63,7 +63,8 @@ struct lz_config {
     int initial_pmr_offset;
     //
     bool only_better_matches:1;
-    bool reversed_file:1;
+    bool reverse_file:1;
+    bool reverse_encoded:1;
     bool is_ascii:1;
     bool preshift_last_ascii_literal:1;
 };
