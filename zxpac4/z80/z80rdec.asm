@@ -46,7 +46,7 @@ not_empty:
 ;
 main:
         ld      hl,file_end
-        ld      de,0xc000
+        ld      de,file
         call    z80rdec
         ret
 
