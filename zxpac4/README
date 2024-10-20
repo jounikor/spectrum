@@ -1,0 +1,179 @@
+This is a DRAFT!
+
+
+ZXPAC4 version 0.1 (c) 2024 Jouni 'Mr.Spiv' Korhonen
+
+
+Work-in-Progress. Quite few optios/features are still not done:
+ * zxpac4b algorithm
+ * --abs option support
+ * --exe option support
+ * --backward support has been removed
+ * No other target than 'asc' and 'bin' are done
+
+Some notes on the targets:
+ * 'asc' is an 7bit ASCII target. The file will be tested that it is 7bit only.
+   - Compressed file contains a normal 4 byte file header.
+   - Default algorithm is zxpac4.
+ * 'bin' is a normal plain binary target.
+   - Compressed file contains a normal 4 byte file header.
+   - Default algorithm is zxpac4.
+ * 'zx' 
+   - Compressed file is an autorun basic program, which contains the compressed
+     data as well.
+   - Default algorithm is zxpac4_32k.
+ * 'bbc'
+   - Compressed file is an autorun basic program, which contains the compressed
+     data as well.
+   - Default algorithm is zxpac4_32k.
+ * 'ami'
+   - Compressed file is an executable that contains either absolute address or
+     relocated standard Amiga executable. Overlay executables are not supported.
+   - If the original executable is relocatable then its hunks are preprocessed
+     before compression (details TBD).
+   - Default algorithm is zxpac4.
+
+Usage and commandline options summary:
+
+Usage: ./build/zxpac4 target [options] infile [outfile]
+ Targets:
+  bin - Binary data file
+  asc - 7bit ASCII data file
+  zx  - ZX Spectrum self executing TAP
+  bbc - BBC Micro self executing program
+  ami - Amiga self executing program
+ Options:
+  --max-chain,-c num    Maximum number of stored matches per position (min 1, max 9999).
+  --good-match,-g num   match length that cuts further searches.
+  --backward,-B num     Number of backward steps after a found match (min 0, max 16).
+  --only-better,-b      Further matches in the history must always be better than previous
+                        matches for the same position (default no).
+  --pmr-offset,-p       Initial PMR offset between 1 and 127 (default depends on the target).
+  --reverse-encoded,-r  Reverse the encoded file to allow end-to-start decompression
+                        (default no reverse)
+  --reverse-file,-R     Reverse the input file to allow end-to-start decompression. This
+                        setting will enable '--reverse-encoded' as well (default no reverse)
+  --algo,-a             Select used algorithm (0=zxpac4, 1=xzpac4b, 2=zxpac4_32k).
+                        (default depends on the target)
+  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).
+  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.
+  --exe,-X              Self-extracting decruncher (Amiga target).
+  --debug,-d            Output a LOT OF debug prints to stderr.
+  --DEBUG,-D            Output EVEN MORE debug prints to stderr.
+  --verbose,-v          Output some additional information to stdout.
+  --help,-h             Print this output ;)
+
+The following options affect the compression outcome (and typically also the memory usage
+during the compression). 
+  --max-chain
+  --good-match
+  --only-better
+  --pmr-offset
+
+The following options affect how the compressed file is saved and therefore
+determines which decompression algorithm is to be used and how that is to be
+parameterized.
+
+  --pmr-offset
+  --reverse-encoded
+  --reverse-file
+  --preshift
+
+
+Some notes on the supporter algorithms:
+ * zxpac4 has a 128K sliding window and a maximum match of 255.
+ * zxpac4_32k has a 32K sliding window and a maximum match of 255.
+ * The maximum match length is capped to 255, which allows simpler decompressor
+   implementation in 8bit platforms.
+
+ All the algorithms use "optimal parser", which betters the compression  ratio
+ as only those matches/literals are chosen that produce the best result with
+ the current encoder (this requires, obviusly, that the parser knows the cost
+ of each encoding choice). The downside of my implementtion of the  optiomal
+ parser is the excessive use of memory and searching for matches on every
+ position of the original file.
+
+ zxpac4(_32k) makes an extensive use of Previous Match References (PMR) or
+ "repeat offsets" as some call them. There's only one PMR slot available but it
+ can be used to encode both matches and literals (i.e. a match with a length of
+ 1). A match of length 2 anywhere is the sliding window can be encoded in 3
+ bits. A literal can be encoded in 3 bits.  Literals in general are encoded
+ individually, not as a run of literals. The zxpac4b is a variant that encodes
+ literal as a run (max 255 and if a longer is found the compression will fail).
+ The zxpac4b would allow even shorted encoding of PMRs (minimum 2 bits) by
+ making a use of the fact that a match cannot be followed by another match,
+ thus a PMR can be encoded as a "literal" following a literal run.
+
+ The ASCII mode allows supressing prefix codes used to distinguish between
+ literals and matches. Since the ASCII literal is always encoded in 7 bits the
+ last remaining bit is used to encode the next match or literal prefix code.
+ Effectively most of the literals in a run of literals are encoded without any
+ prefix overhead:
+ Ascii-only:
+  0 + (LLLLLLLx), x = next prefix bit.
+
+ The zxpac4(b/_32k) encoder attempts to use aligned bytes as much as possible.
+ Literals and the first 7 bits of the offset are always byte aligned. I have
+ used this approach for quite long time with my "crunchers".
+
+ The match length encoder make use of interleaved Elias-Gamma encoder, where
+ Elias-Gamma codes and length bits are interleaved in pairs. See below how
+ match lengths are encoded:
+ Matchlen:
+  0       + [0] = 1                     // 0
+  10      + [1] = 2 -> 3                // 1n0
+  110     + [2] = 4 -> 7                // 1n1n0
+  1110    + [3] = 8 -> 15               // 1n1n1n0
+  11110   + [4] = 16 -> 31              // 1n1n1n1n0
+  111110  + [5] = 32 -> 64              // 1n1n1n1n1n0
+  1111110 + [6] = 64 -> 127             // 1n1n1n1n1n1n0
+  1111111 + [7] = 128 -> 255            // 1n1n1n1n1n1n1n
+
+ The offset encided is a variation of Elias-Gamma encoder. Note that the 7 most
+ significant bits are encoded in an aligned byte as such. The most significant
+ bit of the encoded offset contains the first bit of the following Gamma-Elias
+ code. The encoder is an improved version of the zxpac2 offset encoder.
+ Offset:
+  0       + [0]  = 1 -> 127             // 0+nnnnnnn
+  100     + [0]  = 128 -> 255           // 1+nnnnnnn+00
+  101     + [1]  = 256 -> 511           // 1+nnnnnnn+01+n
+  1100    + [2]  = 512 -> 1023          // 1+nnnnnnn+100+nn
+  1101    + [3]  = 1024 -> 2047         // 1+nnnnnnn+101+nnn
+  11100   + [4]  = 2048 -> 4095         // 1+nnnnnnn+1100+nnnn
+  11101   + [5]  = 4096 -> 8191         // 1+nnnnnnn+1101+nnnnn
+  111100  + [6]  = 8192 -> 16383        // 1+nnnnnnn+11100+nnnnnn
+  111101  + [7]  = 16384 -> 32767       // 1+nnnnnnn+11101+nnnnnnn
+  111110  + [8]  = 32768 -> 65535       // 1+nnnnnnn+11110+nnnnnnnn
+  111111  + [9]  = 65536 -> 131071      // 1+nnnnnnn+11111+nnnnnnnnn
+
+ Note that the offset 0 is an illegal output of the encoder and could
+ potentially be used for other uses. I have been thinking using is as an EOF
+ marker or allow the use of multiple PMRs (see the pmr.cpp and pmr.h sketch
+ codes in the repository).
+
+ The entire zxpac4(_32k) encoder can be described as:
+  Literal Ascii-mode:
+  0 + (LLLLLLLx), x = next prefix bit.
+  Literal Binary-mode:
+  0 + (LLLLLLLL)
+  
+  PMR:
+  1 + 1 + matchlen   -> PMR, where 0 < matchlen < 255
+  
+  Match:
+  1 + 0 + (Xnnnnnnn) + reminder of offset (possible X bit) + matchlen
+          Where matchlen + 1 is the final length
+
+ Anyway, as one can see zxpac4(b/_32k) is a dead old LZSS with a slightly
+ advanced parser.  The main target is anyway 8bit platforms without any
+ additional memory usage during decompression. More elaborate encoders are
+ "reserved", for example, to my old S405 line of compressors. I intend to use a
+ windowed version of the optimal parser with the S405 some day.
+
+Z80 Decompressors:
+ * z80dec_v2.asm
+ * z80rdec.asm
+ * z80rdec_rev.asm
+
+
+
