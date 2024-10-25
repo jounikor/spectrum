@@ -44,7 +44,7 @@ Usage: ./build/zxpac4 target [options] infile [outfile]
   ami - Amiga self executing program
  Options:
   --max-chain,-c num    Maximum number of stored matches per position (min 1, max 9999).
-  --good-match,-g num   match length that cuts further searches.
+  --good-match,-g num   match length that cuts further searches (default ).
   --backward,-B num     Number of backward steps after a found match (min 0, max 16).
   --only-better,-b      Further matches in the history must always be better than previous
                         matches for the same position (default no).
@@ -65,19 +65,37 @@ Usage: ./build/zxpac4 target [options] infile [outfile]
 
 The following options affect the compression outcome (and typically also the memory usage
 during the compression). 
-  --max-chain
-  --good-match
-  --only-better
-  --pmr-offset
+  --max-chain           The maximum number of stored matches per each match position i.e.
+                        each byte in the file.
+  --good-match          The threshold to end searching for a better matches on a match
+                        position. The lower the value the faster the matching but typically
+                        worse compression. The allowed values and defaults depend on the
+                        used algorithm.
+  --only-better         During the string matching only store those matches that are 
+                        better than the previously found match length. This option speeds
+                        up the parsing phase of the compression but typically with worse
+                        compression.
+  --pmr-offset          The default initial PMR offset. Quessing a good initial PMR offset
+                        may gain few bits better compression ;) The initial value is 
+                        stored into the compressed file.
 
 The following options affect how the compressed file is saved and therefore
 determines which decompression algorithm is to be used and how that is to be
 parameterized.
 
-  --pmr-offset
-  --reverse-encoded
-  --reverse-file
-  --preshift
+  --reverse-file        The input file is reversed before compression. The option is only
+                        usable with '--reverse-encoded' and avoid file reversing in the
+                        decompression routine when the '--reverse-encoded' option was
+                        used. Sometimes this option results to worse compression.
+  --reverse-encoded     The encoded file is reversed before saving it. This allows from
+                        higher to lower memory decompression (i.e. inplace decompression).
+                        If the '--reverse-file' option was not used then the decompressor
+                        must do the file reversing.
+  --preshift            In a case the target was 'asc' (7bit ASCII) and depending on the
+                        decompressor to last byte (if literal) must be preshifted.
+                        Otherwise the last decompressed byte is "value << 1". See the
+                        algorithm discussion and the literal encoding for 7bit ASCII
+                        inputs.
 
 
 Some notes on the supporter algorithms:
@@ -171,9 +189,8 @@ Some notes on the supporter algorithms:
  windowed version of the optimal parser with the S405 some day.
 
 Z80 Decompressors:
- * z80dec_v2.asm
- * z80rdec.asm
- * z80rdec_rev.asm
-
-
+ * z80dec.asm      - normal from lower to higher memory decompressor
+ * z80rdec.asm     - from higher to lower memory (inplace) decompressor
+ * z80rdec_rev.asm - from higher to lower memory (inplace) decompressor
+                     that also reverses the file after decompression
 

@@ -6,6 +6,9 @@
 ; Use e.g. following to assemble:
 ;  pasmo --tapbas --alocal -1 z80rdec.asm rtap.tap
 ;
+; Note: this version of the decompressor is used when both
+; input file has been reversed (--reverse-file) and the
+; encoded file has also been reversed (--reverse-encoded).
 ;
 
 ASCII_LITERALS  equ 1   ; 1 assumes 7bit ascii
