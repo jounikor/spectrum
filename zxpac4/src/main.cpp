@@ -392,7 +392,8 @@ int main(int argc, char** argv)
     lz_config cfg = algos[cfg_algo];
     
     if (cfg_good_match > -1) {
-        if (cfg_good_match > cfg.max_match) {
+        if (cfg_good_match > cfg.max_match || 
+            cfg_good_match < cfg.min_match) {
             std::cerr << "**Error: Invalid parameter value '" << cfg_good_match  << "'\n";
             usage(argv[0]);
         }
@@ -476,6 +477,9 @@ int main(int argc, char** argv)
         std::cout << "Loading from file '" << cfg_infile_name << "'\n";
         std::cout << "Saving to file '" << cfg_outfile_name << "'\n";
         std::cout << "Using target '" << trg.target_name << "' and algorith " << cfg_algo << "\n";
+        std::cout << "Min match is " << cfg.min_match << "\n";
+        std::cout << "Max match is " << cfg.max_match << "\n";
+        std::cout << "Good match is " << cfg.good_match << "\n";
     }
 
     ofs.open(cfg_outfile_name,std::ios::binary|std::ios::out);
@@ -497,9 +501,8 @@ int main(int argc, char** argv)
             std::cout << "Number of matched bytes: " << lz->get_num_matched_bytes() << std::endl;
             std::cout << "Number of PMR matches: " << lz->get_num_pmr_matches() << std::endl; 
             std::cout << "Number of PMR literals: " << lz->get_num_pmr_literals() << std::endl;
+            std::cout << "Security length: " << lz->get_security_distance() << std::endl;
         }
-
-
     } else {
         std::cerr << "**Error: opening output file '" << cfg_outfile_name << "' failed\n";
     }

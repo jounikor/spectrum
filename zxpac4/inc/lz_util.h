@@ -23,9 +23,6 @@ struct match {
 };
 
 
-
-
-// *FIX* make this a template..
 template<typename derived> class putbits {
     derived& impl(void) {
         return *static_cast<derived*>(this);
@@ -41,6 +38,9 @@ public:
     char* byte(int byte) {
         return impl().impl_byte(byte);
     }
+    int size(void) {
+        return impl().impl_size();
+    }
 };
 
 
@@ -49,12 +49,14 @@ class putbits_history : public putbits<putbits_history> {
     int m_bc;
     char* m_bitbuf_tag_ptr;
     char* m_bitbuf_ptr;
+    char* m_start_ptr;
 public:
     putbits_history(char* p_buf) {
         m_bb = 0;
         m_bc = 8;
         m_bitbuf_tag_ptr = NULL;
         m_bitbuf_ptr = p_buf;
+        m_start_ptr = p_buf;
     }
     ~putbits_history(void) { impl_flush();  }
     char* impl_bits(int value, int num_bits) {
@@ -100,6 +102,9 @@ public:
         char* p_old_pos = m_bitbuf_ptr;
         *m_bitbuf_ptr++ = byte & 0xff;
         return p_old_pos;
+    }
+    int impl_size(void) {
+        return m_bitbuf_ptr - m_start_ptr;
     }
 };
 

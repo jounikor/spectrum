@@ -282,6 +282,9 @@ int zxpac4_32k::encode_history(const char* buf, char* p_out, int len, int pos)
     int offset;
     int n;
     putbits_history pb(p_out);
+    int header_size = 4;
+
+    m_security_distance = 0;
 
     // Build header at the beginning of the file.. max 16M files supported.
     if (m_lz_config->is_ascii) {
@@ -320,12 +323,10 @@ int zxpac4_32k::encode_history(const char* buf, char* p_out, int len, int pos)
         literal = buf[pos-1];
 
         if (offset == 0 && length == 1) {
-            // encode raw literal
             if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "O: Literal ";
             }
             if (m_lz_config->is_ascii && last_literal_ptr) {
-                // Unnecessary..
                 if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "last_ptr = " << std::dec << last_literal_ptr-p_out;
                 }
@@ -397,7 +398,22 @@ int zxpac4_32k::encode_history(const char* buf, char* p_out, int len, int pos)
             }
             last_literal_ptr = NULL;
         }
+
+        n = pb.size();
+
+        if (n >= len) {
+            return -1;
+        }
+
+        n = n - pos - header_size;
+
+        if (n > 0) {
+            if (n > m_security_distance) {
+                m_security_distance = n;
+            }
+        }
     }
+    
     if (m_lz_config->preshift_last_ascii_literal && last_literal_ptr) {
         if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
             std::cerr << "Last literal preshifted\n";

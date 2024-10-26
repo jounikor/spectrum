@@ -169,6 +169,7 @@ protected:
     const lz_config* m_lz_config;
     int m_debug_level;
     bool m_verbose;
+    int m_security_distance;
 protected:
     void reverse_buffer(char* p_buf, int len) {
         char t;
@@ -181,7 +182,8 @@ protected:
 public:
     lz_base(const lz_config* p_cfg): m_lz_config(p_cfg), 
         m_debug_level(DEBUG_LEVEL_NONE), 
-        m_verbose(false) { }
+        m_verbose(false),
+        m_security_distance(0) { }
     virtual ~lz_base(void) { }
 
     // The interface definition for the base LZ class..
@@ -222,6 +224,9 @@ public:
     }
     int get_num_pmr_matches(void) const {
         return m_num_pmr_matches;
+    }
+    int get_security_distance(void) const {
+        return m_security_distance;
     }
 };
 
