@@ -501,7 +501,7 @@ int main(int argc, char** argv)
             std::cout << "Number of matched bytes: " << lz->get_num_matched_bytes() << std::endl;
             std::cout << "Number of PMR matches: " << lz->get_num_pmr_matches() << std::endl; 
             std::cout << "Number of PMR literals: " << lz->get_num_pmr_literals() << std::endl;
-            std::cout << "Security length: " << lz->get_security_distance() << std::endl;
+            std::cout << "Security distance: " << lz->get_security_distance() << std::endl;
         }
     } else {
         std::cerr << "**Error: opening output file '" << cfg_outfile_name << "' failed\n";

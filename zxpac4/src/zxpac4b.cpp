@@ -281,9 +281,15 @@ int zxpac4b::encode_history(const char* buf, char* p_out, int len, int pos)
     int n;
     int run_length;
     putbits_history pb(p_out);
-    int header_size = 4;
+    int header_size_to_sub;
 
     m_security_distance = 0;
+    
+    if (m_lz_config->reverse_encoded) {
+        header_size_to_sub = 4;
+    } else {
+        header_size_to_sub = 0;
+    }
 
     // Build header at the beginning of the file.. max 16M files supported.
     if (m_lz_config->is_ascii) {
@@ -393,7 +399,7 @@ int zxpac4b::encode_history(const char* buf, char* p_out, int len, int pos)
             return -1;
         }
 
-        n = n - pos - header_size;
+        n = n - pos - header_size_to_sub;
 
         if (n > 0) {
             if (n > m_security_distance) {
