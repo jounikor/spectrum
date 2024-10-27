@@ -476,7 +476,7 @@ int main(int argc, char** argv)
     if (cfg_verbose_on) {
         std::cout << "Loading from file '" << cfg_infile_name << "'\n";
         std::cout << "Saving to file '" << cfg_outfile_name << "'\n";
-        std::cout << "Using target '" << trg.target_name << "' and algorith " << cfg_algo << "\n";
+        std::cout << "Using target '" << trg.target_name << "' and algorithm " << cfg_algo << "\n";
         std::cout << "Min match is " << cfg.min_match << "\n";
         std::cout << "Max match is " << cfg.max_match << "\n";
         std::cout << "Good match is " << cfg.good_match << "\n";

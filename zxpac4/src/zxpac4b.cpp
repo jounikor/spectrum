@@ -113,8 +113,10 @@ int zxpac4b::lz_parse(const char* buf, int len, int interval)
     int length;
     int offset;
     int pos;
+    int next;
     int num_literals;
     int pmr_offset = m_lz_config->initial_pmr_offset;
+    int previous_was_pmr;
 
     // Unused at the moment..
     (void)interval;
@@ -142,6 +144,7 @@ int zxpac4b::lz_parse(const char* buf, int len, int interval)
     
     pos = len;
     num_literals = 1;
+    previous_was_pmr = 0;
 
     // Fix the links of selected cost nodes
     while (pos > 0) {
@@ -162,19 +165,50 @@ int zxpac4b::lz_parse(const char* buf, int len, int interval)
             ++m_num_pmr_matches;
             ++m_num_matches;
             m_num_matched_bytes += length;
+            previous_was_pmr = pos;
+            next = pos;
         } else if (offset > 0 && length == 1) {
-            ++m_num_pmr_literals;
-            ++m_num_literals;
+            if (previous_was_pmr > 0) {
+                // Link this literal PMR to previous PMR match
+                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                    std::cerr << "previous_was_literal " << previous_was_pmr << " and pos " << pos << std::endl;
+                }
+                if (m_cost_array[previous_was_pmr].length > 1) {
+                    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                        std::cerr << "PMR match" << std::endl;
+                    }
+                } else {
+                    if (get_debug_level() > DEBUG_LEVEL_NORMAL) { 
+                        std::cerr << "PMR literal" << std::endl;
+                    }
+                    --m_num_pmr_literals;
+                    --m_num_literals;
+                }
+                // Skip this PMR and add in into the previous
+                ++m_cost_array[previous_was_pmr].length;
+                ++m_cost_array[previous_was_pmr].offset = 0;
+                ++m_num_matched_bytes;
+                next = previous_was_pmr;
+            } else {
+                ++m_num_pmr_literals;
+                ++m_num_literals;
+                next = pos;
+            }
+            previous_was_pmr = pos;
         } else if (offset == 0 && length == 1) {
             ++m_num_literals;
+            previous_was_pmr = 0;
+            next = pos;
         } else {
             ++m_num_matches;
             m_num_matched_bytes += length;
+            previous_was_pmr = 0;
+            next = pos;
         }
         if (pos == len) {
             m_cost_array[pos].next = 0;
         } 
-        m_cost_array[pos-length].next = pos;
+        m_cost_array[pos-length].next = next;
         pos -= length;
     }
 
@@ -315,6 +349,10 @@ int zxpac4b::encode_history(const char* buf, char* p_out, int len, int pos)
             run_length = m_cost_array[pos].num_literals;
             n = m_cost.impl_get_length_tag(run_length,tag);
 
+            if (run_length > 255) {
+                std::cerr << "**Error: cannot compress this file. Too long literal run." << std::endl;
+                return -1;
+            }
             if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "O: Literal run of " << run_length;
             }

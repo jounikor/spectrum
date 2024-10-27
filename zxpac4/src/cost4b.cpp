@@ -247,7 +247,7 @@ int zxpac4b_cost::impl_literal_cost(int pos, cost* c, const char* buf)
     int offset = p_ctx->offset;
     int num_literals = p_ctx->num_literals;
 
-    if (buf[pos-p_ctx->pmr_offset] == buf[pos]) {
+    if (pos >= p_ctx->pmr_offset && (buf[pos-p_ctx->pmr_offset] == buf[pos])) {
         // PMR of length 1 
         offset = p_ctx->pmr_offset;
         num_literals = 1;
@@ -260,7 +260,7 @@ int zxpac4b_cost::impl_literal_cost(int pos, cost* c, const char* buf)
         new_cost += 8;
         offset = 0;
     }
-    if ((lz_get_config()->is_ascii == false || p_ctx->last_was_literal == false) && num_literals == 1) {
+    if (lz_get_config()->is_ascii == false || p_ctx->last_was_literal == false) {
         // tag of 1bit
         new_cost = new_cost + 1;
     }
