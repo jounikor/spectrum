@@ -169,7 +169,12 @@ int zxpac4b::lz_parse(const char* buf, int len, int interval)
             next = pos;
         } else if (offset > 0 && length == 1) {
             if (previous_was_pmr > 0) {
-                // Link this literal PMR to previous PMR match
+                // Link this literal PMR to previous PMR match.. There are two cases
+                // 1) PMR literal followed by PMR match
+                // 2) PMR literal followed by PMR literal
+                // The decompressor cannot handle back to back PMRs, thus we must kill
+                // one PMR literal and include it into previous PMR match or create a
+                // PMR match with length 2.
                 if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "previous_was_literal " << previous_was_pmr << " and pos " << pos << std::endl;
                 }

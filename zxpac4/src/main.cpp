@@ -94,6 +94,7 @@ void usage( char *prg ) {
     std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --exe,-X              Self-extracting decruncher (Amiga target).\n";
+    std::cerr << "  --overlay,-O          Self-extracting overlay decruncher (Amiga target).\n";
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
     std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
     std::cerr << "  --verbose,-v          Output some additional information to stdout.\n";
@@ -114,7 +115,7 @@ struct target {
     func_t init_add_header;
     func_t post_header_fix;
     func_t post_trailer_fix;
-} const targets[] = {
+} static const targets[] = {
     {   "asc",
         true,
         1<<24,

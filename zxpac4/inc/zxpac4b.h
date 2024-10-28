@@ -28,10 +28,20 @@
  It will in most cases 1 bit per encoded literal or a match following a literal.
  Binary mode compression when all charaters are between 0 to 255.
 
- This encoding uses the cool trick recently seen in Einar Saukas' ZX0 compressor.
+ The PMR encoding uses the cool trick recently seen in Einar Saukas' ZX0 compressor.
  I am definitive I have seen it earlier used somewhere else (could be some of
  Charles Bloom's rants). Anyway, I have so far rejected the idea because the need
- of "run" of literals instead of a single literal at a time approach.
+ of "run" of literals instead of a single literal at a time approach. It is easier
+ to handle individual literals with statistical encoders.
+
+ There's one limitation to the bit encoding below. A PMR after literal run cannot
+ handle two or more PMRs in a row. This is a valid encoding with other zxpac4 
+ encoders and happens time to time, specifically encoding two PMR literals after
+ a normal encoded literal in ASCII mode. The encoding of two PMRs is cheaper than
+ the encoding of a match of 2. The zxpac4b encoder takes this limitation into 
+ account if the match cost calculator comes up with such sequence of PMRs and
+ combines two PMRs into a one.
+
 
   Ascii-only:
   0 + (LLLLLLLx), x = next tag bit.
@@ -55,7 +65,6 @@
   1111110 + [6] = 64 -> 127             // 1n1n1n1n1n1n0
   1111111 + [7] = 128 -> 255            // 1n1n1n1n1n1n1n
   (note: need to fix this max 255 literals..)
-
 
  offset
   0       + [0]  = 1 -> 127             // 0+nnnnnnn
