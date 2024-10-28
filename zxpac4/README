@@ -98,7 +98,7 @@ parameterized.
                         inputs.
 
 
-Some notes on the supporter algorithms:
+Some notes on the supported algorithms:
  * zxpac4 has a 128K sliding window and a maximum match of 255.
  * zxpac4_32k has a 32K sliding window and a maximum match of 255.
  * The maximum match length is capped to 255, which allows simpler decompressor
@@ -189,8 +189,12 @@ Some notes on the supporter algorithms:
  windowed version of the optimal parser with the S405 some day.
 
 Z80 Decompressors:
- * z80dec.asm      - normal from lower to higher memory decompressor
- * z80rdec.asm     - from higher to lower memory (inplace) decompressor
- * z80rdec_rev.asm - from higher to lower memory (inplace) decompressor
+ * z80dec.asm      - zxpac4(_32k) normal from lower to higher memory decompressor
+ * z80rdec.asm     - zxpac4(_32k) from higher to lower memory (inplace) decompressor
+ * z80rdec_rev.asm - zxpac4(_32k) from higher to lower memory (inplace) decompressor
                      that also reverses the file after decompression
+ * z80rdecb.asm    - zxpac4b from higher to lower memory (inplace) decompressor
+
+M680x0 Decompressors: 
+
 

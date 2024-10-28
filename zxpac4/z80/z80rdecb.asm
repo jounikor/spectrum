@@ -11,7 +11,7 @@
 ; encoded file has also been reversed (--reverse-encoded).
 ;
 
-ASCII_LITERALS  equ 1   ; 1 assumes 7bit ascii
+ASCII_LITERALS  equ 0   ; 1 assumes 7bit ascii
 INPLACE         equ 1   ; 1 will change the source compressed file
                         ; during decompression. The file can be
                         ; used for decomporession only once!! This
