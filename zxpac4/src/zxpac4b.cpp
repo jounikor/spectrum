@@ -340,8 +340,6 @@ int zxpac4b::encode_history(const char* buf, char* p_out, int len, int pos)
     pb.byte(len >> 8);
     pb.byte(len >> 0);
     last_literal_ptr = NULL;
-
-    // Always send first literal (which cannot be compressed without a tag..
     pos = 0;
     
     while ((pos = m_cost_array[pos].next)) {
