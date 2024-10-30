@@ -31,8 +31,13 @@ not_empty:
 
         org     $8000
 
+main:
+        ld      hl,file_end
+        ld      de,file
+        call    z80rdec
+        ret
 
-
+;-----------------------------------------------------------------------------
 ; Inputs:
 ;   DE = destination address
 ;   HL = end of compressed file minus
@@ -46,12 +51,6 @@ not_empty:
 ;
 ;
 ;
-main:
-        ld      hl,file_end
-        ld      de,file
-        call    z80rdec
-        ret
-
 z80rdec: ;
         xor     a
         dec     hl
@@ -80,8 +79,7 @@ z80rdec: ;
         ; BC = length of the original file
         ;  A = empty bitbuffer
         ;
-        ; The maximum offset supported by 8bit decoder is 32767 not 131071!!
-        ; This fact allows us to cut some bytes from the offset decorer.
+        ; The maximum offset supported by 8bit decoder is 65535 not 131071!!
         ;
 _main_loop:
         GETBIT

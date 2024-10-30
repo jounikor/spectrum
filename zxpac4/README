@@ -107,7 +107,7 @@ Some notes on the supported algorithms:
  All the algorithms use "optimal parser", which betters the compression  ratio
  as only those matches/literals are chosen that produce the best result with
  the current encoder (this requires, obviusly, that the parser knows the cost
- of each encoding choice). The downside of my implementtion of the  optiomal
+ of each encoding choice). The downside of my implementation of the  optiomal
  parser is the excessive use of memory and searching for matches on every
  position of the original file.
 
@@ -118,25 +118,30 @@ Some notes on the supported algorithms:
  bits. A literal can be encoded in 3 bits.  Literals in general are encoded
  individually, not as a run of literals. The zxpac4b is a variant that encodes
  literal as a run (max 255 and if a longer is found the compression will fail).
- The zxpac4b would allow even shorted encoding of PMRs (minimum 2 bits) by
- making a use of the fact that a match cannot be followed by another match,
- thus a PMR can be encoded as a "literal" following a literal run.
+ The zxpac4b allows even shorted encoding of PMRs (minimum 2 bits) by making a
+ use of the fact that a match cannot be followed by another match, thus a PMR
+ can be encoded as a "literal" following a literal run. The encoder looks like
+ ZX0 encoding a lot to be honest ;-) Anyway, I recall seeing the reuse of
+ literal prefix after literal prefix dicussed years ago, possibly in another
+ context, though.
 
- The ASCII mode allows supressing prefix codes used to distinguish between
+ The ASCII mode allows supressing most prefix codes used to distinguish between
  literals and matches. Since the ASCII literal is always encoded in 7 bits the
- last remaining bit is used to encode the next match or literal prefix code.
- Effectively most of the literals in a run of literals are encoded without any
- prefix overhead:
- Ascii-only:
+ last remaining bit is used to encode the the first bit of the next match or
+ literal prefix code.  Effectively most of the literals in a run of literals
+ are encoded without any prefix overhead.
+ Example of ASCII-only mode encoding of a literal:
   0 + (LLLLLLLx), x = next prefix bit.
 
- The zxpac4(b/_32k) encoder attempts to use aligned bytes as much as possible.
- Literals and the first 7 bits of the offset are always byte aligned. I have
- used this approach for quite long time with my "crunchers".
+ The zxpac4(b/_32k) encoder attempts to use 8bit aligned bytes as much as
+ possible.  Literals and the first 7 bits of the offset are always byte
+ aligned. I have used this approach for quite long time with my "crunchers"
+ and with Z80 assembly it allows the use of LDD/LDI for literals copy and
+ a match string copy.
 
- The match length encoder make use of interleaved Elias-Gamma encoder, where
+ The match length encoder makeis use of interleaved Elias-Gamma encoder, where
  Elias-Gamma codes and length bits are interleaved in pairs. See below how
- match lengths are encoded:
+ match lengths are encoded.
  Matchlen:
   0       + [0] = 1                     // 0
   10      + [1] = 2 -> 3                // 1n0
@@ -147,10 +152,14 @@ Some notes on the supported algorithms:
   1111110 + [6] = 64 -> 127             // 1n1n1n1n1n1n0
   1111111 + [7] = 128 -> 255            // 1n1n1n1n1n1n1n
 
- The offset encided is a variation of Elias-Gamma encoder. Note that the 7 most
- significant bits are encoded in an aligned byte as such. The most significant
- bit of the encoded offset contains the first bit of the following Gamma-Elias
- code. The encoder is an improved version of the zxpac2 offset encoder.
+ The offset encoding is a variation of Elias-Gamma encoder. Note that the 7
+ most significant bits are encoded in an aligned byte as such. The most
+ significant bit of the encoded offset contains the first bit of the following
+ Gamma-Elias code. Since the prefix code for an offset length is 0 for offsets
+ less than 128 and the first bit of the prefix for offsets longer or equal to
+ 128 start with 1, the full 8 bit byte always implicitly contains the "correct
+ set" of 8 high bits of the offset. The offset encoder is an improved version
+ of the zxpac2 offset encoder.
  Offset:
   0       + [0]  = 1 -> 127             // 0+nnnnnnn
   100     + [0]  = 128 -> 255           // 1+nnnnnnn+00
@@ -181,6 +190,21 @@ Some notes on the supported algorithms:
   Match:
   1 + 0 + (Xnnnnnnn) + reminder of offset (possible X bit) + matchlen
           Where matchlen + 1 is the final length
+
+ The entire zxpac4b encoder can be described as:
+  Literal run in ASCII-mode:
+  0 + matchlen + matchlen-1 of (0LLLLLLL) + (LLLLLLLx)
+      x = next prefix bit.
+  Literal run in Binary-mode:
+  0 + matchlen + matchlen of (LLLLLLLL)
+  
+  PMR (after a literal run):
+  0 + matchlen -> PMR, where 0 < matchlen < 255
+  
+  Match:
+  1 + (Xnnnnnnn) + reminder of offset (possible X bit) + matchlen
+      where matchlen + 1 is the final length
+
 
  Anyway, as one can see zxpac4(b/_32k) is a dead old LZSS with a slightly
  advanced parser.  The main target is anyway 8bit platforms without any
