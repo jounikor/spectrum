@@ -104,26 +104,36 @@ Some notes on the supported algorithms:
  * The maximum match length is capped to 255, which allows simpler decompressor
    implementation in 8bit platforms.
 
- All the algorithms use "optimal parser", which betters the compression  ratio
- as only those matches/literals are chosen that produce the best result with
- the current encoder (this requires, obviusly, that the parser knows the cost
- of each encoding choice). The downside of my implementation of the  optiomal
- parser is the excessive use of memory and searching for matches on every
- position of the original file.
-
  zxpac4(_32k) makes an extensive use of Previous Match References (PMR) or
  "repeat offsets" as some call them. There's only one PMR slot available but it
  can be used to encode both matches and literals (i.e. a match with a length of
  1). A match of length 2 anywhere is the sliding window can be encoded in 3
- bits. A literal can be encoded in 3 bits.  Literals in general are encoded
- individually, not as a run of literals. The zxpac4b is a variant that encodes
- literal as a run (max 255 and if a longer is found the compression will fail).
- The zxpac4b allows even shorted encoding of PMRs (minimum 2 bits) by making a
- use of the fact that a match cannot be followed by another match, thus a PMR
- can be encoded as a "literal" following a literal run. The encoder looks like
- ZX0 encoding a lot to be honest ;-) Anyway, I recall seeing the reuse of
- literal prefix after literal prefix dicussed years ago, possibly in another
- context, though.
+ bits. A literal can be encoded in 3 bits.
+
+ Literals in general are encoded individually, not as a run of literals. The
+ zxpac4b is a variant that encodes literal as a run (max 255 and if a longer is
+ found the compression will fail).  The zxpac4b allows even shorter encoding of
+ PMRs (minimum 2 bits) by making a use of the fact that a match cannot be
+ followed by another match, thus a PMR can be encoded as a "literal run"
+ following a literal run. The encoder looks a lot like ZX0 encoding to be
+ honest ;-) Anyway, I recall seeing the reuse of literal prefix after literal
+ prefix dicussed years ago, possibly in another context, though. I was just a 
+ bit disappointed that literal runs did that well.
+
+ All the algorithms use "optimal parser", which betters the compression  ratio
+ as only those matches/literals are chosen that produce the best result with
+ the current encoder (this requires, obviusly, that the parser knows the cost
+ of each encoding choice). Actually, my "optimal parser" calculates arrival
+ costs for each position over the entire the source file. Since there are no
+ statistical encoders involved the exact encoding bit lengths are known ahead
+ of time. Some care had to be taken to calculate arrival costs with PMRs but I
+ think I got it right. What is to be included still (it was there but I removed
+ it) is the artifical shortening of matches to find better end costs. Another
+ weird behavior was that artificially giving literals a lower cost bettered the
+ compression. I still suspect I have an error in the cost calculation ;)  The
+ downside of *my* lazy implementation of the optiomal parser is the excessive
+ use of memory and searching for matches on every position of the original
+ file. There is no measures done to cut the memory usage.
 
  The ASCII mode allows supressing most prefix codes used to distinguish between
  literals and matches. Since the ASCII literal is always encoded in 7 bits the

@@ -54,6 +54,7 @@ set(COMMON_SRC  src/cost4.cpp
                 src/zxpac4b.cpp
                 src/hash.cpp
                 src/main.cpp
+                src/hunk.cpp
 
                 inc/lz_util.h
                 inc/zxpac4.h
@@ -64,6 +65,7 @@ set(COMMON_SRC  src/cost4.cpp
                 inc/cost4b.h
                 inc/lz_base.h
                 inc/hash.h
+                inc/hunk.h
 )
 
 add_executable(${TARGET} ${COMMON_SRC})
