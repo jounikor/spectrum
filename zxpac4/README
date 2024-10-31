@@ -44,7 +44,7 @@ Usage: ./build/zxpac4 target [options] infile [outfile]
   ami - Amiga self executing program
  Options:
   --max-chain,-c num    Maximum number of stored matches per position (min 1, max 9999).
-  --good-match,-g num   match length that cuts further searches (default ).
+  --good-match,-g num   match length that cuts further searches.
   --backward,-B num     Number of backward steps after a found match (min 0, max 16).
   --only-better,-b      Further matches in the history must always be better than previous
                         matches for the same position (default no).
@@ -58,6 +58,7 @@ Usage: ./build/zxpac4 target [options] infile [outfile]
   --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).
   --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.
   --exe,-X              Self-extracting decruncher (Amiga target).
+  --overlay,-O          Self-extracting overlay decruncher (Amiga target).
   --debug,-d            Output a LOT OF debug prints to stderr.
   --DEBUG,-D            Output EVEN MORE debug prints to stderr.
   --verbose,-v          Output some additional information to stdout.
@@ -203,24 +204,31 @@ Some notes on the supported algorithms:
 
  The entire zxpac4b encoder can be described as:
   Literal run in ASCII-mode:
-  0 + matchlen + matchlen-1 of (0LLLLLLL) + (LLLLLLLx)
+  0 + matchlen + matchlen-1 of (0LLLLLLL) bytes + (LLLLLLLx) byte
       x = next prefix bit.
   Literal run in Binary-mode:
-  0 + matchlen + matchlen of (LLLLLLLL)
+  0 + matchlen + matchlen of (LLLLLLLL) bytes
   
   PMR (after a literal run):
   0 + matchlen -> PMR, where 0 < matchlen < 255
   
   Match:
   1 + (Xnnnnnnn) + reminder of offset (possible X bit) + matchlen
-      where matchlen + 1 is the final length
+      where matchlen + 1 is the final match length
 
+ As one can see zxpac4(b/_32k) is a dead old LZSS with a slightly advanced
+ parser.  The main target is anyway 8bit platforms without any additional
+ memory usage during decompression and support for inplace decompression
+ without any "security distance". More elaborate encoders are "reserved", for
+ example, to my old S405 line of compressors. I intend to use a windowed
+ version of the optimal parser with the S405 some day.
 
- Anyway, as one can see zxpac4(b/_32k) is a dead old LZSS with a slightly
- advanced parser.  The main target is anyway 8bit platforms without any
- additional memory usage during decompression. More elaborate encoders are
- "reserved", for example, to my old S405 line of compressors. I intend to use a
- windowed version of the optimal parser with the S405 some day.
+Target specific options and features:
+ Amiga target..
+   - hunk preprocessor
+   - relocatable exe decompressor
+   - overlay relocatable decompressor
+   - absolute address exe decompressor with hunk relocator
 
 Z80 Decompressors:
  * z80dec.asm      - zxpac4(_32k) normal from lower to higher memory decompressor
@@ -231,4 +239,8 @@ Z80 Decompressors:
 
 M680x0 Decompressors: 
 
+ARMv4 (32bit opcoces) Decompressors:
 
+6502 Decompressors:
+
+Hu6280 Decompressors:
