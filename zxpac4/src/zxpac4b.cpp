@@ -217,7 +217,6 @@ int zxpac4b::lz_parse(const char* buf, int len, int interval)
         pos -= length;
     }
 
-    assert(m_cost_array[1].num_literals >= 1);
 
     if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
         std::cerr << ">- Cost debugging phase ------------------------------------------------------" << std::endl;
@@ -285,6 +284,7 @@ int zxpac4b::lz_parse(const char* buf, int len, int interval)
             pos = m_cost_array[pos].next;
         } while (pos > 0);
     }
+    assert(m_cost_array[1].num_literals >= 1);
     return 0;
 }
 

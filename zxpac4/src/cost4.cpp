@@ -202,6 +202,8 @@ int zxpac4_cost::impl_get_offset_bits(int offset)
 
 int zxpac4_cost::impl_get_length_bits(int length)
 {
+
+
     assert(length > 0);
     assert(length < 256);
 
@@ -257,7 +259,7 @@ int zxpac4_cost::impl_literal_cost(int pos, cost* c, const char* buf)
     uint32_t new_cost = p_ctx->arrival_cost;
     int offset = p_ctx->offset;
 
-    if (buf[pos-p_ctx->pmr_offset] == buf[pos]) {
+    if (pos >= p_ctx->pmr_offset && buf[pos-p_ctx->pmr_offset] == buf[pos]) {
         offset = p_ctx->pmr_offset;
         new_cost += 2;
     } else {

@@ -27,6 +27,7 @@
 #include "zxpac4b.h"
 #include "lz_util.h"
 #include "lz_base.h"
+#include "hunk.h"
 
 // Constants for LZ stuff
 //
@@ -227,6 +228,12 @@ int handle_file(lz_base* lz, std::ifstream& ifs, std::ofstream& ofs, int len)
                 return -1;
             }
         }
+    }
+    
+    amiga_hunks::hunk_info_t* hunk_list = NULL;
+    n = amiga_hunks::parse_hunks(buf,len,hunk_list,true);
+    if (n >= 0) {
+        free_hunk_info(hunk_list);
     }
 
     lz->lz_search_matches(buf,len,0); 
@@ -493,7 +500,7 @@ int main(int argc, char** argv)
         }
 
         double gain = 1.0 - static_cast<double>(compressed_len) / static_cast<double>(file_len);
-        std::cout << "Original: " << file_len << ", compressed: " << std::setprecision(4)
+        std::cout << std::dec << "Original: " << file_len << ", compressed: " << std::setprecision(4)
                   << compressed_len << ", gained: " << gain*100 << "%\n";
 
         if (cfg_verbose_on) {

@@ -87,7 +87,7 @@ protected:
 
     int check_match(const char* s, const char* d, int max) {
         int len = 0;
-        while (*s++ == *d++ && len++ < max); 
+        while (*s++ == *d++ && ++len < max); 
         return len;
     }
 

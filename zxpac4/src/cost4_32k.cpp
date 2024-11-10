@@ -243,7 +243,7 @@ int zxpac4_32k_cost::impl_literal_cost(int pos, cost* c, const char* buf)
     uint32_t new_cost = p_ctx->arrival_cost;
     int offset = p_ctx->offset;
 
-    if (buf[pos-p_ctx->pmr_offset] == buf[pos]) {
+    if (pos >= p_ctx->pmr_offset && buf[pos-p_ctx->pmr_offset] == buf[pos]) {
         offset = p_ctx->pmr_offset;
         new_cost += 2;
     } else {

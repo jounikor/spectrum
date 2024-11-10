@@ -186,8 +186,10 @@ int zxpac4::lz_parse(const char* buf, int len, int interval)
         pos -= length;
     }
 
-    assert(m_cost_array[1].num_literals >= 1);
-
+    if (m_cost_array[1].num_literals < 1) {
+        std::cerr << pos << ", " << m_cost_array[0].num_literals << ", " 
+            << m_cost_array[1].num_literals << std::endl;
+    }
     if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
         std::cerr << ">- Cost debugging phase ------------------------------------------------------" << std::endl;
         std::cerr << "  file pos: asc (hx) #lit (pmroff) offset:len  arri_cost ->     nxtpos pmr" << std::endl;
@@ -255,6 +257,7 @@ int zxpac4::lz_parse(const char* buf, int len, int interval)
             pos = m_cost_array[pos].next;
         } while (pos > 0);
     }
+    assert(m_cost_array[1].num_literals >= 1);
     return 0;
 }
 

@@ -111,7 +111,7 @@ int hash3::impl_find_matches(const char *buf, int pos, int len, bool only_better
             }
         }
 
-        while (*m++ == *n++ && length++ < len);
+        while (*m++ == *n++ && ++length < len);
         
         if (length >= m_min_match) {
             if (only_better_matches) {
