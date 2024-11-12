@@ -229,12 +229,13 @@ int handle_file(lz_base* lz, std::ifstream& ifs, std::ofstream& ofs, int len)
             }
         }
     }
-    
-    amiga_hunks::hunk_info_t* hunk_list = NULL;
+
+
+    std::vector<amiga_hunks::hunk_info_t> hunk_list(0);
+    char* bbb;
     n = amiga_hunks::parse_hunks(buf,len,hunk_list,true);
-    if (n >= 0) {
-        free_hunk_info(hunk_list);
-    }
+    n = amiga_hunks::optimize_hunks(hunk_list,bbb,len);
+    free_hunk_info(hunk_list);
 
     lz->lz_search_matches(buf,len,0); 
     lz->lz_parse(buf,len,0); 

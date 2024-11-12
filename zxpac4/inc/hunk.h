@@ -13,6 +13,7 @@
 
 #include <iostream>
 #include <iomanip>
+#include <vector>
 #include <cassert>
 #include <stdint.h>
 
@@ -47,6 +48,19 @@
 #define HUNK_PPC_CODE7	    0x4E9       // error
 #define HUNK_RELRELOC26     0x4EC       // error
 
+//
+
+#define MASK_OVERLAY_EXE        0x80000000
+#define MASK_UNSUPPORTED_HUNK   0x40000000
+
+//
+#define MEMF_ANY        0
+#define MEMF_PUBLIC     1
+#define MEMF_CHIP       2
+#define MEMF_FAST       4
+
+
+
 /*
  
  Hunk merger/optimizer 
@@ -64,7 +78,8 @@
 
 
 namespace amiga_hunks {
-    typedef struct hunk_info {
+    typedef struct {
+        int hunks_remaining;
         uint32_t hunk_type;
         uint32_t hunk_num;
         uint32_t memory_size;
@@ -73,14 +88,13 @@ namespace amiga_hunks {
         uint32_t* segment_start;    //< 
         uint32_t* reloc_start;
         bool short_reloc:1;
-        bool fast:1;
-        bool chip:1;
     } hunk_info_t;
 
     uint32_t read32be(const uint32_t* ptr);
     uint16_t read16be(const uint16_t* ptr);
-    int parse_hunks(const char* buf, int size, hunk_info_t*& hunk_list, bool verbose=false);
-    void free_hunk_info(hunk_info_t* hunk_list);
+    uint32_t parse_hunks(const char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool verbose=false);
+    void free_hunk_info(std::vector<hunk_info_t>& hunk_list);
+    int optimize_hunks(std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len);
 };
 
 

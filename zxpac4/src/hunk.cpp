@@ -39,6 +39,21 @@ static const char* s_hunk_str[] = {
     "HUNK_ABSRELOC16"	        // 0x3FE       // error
 };
 
+static const char* s_memtype_str[] = {
+    // MEMF_PUBLIC == 1
+    // MEMF_CHIP   == 2
+    // MEMF_FAST   == 4}
+    "MEMF_ANY",
+    "MEMF_PUBLIC",
+    "MEMF_CHIP",
+    "??",
+    "MEMF_FAST",
+    "??",
+    "??",
+};
+
+
+
 uint32_t amiga_hunks::read32be(const uint32_t* ptr)
 {
     const uint8_t* p = reinterpret_cast<const uint8_t*>(ptr);
@@ -61,30 +76,38 @@ uint16_t amiga_hunks::read16be(const uint16_t* ptr)
     return r;
 }
 
+/**
+ *
+ *
+ * @return Lower 16 bits: 0 if error, otherwise number of found hunks
+ *         Upper 16 bits: additional information like errors.
+ */
 
-
-int amiga_hunks::parse_hunks(const char* buf, int size, hunk_info_t*& hunk_list, bool verbose)
+uint32_t amiga_hunks::parse_hunks(const char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool verbose)
 {
     uint32_t* ptr = (uint32_t*)buf;
     uint32_t* end = (uint32_t*)(buf+size);
     uint32_t n, m, j;
-    uint32_t tsize, tnum, tmax;     // Follow DOS RKRM ;)
+    uint32_t tsize, tnum, tmax;         // Follow DOS RKRM ;)
     uint32_t msj, mtj;
     uint32_t num_residents;              // archaic stuff
     uint32_t hunk_type, hunk_size;
     uint16_t* c;
     int padding;
+    bool overlay = false;
 
-    if (size % 4) {
-        std::cerr << "**Error: file size must be 4 byte aligned." << std::endl;
-        return -1;
-    }
-    
     hunk_type = read32be(ptr++);
-
+    
+    if (verbose) {
+        std::cout << ">- Executable file Hunk Parser -------------------------" << std::endl;
+    }
+    if (size % 4) {
+        std::cerr << "**Error: Amiga executable size must be 4 byte aligned." << std::endl;
+        return 0;
+    }
     if (size < 6*4 || (hunk_type != HUNK_HEADER)) { 
-        std::cerr << "**Error: not Amiga executable." << std::endl;
-        return -1;
+        std::cerr << "**Error: not Amiga executable, no HUNK_HEADER found." << std::endl;
+        return 0;
     }
     if (verbose) {
         std::cout << "HUNK_HEADER (0x" << std::hex << hunk_type << ")" << std::endl;
@@ -105,22 +128,23 @@ int amiga_hunks::parse_hunks(const char* buf, int size, hunk_info_t*& hunk_list,
     tmax  = read32be(ptr++);
    
     if (verbose) {
-        std::cout << "  Number of hunk: " << tsize << std::endl;
-        std::cout << "  First hunk: " << tnum << std::endl;
-        std::cout << "  Last of hunk: " << tmax << std::endl;
+        std::cout << "  Number of segments: " << tsize << std::endl;
+        std::cout << "  First segment:      " << tnum << std::endl;
+        std::cout << "  Last of segment:    " << tmax << std::endl;
     }
     if (num_residents != tnum) {
         std::cerr << "  First root hunk (" << tnum << ") does not match the number of residents" << std::endl;
-        return -1;
+        return 0;
     }
     if ((tsize - 1 > tmax) && verbose) {
         std::cout << "  Likely an OVERLAY file" << std::endl;
     }
 
-    hunk_list = new hunk_info_t[tmax-tnum+1];
+    hunk_list.reserve(tsize);
 
     for (n = tnum, m = 0; n <= tmax; n++, m++) {
         msj = read32be(ptr++);
+        // MEMF_ANY    == 0
         // MEMF_PUBLIC == 1
         // MEMF_CHIP   == 2
         // MEMF_FAST   == 4
@@ -133,13 +157,16 @@ int amiga_hunks::parse_hunks(const char* buf, int size, hunk_info_t*& hunk_list,
             mtj = read32be(ptr++);
         }
         if (verbose) {
-            std::cout << std::dec << "  Segment: " << n << " memory size is " << msj << " bytes "
-                << "of memory type " << mtj << std::endl;
+            std::cout << std::dec << "  Segment: " << n << ", memory size: " << msj << " bytes "
+                << "(" << s_memtype_str[mtj] << ")" << std::endl;
         }
 
-        hunk_list[m].hunk_num = n;
-        hunk_list[m].memory_size = msj;
-        hunk_list[m].memory_type = mtj;
+        hunk_info_t hunk;
+        hunk.hunks_remaining = tmax-tnum-m;
+        hunk.hunk_num = n;
+        hunk.memory_size = msj;
+        hunk.memory_type = mtj;
+        hunk_list.push_back(hunk);
     }
 
     hunk_size = 0;
@@ -198,8 +225,9 @@ int amiga_hunks::parse_hunks(const char* buf, int size, hunk_info_t*& hunk_list,
             hunk_list[n].data_size = hunk_size << 2;
             if (verbose) {
                 std::cout << std::dec << "  segment: " << hunk_list[n].hunk_num 
-                    << " with data size: " << hunk_list[n].data_size
-                    << " and memory size: " << hunk_list[n].memory_size << std::endl;
+                    << ", data size: " << hunk_list[n].data_size
+                    << ", memory size: " << hunk_list[n].memory_size 
+                    << ", remaining: " << hunk_list[n].hunks_remaining << std::endl;
             }
             break;
         case HUNK_END:
@@ -251,25 +279,86 @@ int amiga_hunks::parse_hunks(const char* buf, int size, hunk_info_t*& hunk_list,
             ptr = reinterpret_cast<uint32_t*>(c);
             break;
         case HUNK_BREAK:
+            break;
         case HUNK_OVERLAY:
+            overlay = true;
+            // Definitely not sure if this is enough to parse overlay files..
+            hunk_size = read32be(ptr++) + 1;
+            break;
         default:
             std::cerr << "**Error: unsupported hunk 0x" << std::hex << hunk_type << std::endl;
-            delete[] hunk_list;
-            return -1;
+            free_hunk_info(hunk_list);
+            return 0;
         }
 
         ptr += hunk_size;
     }
 
-    if (n+1 < tsize && verbose) {
+    if (++n < tsize && verbose) {
         std::cout << "Number of parsed segments does not match with the header information.." << std::endl;
     }
-    return n+1;
+    if (overlay) {
+        return n | MASK_OVERLAY_EXE;
+    } else {
+        return n;
+    }
 }
 
 
-void amiga_hunks::free_hunk_info(hunk_info_t* hunk_list)
+void amiga_hunks::free_hunk_info(std::vector<hunk_info_t>& hunk_list)
 {
-    delete[] hunk_list;
+    hunk_list.resize(0);;
 }
+
+
+/**
+ *
+ * @return 0 if no changes and no @p new_exe was allocated
+ *         -1 if an error occured
+ *         > 0 new number of hunks in $p hunk_list
+ */
+int amiga_hunks::optimize_hunks(std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len) {
+    (void)hunk_list;
+    (void)new_exe;
+    (void)len;
+
+    std::vector<hunk_info_t> chip;
+    std::vector<hunk_info_t> fast;
+    std::vector<hunk_info_t> any;
+
+    for (auto& it : hunk_list) {
+        switch (it.memory_type) {
+        case MEMF_ANY:
+            any.push_back(std::move(it));
+            break;
+        case MEMF_CHIP:
+            chip.push_back(std::move(it));
+            break;
+        case MEMF_FAST:
+            fast.push_back(std::move(it));
+            break;
+        default:
+            return -1;
+        }
+    }
+
+    std::cout << "MEMF_ANY hunks:" << std::endl;
+    for (auto &it : any) {
+        std::cout << "  Hunk number: " << it.hunk_num << std::endl; 
+    }
+
+    std::cout << "MEMF_FAST hunks:" << std::endl;
+    for (auto &it : fast) {
+        std::cout << "  Hunk number: " << it.hunk_num << std::endl; 
+    }
+    
+    std::cout << "MEMF_CHIP hunks:" << std::endl;
+    for (auto &it : chip) {
+        std::cout << "  Hunk number: " << it.hunk_num << std::endl; 
+    }
+
+    return 0;
+}
+
+
 
