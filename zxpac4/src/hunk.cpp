@@ -8,6 +8,8 @@
  *
  */
 
+#include <map>
+#include <iterator>
 #include "hunk.h"
 
 using namespace amiga_hunks;
@@ -166,6 +168,7 @@ uint32_t amiga_hunks::parse_hunks(const char* buf, int size, std::vector<hunk_in
         hunk.hunk_num = n;
         hunk.memory_size = msj;
         hunk.memory_type = mtj;
+        hunk.combined_type = mtj << 29;
         hunk_list.push_back(hunk);
     }
 
@@ -223,6 +226,8 @@ uint32_t amiga_hunks::parse_hunks(const char* buf, int size, std::vector<hunk_in
             ++n;
             hunk_list[n].segment_start = ptr;
             hunk_list[n].data_size = hunk_size << 2;
+            hunk_list[n].hunk_type = hunk_type;
+            hunk_list[n].combined_type |= hunk_type;
             if (verbose) {
                 std::cout << std::dec << "  segment: " << hunk_list[n].hunk_num 
                     << ", data size: " << hunk_list[n].data_size
@@ -322,41 +327,27 @@ int amiga_hunks::optimize_hunks(std::vector<hunk_info_t>& hunk_list, char*& new_
     (void)new_exe;
     (void)len;
 
-    std::vector<hunk_info_t> chip;
-    std::vector<hunk_info_t> fast;
-    std::vector<hunk_info_t> any;
+    std::map<uint32_t,std::vector<hunk_info_t>> new_hunks;
+    uint32_t hunk0_type = 0;
 
-    for (auto& it : hunk_list) {
-        switch (it.memory_type) {
-        case MEMF_ANY:
-            any.push_back(std::move(it));
-            break;
-        case MEMF_CHIP:
-            chip.push_back(std::move(it));
-            break;
-        case MEMF_FAST:
-            fast.push_back(std::move(it));
-            break;
-        default:
-            return -1;
+    for (std::move_iterator<std::vector<hunk_info_t>::iterator> it{hunk_list.begin()}, et{hunk_list.end()}; it != et; it++) {
+        if (it->hunk_num == 0) {
+            hunk0_type = it->combined_type;
         }
+
+        new_hunks[it->combined_type].push_back(*it);
     }
 
-    std::cout << "MEMF_ANY hunks:" << std::endl;
-    for (auto &it : any) {
-        std::cout << "  Hunk number: " << it.hunk_num << std::endl; 
-    }
+    hunk_list.clear();
+    std::cout << "hunk0 number is " << new_hunks[hunk0_type][0].hunk_num << std::endl;
 
-    std::cout << "MEMF_FAST hunks:" << std::endl;
-    for (auto &it : fast) {
-        std::cout << "  Hunk number: " << it.hunk_num << std::endl; 
-    }
-    
-    std::cout << "MEMF_CHIP hunks:" << std::endl;
-    for (auto &it : chip) {
-        std::cout << "  Hunk number: " << it.hunk_num << std::endl; 
-    }
+    for (auto& i: new_hunks)  {
+        std::cout << i.first << std::endl;
+        for (auto& n: i.second) {
+            std::cout << "  " << n.hunk_num << std::endl;
+        }
 
+    }
     return 0;
 }
 

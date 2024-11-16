@@ -85,6 +85,7 @@ namespace amiga_hunks {
         uint32_t memory_size;
         uint32_t data_size;
         uint32_t memory_type;
+        uint32_t combined_type;     // hunk_type | (memory_type << 30)
         uint32_t* segment_start;    //< 
         uint32_t* reloc_start;
         bool short_reloc:1;
