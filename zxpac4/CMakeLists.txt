@@ -31,9 +31,10 @@ if (DEFINED CMAKE_BUILD_TYPE)
 	message("Build type define as ${CMAKE_BUILD_TYPE}")
 	
 	if (CMAKE_BUILD_TYPE STREQUAL "Release")
-		set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O -Werror -Wall -Wextra -Wshadow")
+		#set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O -Werror -Wall -Wextra -Wshadow")
+		set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O -Wall -Wextra -Wshadow")
 	else()
-		set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -Werror -Wall -Wextra -Wshadow")
+		set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -Wall -Wextra -Wshadow")
 	endif()
 endif()
 

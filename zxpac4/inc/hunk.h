@@ -81,24 +81,73 @@ namespace amiga_hunks {
     typedef struct {
         int hunks_remaining;
         uint32_t hunk_type;
-        uint32_t hunk_num;
-        uint32_t memory_size;
-        uint32_t data_size;
+        int old_segment_num;
+        int new_segment_num;
+        int memory_size;
+        int data_size;
+        int merged_start_index;
         uint32_t memory_type;
         uint32_t combined_type;     // hunk_type | (memory_type << 30)
-        uint32_t* segment_start;    //< 
-        uint32_t* reloc_start;
+        int reloc_size;                 // in bytes
+        const char* segment_start;    //
+        const char* reloc_start;
         bool short_reloc:1;
     } hunk_info_t;
 
-    uint32_t read32be(const uint32_t* ptr);
-    uint16_t read16be(const uint16_t* ptr);
+    uint32_t read32be(const char*& ptr);
+    uint16_t read16be(const char*& ptr);
+    char* write32be(char* ptr, uint32_t v);
+    char* write16be(char* ptr, uint16_t v);
     uint32_t parse_hunks(const char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool verbose=false);
     void free_hunk_info(std::vector<hunk_info_t>& hunk_list);
     int optimize_hunks(std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len);
 };
 
+#define MEMORY_TYPE_MEMF_ANY    0x00
+#define MEMORY_TYPE_MEMF_CHIP   0x01
+#define MEMORY_TYPE_MEMF_FAST   0x02
+#define MEMORY_TYPE_MEMF_RESV   0x03
 
+#define SEGMENT_TYPE_RELOC      0x0000
+#define SEGMENT_TYPE_CODE       0x40000000
+#define SEGMENT_TYPE_DATA       0x80000000
+#define SEGMENT_TYPE_BSS        0xc000
+#define SEGMENT_TYPE_MASK       0xc000
+#define SEGMENT_TYPE_EOF        0xffff
+
+/*
+ *
+  Hunk header
+    nnnnnnnnnnnnnnnn                     -> 16bit number of segments
+    'mm..m' times
+    mmmmmmmmmmmmmmmmmmmmmmmmmmmmm00      -> MEMF_PUBLIC memory size (multiple by 4)
+    mmmmmmmmmmmmmmmmmmmmmmmmmmmmm01      -> MEMF_CHIP memory size
+    mmmmmmmmmmmmmmmmmmmmmmmmmmmmm10      -> MEMF_FAST memory size
+    nnnnnnnnnnnnnnnnnnnnnnnnnnnnn11      -> reserved
+    
+  Hunk types:
+    01nnnnnnnnnnnnnn + nnnnnnnnnnnnnnnn  -> HUNK_CODE (data size nnnnnnnnnnnnnnnnnnnnnnnnnnnnnn << 2)
+    10nnnnnnnnnnnnnn + nnnnnnnnnnnnnnnn  -> HUNK_DATA
+    1100000000000000                     -> HUNK_BSS
+    1111111111111111                     -> EOF
+    
+  Relocation information:
+    00ssssssssssssss + 00dddddddddddddd  -> reloc within "ss...s" segment to "dd..d" segment
+    rrrrrrrr + rrrrrrrr + rrrrrrrr       -> first 24bit reloc to which deltas are applied to
+  Reloc entry
+    0rrrrrrr                             -> 7 lowest bits of reloc delta
+    1rrrrrrr                             -> 7 upper bits of reloc delta and read next byte for next 7bits
+    00000000 + [00000000]                -> End of relocs + optional byte to align delta relocs to 16bit
+    Note: reloc entries are always even thus the delta is shift to right before encoding.
+
+    examples: 
+      0aaaaaaa                           -> 8bit  reloc delta aaaaaaa0
+      1aaaaaaa + 0bbbbbbb                -> 15bit reloc delta aaaaaaabbbbbbb0
+      1aaaaaaa + 1bbbbbbb + 0ccccccc     -> 22bit reloc delta aaaaaaabbbbbbbccccccc0
+      00000000                           -> end of relocs
+
+
+ */
 
 
 
