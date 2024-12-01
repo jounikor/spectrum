@@ -69,6 +69,17 @@ uint32_t amiga_hunks::read32be(const char*& ptr)
     return r;
 }
 
+uint32_t amiga_hunks::readbe(const char*& ptr, int bytes)
+{
+    uint32_t r = 0;
+    
+    while (bytes-- > 0) {
+        r <<= 8;
+        r |= (*ptr++ & 0xff);
+    }
+    return r;
+}
+
 uint16_t amiga_hunks::read16be(const char*& ptr)
 {
     uint16_t r;
@@ -310,7 +321,7 @@ uint32_t amiga_hunks::parse_hunks(const char* ptr, int size, std::vector<hunk_in
                 ptr += (m * 2);
                 padding += (m * 2);
                 // 16 bit relocs are internally hansled as 32 bit anyway..
-                reloc_size = reloc_size + 8 + m * 8;
+                reloc_size = reloc_size + 8 + m * 4;
             } while (true);
             
             if (padding & 1) {
@@ -367,16 +378,11 @@ int amiga_hunks::optimize_hunks(std::vector<hunk_info_t>& hunk_list, char*& new_
 
     int o, m, n;
     int number_old_segments = hunk_list.size();
-    //int* segment_mapping = new int[number_old_segments];
-    uint32_t* merged_hunk_type;
-    uint32_t* merged_data_size;
-    uint32_t* merged_mem_size;
     std::map<uint32_t,int> new_hunks;
     int number_new_segments = 0;
     new_exe = new char[len];
     char* ptr = new_exe;
     int total_reloc_size = 0;
-    char* p_reloc, *t_reloc;
 
     int* old_seg_size = new int[number_old_segments];
     int* old_seg_bss = new int[number_old_segments];
@@ -395,13 +401,15 @@ int amiga_hunks::optimize_hunks(std::vector<hunk_info_t>& hunk_list, char*& new_
         old_seg_bss[it->old_segment_num] = it->memory_size - it->data_size;
     }
 
-    merged_data_size = new uint32_t[number_new_segments];
-    merged_hunk_type = new uint32_t[number_new_segments];
-    merged_mem_size  = new uint32_t[number_new_segments];
+    uint32_t* merged_data_size = new uint32_t[number_new_segments];
+    uint32_t* merged_hunk_type = new uint32_t[number_new_segments];
+    uint32_t* merged_mem_size  = new uint32_t[number_new_segments];
+    uint32_t* merged_bss_size  = new uint32_t[number_new_segments];
 
     for (m = 0; m < number_new_segments; m++) {
         merged_data_size[m] = 0;
         merged_mem_size[m] = 0;
+        merged_bss_size[m] = 0;
         old_seg_offs[m] = 0;
     }
     for (m = 0; m < number_old_segments; m++) {
@@ -414,6 +422,13 @@ int amiga_hunks::optimize_hunks(std::vector<hunk_info_t>& hunk_list, char*& new_
         
         old_seg_size[m] = hunk_list[m].data_size;
     }
+    for (m = 0; m < number_old_segments; m++) {
+        old_seg_bss_offs[m] = merged_data_size[hunk_list[m].new_segment_num] + merged_bss_size[hunk_list[m].new_segment_num];
+        merged_bss_size[hunk_list[m].new_segment_num] += old_seg_bss[m];
+    }
+
+    std::cout << "Number of merged hunks is " << number_new_segments << std::endl;
+    
     for (m = 0; m < number_new_segments; m++) {
         std::cout << "Merged new segment " << m << ":" << std::endl;
         std::cout << "  Hunk type -> " << merged_hunk_type[m] << std::endl;
@@ -425,6 +440,16 @@ int amiga_hunks::optimize_hunks(std::vector<hunk_info_t>& hunk_list, char*& new_
         std::cout << "  Offset -> " << old_seg_offs[m] << std::endl;  
         std::cout << "  Size -> " << old_seg_size[m] << std::endl;  
         std::cout << "  BSS -> " << old_seg_bss[m] << std::endl;
+        std::cout << "  BSS offset " << old_seg_bss_offs[m] << std::endl;
+    }
+    for (m = 0; m < number_new_segments; m++) {
+        std::cout << "Merged segment " << m << " end  -> " << m << ": " << merged_data_size[m] << std::endl;
+    }
+
+    // Just for my own education.. Did not remember this ;)
+    // https://stackoverflow.com/questions/7648756/is-the-order-of-iterating-through-stdmap-known-and-guaranteed-by-the-standard
+    for (auto& i: new_hunks)  {
+        std::cout << "Combined mapping -> " << i.first << ": " << i.second << std::endl;
     }
 
     // Merge datas..
@@ -474,6 +499,72 @@ int amiga_hunks::optimize_hunks(std::vector<hunk_info_t>& hunk_list, char*& new_
     n = (ptr-new_exe);
     std::cout << ">> New exe size before reloc data: " << n << std::endl;
 
+#if 0   // just for the debug
+    std::ofstream ofs;
+    ofs.open("h.bin",std::ios::binary|std::ios::out);
+    ofs.write(new_exe,n);
+    ofs.close();
+#endif
+
+    for (int new_seg_num = 0; new_seg_num < number_new_segments; new_seg_num++) {
+        int num_total_relocs = 0;
+        char* p_total_relocs = ptr;
+        // relocate this segment
+        std::cout << "New Segment 0x" << new_seg_num << std::endl;
+
+        ptr = write32be(ptr,num_total_relocs);
+
+        for (int old_seg_num = 0; old_seg_num < number_old_segments; old_seg_num++) {
+            int mapped_to_seg = hunk_list[old_seg_num].new_segment_num;
+            const char* r_ptr = hunk_list[old_seg_num].reloc_start;
+            const char* t_ptr;
+            int bytes;
+            int offset_within_file;
+            int offset_add_to_base;
+
+            if (hunk_list[old_seg_num].short_reloc) {
+                bytes = 2;
+            } else {
+                bytes = 4;
+            }
+            if (new_seg_num == mapped_to_seg && r_ptr) {
+                int reloc_to_seg;
+                
+                std::cout << "  Bytes per reloc " << bytes << std::endl;
+
+                while ((n = readbe(r_ptr,bytes)) > 0) {
+                    reloc_to_seg = readbe(r_ptr,bytes);    
+                    std::cout << "  reloc to old segment 0x" << reloc_to_seg << " with base offset 0x"
+                        << old_seg_offs[reloc_to_seg] << std::endl;
+                    num_total_relocs += n; 
+                    ptr = write32be(ptr,new_seg_num);
+                    ptr = write32be(ptr,reloc_to_seg);
+
+                    while (n-- > 0) {
+                        offset_within_file = readbe(r_ptr,bytes);
+                        t_ptr = hunk_list[old_seg_num].segment_start + offset_within_file;
+                        offset_add_to_base = read32be(t_ptr);
+                        ptr = write32be(ptr,offset_within_file);
+
+                        std::cout << "    reloc offset within file 0x" << offset_within_file << std::endl;
+                        std::cout << "      offset add to base address 0x" << offset_add_to_base << std::endl;
+
+                        if (reloc_to_seg == old_seg_num && offset_add_to_base > old_seg_size[old_seg_num]) {
+                            // Reloc to this segment and into the BSS area
+                            std::cout << "      ** reloc into BSS following data" << std::endl;
+                        } else {
+                            //
+                        }
+                    }
+                }
+            }
+        }
+        write32be(p_total_relocs,num_total_relocs);
+    }
+
+    n = (ptr-new_exe);
+    std::cout << ">> New exe size after reloc data: " << n << std::endl;
+
 #if 1   // just for the debug
     std::ofstream ofs;
     ofs.open("h.bin",std::ios::binary|std::ios::out);
@@ -481,53 +572,17 @@ int amiga_hunks::optimize_hunks(std::vector<hunk_info_t>& hunk_list, char*& new_
     ofs.close();
 #endif
 
-    // collect relocations
-    p_reloc = new char[total_reloc_size];
-    t_reloc = p_reloc;
-
-
-    for (int reloc_to_seg = 0; reloc_to_seg < number_new_segments; reloc_to_seg++) {
-        int reloc_base_addr = 0;
-
-        // relocate this segment
-        t_reloc = write32be(t_reloc,reloc_to_seg);
-
-        for (int old_seg_num = 0; old_seg_num < number_old_segments; old_seg_num++) {
-            int new_seg_num = hunk_list[old_seg_num].new_segment_num;
-
-            if (new_seg_num == reloc_to_seg && hunk_list[old_seg_num].reloc_start) {
-                // Collect relocs and adjust the base address 
-
-
-
-                t_reloc = write32be(t_reloc,reloc_to_seg); 
-
-            }
-        }
-    }
-
-
     //
 
-    for (m = 0; m < number_new_segments; m++) {
-        std::cout << "  Merged segment end  -> " << m << ": " << merged_data_size[m] << std::endl;
-    }
 
 
-    std::cout << "Number of merged hunks is " << number_new_segments << std::endl;
-
-    // Just for my own education.. Did not remember this ;)
-    // https://stackoverflow.com/questions/7648756/is-the-order-of-iterating-through-stdmap-known-and-guaranteed-by-the-standard
-    for (auto& i: new_hunks)  {
-        std::cout << "Combined mapping -> " << i.first << ": " << i.second << std::endl;
-    }
 
     m = 0;
 
-    delete[] p_reloc;
     delete[] merged_data_size;
     delete[] merged_hunk_type;
     delete[] merged_mem_size;
+    delete[] merged_bss_size;
     delete[] old_seg_size;
     delete[] old_seg_offs;
     delete[] old_seg_bss;

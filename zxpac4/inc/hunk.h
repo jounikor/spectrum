@@ -96,6 +96,7 @@ namespace amiga_hunks {
 
     uint32_t read32be(const char*& ptr);
     uint16_t read16be(const char*& ptr);
+    uint32_t readbe(const char*& ptr, int bytes);
     char* write32be(char* ptr, uint32_t v);
     char* write16be(char* ptr, uint16_t v);
     uint32_t parse_hunks(const char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool verbose=false);
@@ -130,7 +131,10 @@ namespace amiga_hunks {
     10nnnnnnnnnnnnnn + nnnnnnnnnnnnnnnn  -> HUNK_DATA
     1100000000000000                     -> HUNK_BSS
     1111111111111111                     -> EOF
-    
+
+  All segments' data is together followed but all relocation data. Unlinke in normal executable
+  layout the relocation information is not after each segment.
+
   Relocation information:
     00ssssssssssssss + 00dddddddddddddd  -> reloc within "ss...s" segment to "dd..d" segment
     rrrrrrrr + rrrrrrrr + rrrrrrrr       -> first 24bit reloc to which deltas are applied to
