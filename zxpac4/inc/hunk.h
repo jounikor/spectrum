@@ -14,6 +14,9 @@
 #include <iostream>
 #include <iomanip>
 #include <vector>
+#include <map>
+#include <set>
+
 #include <cassert>
 #include <stdint.h>
 
@@ -81,27 +84,27 @@ namespace amiga_hunks {
     typedef struct {
         int hunks_remaining;
         uint32_t hunk_type;
-        int old_segment_num;
-        int new_segment_num;
+        int old_seg_num;
+        int new_seg_num;
         int memory_size;
         int data_size;
         int merged_start_index;
         uint32_t memory_type;
         uint32_t combined_type;     // hunk_type | (memory_type << 30)
-        int reloc_size;                 // in bytes
-        const char* segment_start;    //
-        const char* reloc_start;
+        char* seg_start;    //
+        char* reloc_start;
+        std::map<int,std::set<uint32_t> > relocs;    ///< Key is dst_segment, value is reloc
         bool short_reloc:1;
     } hunk_info_t;
 
-    uint32_t read32be(const char*& ptr);
-    uint16_t read16be(const char*& ptr);
-    uint32_t readbe(const char*& ptr, int bytes);
-    char* write32be(char* ptr, uint32_t v);
-    char* write16be(char* ptr, uint16_t v);
-    uint32_t parse_hunks(const char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool verbose=false);
+    uint32_t read32be(char*& ptr, bool inc);
+    uint16_t read16be(char*& ptr, bool inc);
+    uint32_t readbe(char*& ptr, int bytes, bool inc);
+    char* write32be(char* ptr, uint32_t v, bool inc);
+    char* write16be(char* ptr, uint16_t v, bool inc);
+    uint32_t parse_hunks(char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool verbose=false);
     void free_hunk_info(std::vector<hunk_info_t>& hunk_list);
-    int optimize_hunks(std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len);
+    int merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len);
 };
 
 #define MEMORY_TYPE_MEMF_ANY    0x00

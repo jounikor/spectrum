@@ -234,7 +234,7 @@ int handle_file(lz_base* lz, std::ifstream& ifs, std::ofstream& ofs, int len)
     std::vector<amiga_hunks::hunk_info_t> hunk_list(0);
     char* bbb;
     n = amiga_hunks::parse_hunks(buf,len,hunk_list,true);
-    n = amiga_hunks::optimize_hunks(hunk_list,bbb,len);
+    n = amiga_hunks::merge_hunks(buf,hunk_list,bbb,len);
     free_hunk_info(hunk_list);
 
     lz->lz_search_matches(buf,len,0); 
