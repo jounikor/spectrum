@@ -94,7 +94,6 @@ namespace amiga_hunks {
         char* seg_start;    //
         char* reloc_start;
         std::map<int,std::set<uint32_t> > relocs;    ///< Key is dst_segment, value is reloc
-        bool short_reloc:1;
     } hunk_info_t;
 
     uint32_t read32be(char*& ptr, bool inc);

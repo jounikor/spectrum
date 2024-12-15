@@ -191,7 +191,7 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
     tmax  = read32be(ptr);
    
     TDEBUG(                                                             \
-        std::cerr << "  Number of segments: " << tsize << std::endl;    \
+        std::cerr << std::hex << "  Number of segments: " << tsize << std::endl;    \
         std::cerr << "  First segment:      " << tnum << std::endl;     \
         std::cerr << "  Last of segment:    " << tmax << std::endl;     \
     )
@@ -210,7 +210,6 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         hunk.hunks_remaining = tmax-tnum-m;
         hunk.old_seg_num = n;
         hunk.new_seg_num = -1;
-        hunk.short_reloc = false;
         hunk.seg_start = NULL;
         hunk.reloc_start = NULL;
         hunk.merged_start_index = 0;
@@ -230,7 +229,7 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         if (mtj == (3 << 1)) {
             mtj = read32be(ptr);
         }
-        TDEBUG ( std::cerr << std::dec << "  Segment: " << n << ", memory size: " << msj    \
+        TDEBUG ( std::cerr << std::hex << "  Segment: 0x" << n << ", memory size: 0x" << msj    \
                     << " bytes " << "(" << s_memtype_str[mtj] << ")" << std::endl;          \
         )
 
@@ -241,6 +240,16 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
 
     hunk_size = 0;
     n = -1;
+
+    // The algorithm for the hunk parser:
+    //  1) the parsed result is placed into hunk_list_t vector.
+    //  2) HUNK_SYMBOL/_DEBUG/_NAME are removed.
+    //  3) Hunk advisory is removed.
+    //  4) Both 16 bit and 32 bit relocations are supported.
+    //     - All relocs are stored into map indexed by the destination segment.
+    //     - All reloc to the same destination segment under the same 
+    //       relcation withint one hunk are merged.
+    //     - Reloc entries are sorted into ascendin order (a property of std::set).
 
     while (ptr < end) {
         hunk_size = 0;
@@ -264,9 +273,7 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
 
         switch (hunk_type) {
         case HUNK_SYMBOL:
-            if (debug) {
-                std::cerr << "  Removing.." << std::endl;
-            }
+            TDEBUG(std::cout << "  Removing.." << std::endl;)
             do {
                 hunk_size = read32be(ptr) & 0x00ffffff;
                 if (hunk_size == 0) {
@@ -277,9 +284,7 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
             break;
         case HUNK_DEBUG:
         case HUNK_NAME:
-            if (debug) {
-                std::cerr << "  Removing.." << std::endl;
-            }
+            TDEBUG(std::cerr << "  Removing.." << std::endl;)
             hunk_size = read32be(ptr);
             break;
         case HUNK_DATA:
@@ -294,10 +299,10 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
             hunk_list[n].hunk_type = hunk_type;
             hunk_list[n].combined_type |= hunk_type;
             TDEBUG(std::cerr << std::dec << "  segment: " << hunk_list[n].old_seg_num   \
-                    << ", data size: " << hunk_list[n].data_size                        \
-                    << ", memory size: " << hunk_list[n].memory_size                    \
-                    << ", remaining: " << hunk_list[n].hunks_remaining                  \
-                    << ", pointer: " << (uint64_t)ptr << std::endl;                     \
+                    << std::hex << ", data size: 0x" << hunk_list[n].data_size                        \
+                    << ", memory size: 0x" << hunk_list[n].memory_size                    \
+                    << ", remaining: 0x" << hunk_list[n].hunks_remaining                  \
+                    << ", pointer: 0x" << (uint64_t)ptr << std::endl;                     \
             )
             break;
         case HUNK_END:
@@ -306,7 +311,6 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         case HUNK_RELOC32:
         case HUNK_RELRELOC32:
             hunk_list[n].reloc_start = ptr;
-            hunk_list[n].short_reloc = false;
             hunk_size = 0;
             
             do {
@@ -316,9 +320,7 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
                 }
                 
                 j = read32be(ptr);
-                if (debug) {
-                    std::cerr << std::dec << "  " << m << " relocs to segment " << j << std::endl;
-                }
+                TDEBUG(std::cout << std::dec << "  " << m << " relocs to segment " << j << std::endl;)
                 
                 // Since destination segmentt are using map a reoccurrance of relocations into an
                 // existing segment are all combined into one..
@@ -335,7 +337,6 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         case HUNK_RELOC32SHORT:
             padding = 1;
             hunk_list[n].reloc_start = ptr;
-            hunk_list[n].short_reloc = true;
             hunk_size = 0;
             
             do {
