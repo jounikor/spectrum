@@ -2,7 +2,7 @@
  * @file hunk.cpp
  * @brief Amiga executable hunk parsing and processing.
  * @author Jouni 'Mr.Spiv' Korhonen
- * @version 0.1*
+ * @version 0.1
  *
  * @copyright The Unlicense
  *
@@ -103,6 +103,19 @@ uint16_t amiga_hunks::read16be(char*& ptr, bool inc=true)
     return r;
 }
 
+char* amiga_hunks::write24be(char* ptr, uint32_t r, bool inc=true)
+{
+    uint8_t* p = reinterpret_cast<uint8_t*>(ptr);
+    *p++ = r >> 16;
+    *p++ = r >> 8;
+    *p = r;
+    
+    if (inc) {
+        ptr += 3;
+    }
+    return ptr;
+}
+
 char* amiga_hunks::write32be(char* ptr, uint32_t r, bool inc=true)
 {
     uint8_t* p = reinterpret_cast<uint8_t*>(ptr);
@@ -151,20 +164,17 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
 
     hunk_type = read32be(ptr);
     
-    if (debug) {
-        std::cerr << ">- Executable file Hunk Parser -------------------------" << std::endl;
-    }
+    TDEBUG(std::cerr << ">- Executable file Hunk Parser -------------------------" << std::endl;)
+    
     if (size % 4) {
-        std::cerr << "**Error: Amiga executable size must be 4 byte aligned." << std::endl;
+        TDEBUG(std::cerr << "**Error: Amiga executable size must be 4 byte aligned." << std::endl;)
         return 0;
     }
     if (size < 6*4 || (hunk_type != HUNK_HEADER)) { 
-        std::cerr << "**Error: not Amiga executable, no HUNK_HEADER found." << std::endl;
+        TDEBUG(std::cerr << "**Error: not Amiga executable, no HUNK_HEADER found." << std::endl;)
         return 0;
     }
-    if (debug) {
-        std::cerr << "HUNK_HEADER (0x" << std::hex << hunk_type << ")" << std::endl;
-    }
+    TDEBUG(std::cerr << "HUNK_HEADER (0x" << std::hex << hunk_type << ")" << std::endl;)
 
     num_residents = 0;
     while ((n = read32be(ptr))) {
@@ -172,25 +182,25 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         ++num_residents;
     }
 
-    if (num_residents > 0 && debug) {
-        std::cerr << "  File has " << num_residents << " resident libraries.." << std::endl;
+    if (num_residents > 0) {
+        TDEBUG(std::cerr << "  File has " << num_residents << " resident libraries.." << std::endl;)
     }
 
     tsize = read32be(ptr);
     tnum  = read32be(ptr);
     tmax  = read32be(ptr);
    
-    if (debug) {
-        std::cerr << "  Number of segments: " << tsize << std::endl;
-        std::cerr << "  First segment:      " << tnum << std::endl;
-        std::cerr << "  Last of segment:    " << tmax << std::endl;
-    }
+    TDEBUG(                                                             \
+        std::cerr << "  Number of segments: " << tsize << std::endl;    \
+        std::cerr << "  First segment:      " << tnum << std::endl;     \
+        std::cerr << "  Last of segment:    " << tmax << std::endl;     \
+    )
     if (num_residents != tnum) {
         std::cerr << "  First root hunk (" << tnum << ") does not match the number of residents" << std::endl;
         return 0;
     }
-    if ((tsize - 1 > tmax) && debug) {
-        std::cerr << "  Likely an OVERLAY file" << std::endl;
+    if (tsize - 1 > tmax) {
+        TDEBUG(std::cerr << "  Likely an OVERLAY file" << std::endl;)
     }
 
     hunk_list.reserve(tsize);
@@ -239,19 +249,17 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         // Bit 29 contains flag for possible hunk advisory..
         hunk_type = msj & 0x1fffffff;
         
-        if (debug && hunk_type <= LAST_SUPPORTED_HUNK) {
-            std::cerr << s_hunk_str[hunk_type-FIRST_SUPPORTED_HUNK] << "(0x" << std::hex 
-                << hunk_type << ")" << std::endl;
-        } 
+        if (hunk_type <= LAST_SUPPORTED_HUNK) {
+            TDEBUG(std::cerr << s_hunk_str[hunk_type-FIRST_SUPPORTED_HUNK] << "(0x" \
+                << std::hex << hunk_type << ")" << std::endl;)
+        }
         // skip memory type but parse advisory hunk flag
         if (msj & 0x20000000) {
             hunk_size = read32be(ptr);
 
-            if (debug) {
-                std::cerr << "  Advisory hunk flag seen.. skipping " << hunk_size
-                    << " long words in hunk " << tnum << std::endl;
-                ptr += hunk_size;
-            }
+            TDEBUG(std::cerr << "  Advisory hunk flag seen.. skipping "             \
+                << hunk_size    << " long words in hunk " << tnum << std::endl;)
+            ptr += hunk_size;
         }
 
         switch (hunk_type) {
@@ -337,10 +345,7 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
                 }
             
                 j = read16be(ptr);
-                if (debug) {
-                    std::cerr << std::dec << "  " << m << " relocs to segment " << j << std::endl;
-                }
-
+                TDEBUG(std::cerr << std::dec << "  " << m << " relocs to segment " << j << std::endl;)
                 padding += (m * 2);
                 std::set<uint32_t>& s = hunk_list[n].relocs[j];
                 
@@ -370,8 +375,8 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         ptr += (hunk_size * 4);
     }
 
-    if (++n < tsize && debug) {
-        std::cerr << "Number of parsed segments does not match with the header information.." << std::endl;
+    if (++n < tsize) {
+        TDEBUG(std::cerr << "Number of parsed segments does not match with the header information.." << std::endl;)
     }
     if (overlay) {
         return n | MASK_OVERLAY_EXE;
@@ -753,10 +758,8 @@ char* amiga_hunks::compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_
 
         assert(base <= MAX_RELOC_OFFSET); 
         dst = write16be(dst,scr_seg);
-        dst = write16be(dst,dst_seg);
-        *dst++ = base >> 16;
-        *dst++ = base >> 8;
-        *dst++ = base;
+        dst = write16be(dst,scr_seg);
+        dst = write24be(dst,dst_seg);
         
         std::cout << std::dec << "Segment " << scr_seg << ", destination " << dst_seg
             << std::hex << ", base 0x" << base << ", entries " 

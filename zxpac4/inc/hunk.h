@@ -101,6 +101,7 @@ namespace amiga_hunks {
     uint16_t read16be(char*& ptr, bool inc);
     uint32_t readbe(char*& ptr, int bytes, bool inc);
     char* write32be(char* ptr, uint32_t v, bool inc);
+    char* write24be(char* ptr, uint32_t r, bool inc);
     char* write16be(char* ptr, uint16_t v, bool inc);
     uint32_t parse_hunks(char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool debug=false);
     void free_hunk_info(std::vector<hunk_info_t>& hunk_list);
