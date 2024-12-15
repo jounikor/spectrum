@@ -102,10 +102,13 @@ namespace amiga_hunks {
     uint32_t readbe(char*& ptr, int bytes, bool inc);
     char* write32be(char* ptr, uint32_t v, bool inc);
     char* write16be(char* ptr, uint16_t v, bool inc);
-    uint32_t parse_hunks(char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool verbose=false);
+    uint32_t parse_hunks(char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool debug=false);
     void free_hunk_info(std::vector<hunk_info_t>& hunk_list);
-    int merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len);
+    int merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len, bool debug=false);
+    char* compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_t> >& new_relocs, bool debug=false); 
 };
+
+#define TDEBUG(x) {if (debug) {x}}
 
 #define MEMORY_TYPE_MEMF_ANY    0x00
 #define MEMORY_TYPE_MEMF_CHIP   0x01
@@ -118,6 +121,8 @@ namespace amiga_hunks {
 #define SEGMENT_TYPE_BSS        0xc000
 #define SEGMENT_TYPE_MASK       0xc000
 #define SEGMENT_TYPE_EOF        0xffff
+
+#define MAX_RELOC_OFFSET        0x00ffffff
 
 /*
  *
@@ -139,19 +144,21 @@ namespace amiga_hunks {
   layout the relocation information is not after each segment.
 
   Relocation information:
-    00ssssssssssssss + 00dddddddddddddd  -> reloc within "ss...s" segment to "dd..d" segment
-    rrrrrrrr + rrrrrrrr + rrrrrrrr       -> first 24bit reloc to which deltas are applied to
+    ssssssssssssssss + dddddddddddddddd  -> reloc within "ss...s" segment to "dd..d" segment
+                                         -> if "sss.s" is 0xffff then EOF
+    rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr     -> first 32bit reloc to which deltas are applied to
   Reloc entry
     0rrrrrrr                             -> 7 lowest bits of reloc delta
     1rrrrrrr                             -> 7 upper bits of reloc delta and read next byte for next 7bits
     00000000 + [00000000]                -> End of relocs + optional byte to align delta relocs to 16bit
-    Note: reloc entries are always even thus the delta is shift to right before encoding.
-
+    Note1: reloc entries are always even thus the delta is shift to right before encoding.
+    Note2: reloc delta entry cannot be 0, thus it can be used as an end marker.
+    
     examples: 
       0aaaaaaa                           -> 8bit  reloc delta aaaaaaa0
       1aaaaaaa + 0bbbbbbb                -> 15bit reloc delta aaaaaaabbbbbbb0
       1aaaaaaa + 1bbbbbbb + 0ccccccc     -> 22bit reloc delta aaaaaaabbbbbbbccccccc0
-      00000000                           -> end of relocs
+      00000000                           -> end of relocs for this hunk.
 
 
  */

@@ -137,10 +137,10 @@ char* amiga_hunks::write16be(char* ptr, uint16_t r, bool inc=true)
  *         Upper 16 bits: additional information like errors.
  */
 
-uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk_list, bool verbose)
+uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk_list, bool debug)
 {
     char* end = ptr+size;
-    uint32_t n, m, j, r;
+    uint32_t n, m, j;
     uint32_t tsize, tnum, tmax;         // Follow DOS RKRM ;)
     uint32_t msj, mtj;
     uint32_t num_residents;              // archaic stuff
@@ -151,8 +151,8 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
 
     hunk_type = read32be(ptr);
     
-    if (verbose) {
-        std::cout << ">- Executable file Hunk Parser -------------------------" << std::endl;
+    if (debug) {
+        std::cerr << ">- Executable file Hunk Parser -------------------------" << std::endl;
     }
     if (size % 4) {
         std::cerr << "**Error: Amiga executable size must be 4 byte aligned." << std::endl;
@@ -162,8 +162,8 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         std::cerr << "**Error: not Amiga executable, no HUNK_HEADER found." << std::endl;
         return 0;
     }
-    if (verbose) {
-        std::cout << "HUNK_HEADER (0x" << std::hex << hunk_type << ")" << std::endl;
+    if (debug) {
+        std::cerr << "HUNK_HEADER (0x" << std::hex << hunk_type << ")" << std::endl;
     }
 
     num_residents = 0;
@@ -172,25 +172,25 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         ++num_residents;
     }
 
-    if (num_residents > 0 && verbose) {
-        std::cout << "  File has " << num_residents << " resident libraries.." << std::endl;
+    if (num_residents > 0 && debug) {
+        std::cerr << "  File has " << num_residents << " resident libraries.." << std::endl;
     }
 
     tsize = read32be(ptr);
     tnum  = read32be(ptr);
     tmax  = read32be(ptr);
    
-    if (verbose) {
-        std::cout << "  Number of segments: " << tsize << std::endl;
-        std::cout << "  First segment:      " << tnum << std::endl;
-        std::cout << "  Last of segment:    " << tmax << std::endl;
+    if (debug) {
+        std::cerr << "  Number of segments: " << tsize << std::endl;
+        std::cerr << "  First segment:      " << tnum << std::endl;
+        std::cerr << "  Last of segment:    " << tmax << std::endl;
     }
     if (num_residents != tnum) {
         std::cerr << "  First root hunk (" << tnum << ") does not match the number of residents" << std::endl;
         return 0;
     }
-    if ((tsize - 1 > tmax) && verbose) {
-        std::cout << "  Likely an OVERLAY file" << std::endl;
+    if ((tsize - 1 > tmax) && debug) {
+        std::cerr << "  Likely an OVERLAY file" << std::endl;
     }
 
     hunk_list.reserve(tsize);
@@ -220,10 +220,9 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         if (mtj == (3 << 1)) {
             mtj = read32be(ptr);
         }
-        if (verbose) {
-            std::cout << std::dec << "  Segment: " << n << ", memory size: " << msj << " bytes "
-                << "(" << s_memtype_str[mtj] << ")" << std::endl;
-        }
+        TDEBUG ( std::cerr << std::dec << "  Segment: " << n << ", memory size: " << msj    \
+                    << " bytes " << "(" << s_memtype_str[mtj] << ")" << std::endl;          \
+        )
 
         hunk.memory_size = msj;
         hunk.memory_type = mtj;
@@ -240,16 +239,16 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         // Bit 29 contains flag for possible hunk advisory..
         hunk_type = msj & 0x1fffffff;
         
-        if (verbose && hunk_type <= LAST_SUPPORTED_HUNK) {
-            std::cout << s_hunk_str[hunk_type-FIRST_SUPPORTED_HUNK] << "(0x" << std::hex 
+        if (debug && hunk_type <= LAST_SUPPORTED_HUNK) {
+            std::cerr << s_hunk_str[hunk_type-FIRST_SUPPORTED_HUNK] << "(0x" << std::hex 
                 << hunk_type << ")" << std::endl;
         } 
         // skip memory type but parse advisory hunk flag
         if (msj & 0x20000000) {
             hunk_size = read32be(ptr);
 
-            if (verbose) {
-                std::cout << "  Advisory hunk flag seen.. skipping " << hunk_size
+            if (debug) {
+                std::cerr << "  Advisory hunk flag seen.. skipping " << hunk_size
                     << " long words in hunk " << tnum << std::endl;
                 ptr += hunk_size;
             }
@@ -257,8 +256,8 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
 
         switch (hunk_type) {
         case HUNK_SYMBOL:
-            if (verbose) {
-                std::cout << "  Removing.." << std::endl;
+            if (debug) {
+                std::cerr << "  Removing.." << std::endl;
             }
             do {
                 hunk_size = read32be(ptr) & 0x00ffffff;
@@ -270,8 +269,8 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
             break;
         case HUNK_DEBUG:
         case HUNK_NAME:
-            if (verbose) {
-                std::cout << "  Removing.." << std::endl;
+            if (debug) {
+                std::cerr << "  Removing.." << std::endl;
             }
             hunk_size = read32be(ptr);
             break;
@@ -286,13 +285,12 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
             hunk_list[n].data_size = hunk_size << 2;
             hunk_list[n].hunk_type = hunk_type;
             hunk_list[n].combined_type |= hunk_type;
-            if (verbose) {
-                std::cout << std::dec << "  segment: " << hunk_list[n].old_seg_num 
-                    << ", data size: " << hunk_list[n].data_size
-                    << ", memory size: " << hunk_list[n].memory_size 
-                    << ", remaining: " << hunk_list[n].hunks_remaining
-                    << ", pointer: " << (uint64_t)ptr << std::endl;
-            }
+            TDEBUG(std::cerr << std::dec << "  segment: " << hunk_list[n].old_seg_num   \
+                    << ", data size: " << hunk_list[n].data_size                        \
+                    << ", memory size: " << hunk_list[n].memory_size                    \
+                    << ", remaining: " << hunk_list[n].hunks_remaining                  \
+                    << ", pointer: " << (uint64_t)ptr << std::endl;                     \
+            )
             break;
         case HUNK_END:
             hunk_size = 0;
@@ -310,8 +308,8 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
                 }
                 
                 j = read32be(ptr);
-                if (verbose) {
-                    std::cout << std::dec << "  " << m << " relocs to segment " << j << std::endl;
+                if (debug) {
+                    std::cerr << std::dec << "  " << m << " relocs to segment " << j << std::endl;
                 }
                 
                 // Since destination segmentt are using map a reoccurrance of relocations into an
@@ -339,8 +337,8 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
                 }
             
                 j = read16be(ptr);
-                if (verbose) {
-                    std::cout << std::dec << "  " << m << " relocs to segment " << j << std::endl;
+                if (debug) {
+                    std::cerr << std::dec << "  " << m << " relocs to segment " << j << std::endl;
                 }
 
                 padding += (m * 2);
@@ -372,8 +370,8 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
         ptr += (hunk_size * 4);
     }
 
-    if (++n < tsize && verbose) {
-        std::cout << "Number of parsed segments does not match with the header information.." << std::endl;
+    if (++n < tsize && debug) {
+        std::cerr << "Number of parsed segments does not match with the header information.." << std::endl;
     }
     if (overlay) {
         return n | MASK_OVERLAY_EXE;
@@ -398,7 +396,7 @@ void amiga_hunks::free_hunk_info(std::vector<hunk_info_t>& hunk_list)
  *
  *
  */
-int amiga_hunks::merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len) {
+int amiga_hunks::merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len, bool debug) {
     (void)len;
 
     int o, p, m, n;
@@ -409,31 +407,132 @@ int amiga_hunks::merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, cha
     new_exe = new char[len];
     char* ptr = new_exe;
 
-    int* old_seg_size = new int[num_old_seg];
+    // A list of original executable file hubk/segment code/data sizes.
+    // The entries do not contain the possible associated BSS. The list
+    // is indexed using the original executable file hunk/segment numbers.
+    // The size of the list is the number of the original executable file
+    // hunk/segments.
+
+    uint32_t* merged_old_seg_size = new uint32_t[num_old_seg];
+    
+    // A list of the original executable file hubk/segment BSS sizes. Note,
+    // not all code/data hunks contain an associated BSS.  The list
+    // is indexed using the original executable file hunk/segment numbers.
+    // The size of the list is the number of the original executable file
+    // hunk/segments.
+
     int* old_seg_bss = new int[num_old_seg];
-    int* old_seg_bss_offs = new int[num_old_seg];
+    
+    // A list of original executable file hunk offsets after all hunks have been
+    // merged. The offsets are within the merged executable file but indexed using
+    // the original hunk/segment numbers. The size of the list is the number of
+    // segments in the original executable file.
 
-    // Find mergeable hunks/segments
+    int* merged_old_seg_offs = new int[num_old_seg];
 
-    //for (std::move_iterator<std::vector<hunk_info_t>::iterator> it{hunk_list.begin()}, et{hunk_list.end()}; it != et; it++) {
-    for (std::vector<hunk_info_t>::iterator  it = hunk_list.begin(), et = hunk_list.end(); it != et; it++) {
+    // This list is used with merged_old_seg_offs and indexes similarly using the 
+    // original executable file hunk/segment numbers. If a code/data hunk had an
+    // assiciated BSS area, then this list contains the adjustment offset for each
+    // old hunk/segment in the new merged hunk how much the relocation entry in 
+    // the file has to be offsetted to be inthe BSS area. The below drawing attemps
+    // to illustrate what this means:
+    //
+    // Original HUNK_DATA #1 with an associated BSS
+    //
+    // +-----------------+--------+
+    // | HUNK_DATA #1    | BSS #1 | 
+    // +-----------------+--------+
+    //
+    // Original HUNK_DATA #2 with an associated BSS
+    //
+    // +--------------+--------------+
+    // | HUNK_DATA #3 | BSS #3       | 
+    // +--------------+--------------+
+    //
+    // |<- Merged HUNK x ---------------|- merged hunk x BSS -->|
+    // +-----------------+--------------+--------+--------------+
+    // | HUNK_DATA #1    | HUNK_DATA #3 | BSS #1 | BSS #3       |
+    // +-----------------+--------------+--------+--------------+
+    // |<- n bytes ----->|
+    //                   |<- m bytes -->|
+    //                                  |<- N -->|
+    //                                           |<- M bytes -->|
+    // |<- offset n=0
+    // |-- offset m=n -->|
+    // |-- bss n offset --------------->|
+    // |-- bss m offset ------------------------>|
+    //
+    // merged_old_seg_offs[1] = 0;
+    // merged_old_seg_offs[3] = n;
+    // merged_old_seg_bss_offs[1] = n+m;
+    // merged_old_seg_bss_offs[3] = n+m+N;
+
+    int* merged_old_seg_bss_offs = new int[num_old_seg];
+
+    // The hunk merging algorithms works as follows:
+    //  1) Combine hunks with the same type and the memory requirement into a single merged hunk.
+    //  2) If merged hunks (HUNK_DATA and HUNK_CODE) have attaced BSS section those are also
+    //     included into the merged hunk. There can be total 9 merged hunks.
+    //  3) CODE/DATA/BSS hunks are separated from relocation information. The relocation information
+    //     is stored as a one binary blob at the end of all merged hunks.
+    //  4) Relocation datas are also merged accordingly to merged hunks. Duplicates are removed and
+    //     possible multiple relocations to the same hunk are combined.
+    //  5) Relocation entries are delta encoded.
+    //
+    //  Note that there are some restrictions.
+    //  - Maximum number of merged hunks is 9 but if the encoder does not not merge hunks then
+    //    the limit is 65534. The value 65535 is reserved for an EOF marker.
+    //  - Maximum length of a reloc entry is 2^24-1.
+    
+    for (std::vector<hunk_info_t>::iterator it = hunk_list.begin(), et = hunk_list.end(); it != et; it++) {
         if (new_hunks.find(it->combined_type) == new_hunks.end()) {
             new_hunks[it->combined_type] = num_new_seg++;
         }
         it->new_seg_num = new_hunks[it->combined_type];
-        old_seg_size[it->old_seg_num] = it->data_size;
+        merged_old_seg_size[it->old_seg_num] = it->data_size;
         old_seg_bss[it->old_seg_num] = it->memory_size - it->data_size;
     }
 
+    // Explanation of the following assistance tables used for lookups during hunk merging:
+    //
+    // A list of char pointers to the start of each merged hunk. Each merged hunk contains
+    // one or more original hunks of the same type and memory allocation type.
+    // The list size is the number of total merged hunks, which is less of equal to the
+    // original number of hunks.
+   
     char** merged_hunk_start   = new char*[num_new_seg];   
-    uint32_t* merged_data_size = new uint32_t[num_new_seg];
-    uint32_t* merged_data_offs = new uint32_t[num_new_seg+1];
-    uint32_t* merged_hunk_type = new uint32_t[num_new_seg];
-    uint32_t* merged_mem_size  = new uint32_t[num_new_seg];
-    uint32_t* merged_bss_size  = new uint32_t[num_new_seg];
-    int* merged_old_seg_offs = new int[num_old_seg];
-    merged_data_offs[0] = 0;
 
+    // A list of merged hunk data sizes type of uint32_t. Each merged hunk is a sum of
+    // merged original hunks. Possible BSS attached to original HUNK_DATAs are not part
+    // of these sizes. The size of the list is the number of new merged hunks.
+  
+    uint32_t* merged_data_size = new uint32_t[num_new_seg];
+   
+    // A list of offsets to the start of each merged hunk and type of uint32_t. The 
+    // first offset is always zero i.e. the beginning of the merged binary blob. The
+    // size of the list is the number of merged hunks plus one (the last list entry
+    // is not every used except during the calculation of the offsets).
+ 
+    uint32_t* merged_data_offs = new uint32_t[num_new_seg+1];
+    merged_data_offs[0] = 0;
+    
+    // A list of merged hunk types. Each entry contains the memory type in bits 31 & 30,
+    // and the standard AmigaDOS hunk type in bits 29-0. The size of the list is the 
+    // number of new merged hunks.
+    
+    uint32_t* merged_hunk_type = new uint32_t[num_new_seg];
+    
+    // A list of merged hunk memory sized, which also include possible associated
+    // BSS hunk. It is possible to have BSS associeated with HUNK_CODE and HUNK_DATA.
+    // The size of the list is the number of new merged hunks.
+
+    uint32_t* merged_mem_size  = new uint32_t[num_new_seg];
+    
+    // A list of merged hunk BSS sizes. Note that a merged code or data hunk may
+    // also contain a BSS. The size of the list is the number of new merged hunks.
+
+    uint32_t* merged_bss_size  = new uint32_t[num_new_seg];
+    
     for (m = 0; m < num_new_seg; m++) {
         merged_data_size[m] = 0;
         merged_mem_size[m] = 0;
@@ -442,46 +541,47 @@ int amiga_hunks::merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, cha
     }
     for (m = 0; m < num_old_seg; m++) {
         merged_old_seg_offs[m] = merged_data_size[new_hunks[hunk_list[m].combined_type]]; 
-        old_seg_size[m] = hunk_list[m].data_size;
-        
+        merged_old_seg_size[m] = hunk_list[m].data_size;
         merged_hunk_type[hunk_list[m].new_seg_num] = hunk_list[m].combined_type;
         merged_data_size[hunk_list[m].new_seg_num] += hunk_list[m].data_size;
         merged_mem_size[hunk_list[m].new_seg_num] += hunk_list[m].memory_size;
     }
     for (m = 0; m < num_old_seg; m++) {
-        old_seg_bss_offs[m] = merged_data_size[hunk_list[m].new_seg_num] + merged_bss_size[hunk_list[m].new_seg_num];
+        merged_old_seg_bss_offs[m] = merged_data_size[hunk_list[m].new_seg_num] + merged_bss_size[hunk_list[m].new_seg_num];
         merged_bss_size[hunk_list[m].new_seg_num] += old_seg_bss[m];
-    
-        std::cout << "Binnary pointers: " << reinterpret_cast<uint64_t>(hunk_list[m].seg_start) << "\n";
+   
+        TDEBUG(std::cerr << "Binnary pointers: " << reinterpret_cast<uint64_t>(hunk_list[m].seg_start) << "\n";)
     }
 
-    std::cout << "Number of merged hunks is " << num_new_seg << std::endl;
+    TDEBUG(std::cerr << "Number of merged hunks is " << num_new_seg << std::endl;)
     
     for (m = 0; m < num_new_seg; m++) {
         merged_data_offs[m+1] = merged_data_offs[m] + merged_data_size[m];
 
-        std::cout << "Merged new segment " << m << ":" << std::endl;
-        std::cout << "  Hunk type -> " << merged_hunk_type[m] << std::endl;
-        std::cout << "  Sizes  -> " << merged_data_size[m] << std::endl;
-        std::cout << "  Offset from beginning -> " << merged_data_offs[m] << std::endl;
+        TDEBUG( \
+            std::cerr << "Merged new segment " << m << ":" << std::endl;                        \
+            std::cerr << "  Hunk type -> " << merged_hunk_type[m] << std::endl;                 \
+            std::cerr << "  Sizes  -> " << merged_data_size[m] << std::endl;                    \
+            std::cerr << "  Offset from beginning -> " << merged_data_offs[m] << std::endl;)
     }
-    for (m = 0; m < num_old_seg; m++) {
-        std::cout << "Old segment " << m << ":" << std::endl;
-        std::cout << "  Mapped to -> " << hunk_list[m].new_seg_num << std::endl;
-        std::cout << "  Offset -> " << merged_old_seg_offs[m] << std::endl;  
-        std::cout << "  Size -> " << old_seg_size[m] << std::endl;  
-        std::cout << "  BSS -> " << old_seg_bss[m] << std::endl;
-        std::cout << "  BSS offset " << old_seg_bss_offs[m] << std::endl;
-    }
-    for (m = 0; m < num_new_seg; m++) {
-        std::cout << "Merged segment " << m << " end  -> " << m << ": " << merged_data_size[m] << std::endl;
-    }
+    TDEBUG(for (m = 0; m < num_old_seg; m++) {                                                  \
+        std::cerr << "Old segment " << m << ":" << std::endl;                                   \
+        std::cerr << "  Mapped to -> " << hunk_list[m].new_seg_num << std::endl;                \
+        std::cerr << "  Offset -> " << merged_old_seg_offs[m] << std::endl;                     \
+        std::cerr << "  Size -> " << merged_old_seg_size[m] << std::endl;                              \
+        std::cerr << "  BSS -> " << old_seg_bss[m] << std::endl;                                \
+        std::cerr << "  BSS offset " << merged_old_seg_bss_offs[m] << std::endl; }                     \
+    
+        for (m = 0; m < num_new_seg; m++) {                                                     \
+            std::cerr << "Merged segment " << m << " end  -> " << m << ": " << merged_data_size[m]  \
+                << ", " << merged_mem_size[m] << std::endl;                                     \
+    })
 
     // Just for my own education.. Did not remember this ;)
     // https://stackoverflow.com/questions/7648756/is-the-order-of-iterating-through-stdmap-known-and-guaranteed-by-the-standard
-    for (auto& i: new_hunks)  {
-        std::cout << "Combined mapping -> " << i.first << ": " << i.second << std::endl;
-    }
+    TDEBUG(for (auto& i: new_hunks)  {                                                          \
+        std::cerr << "Combined mapping -> " << i.first << ": " << i.second << std::endl;        \
+    })
 
     // Merge datas..
     // Output the "HUNK_HEADER"
@@ -519,55 +619,40 @@ int amiga_hunks::merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, cha
                     o = hunk_list[n].data_size;
                     p = 0;
 
-                    std::cout << "Binary Offset copying to: " << (uint32_t)(ptr-new_exe) << "\n";
-                    std::cout << "Binary ptr " << (uint64_t)hunk_list[n].seg_start << "\n";
-                    std::cout << "Binary Offset copying from: " << (uint32_t)(hunk_list[n].seg_start-exe) << "\n";
-
+                    TDEBUG(                                                                         \
+                    std::cerr << "Binary Offset copying to: " << (uint32_t)(ptr-new_exe) << "\n";   \
+                    std::cerr << "Binary ptr " << (uint64_t)hunk_list[n].seg_start << "\n";         \
+                    std::cerr << "Binary Offset copying from: " << (uint32_t)(hunk_list[n].seg_start-exe) << "\n";)
 
                     while (o-- > 0) {
                         *ptr++ = hunk_list[n].seg_start[p++];
     }   }   }   }   }
 
-    n = (ptr-new_exe);
-    std::cout << ">> New exe size before reloc data: " << n << std::endl;
-
-    for (auto& hunks : hunk_list) {
-        std::cout << std::dec << "Old segment " << hunks.old_seg_num << "(-> " 
-            << hunks.new_seg_num << ")\n"; 
-        for (auto& rels : hunks.relocs) {
-            std::cout << std::dec << "  **reloc to hunk " << rels.first << std::endl;
-        
-            for (auto& p2 : rels.second) {
-                std::cout << std::hex << "  0x" << p2 << std::endl; 
-    }   }   }
-
+    TDEBUG (                                                                            \
+        std::cerr << ">> New exe size before reloc data: " << (ptr-new_exe) << std::endl;   \
+        for (auto& hunks : hunk_list) {                                                     \
+            std::cerr << std::dec << "Old segment " << hunks.old_seg_num << "(-> "          \
+                << hunks.new_seg_num << ")\n";                                              \
+            for (auto& rels : hunks.relocs) {                                               \
+                std::cerr << std::dec << "  **reloc to hunk " << rels.first << std::endl;   \
+                for (auto& p2 : rels.second) {                                              \
+                    std::cerr << std::hex << "  0x" << p2 << std::endl;                     \
+        }   }   })
 
     for (int new_seg_num = 0; new_seg_num < num_new_seg; new_seg_num++) {
-        char* p_total_relocs = ptr;
-        int num_total_relocs = 0;
-        //ptr = write32be(ptr,num_total_relocs);
-       
         uint32_t base_offset = merged_data_offs[new_seg_num];
 
-        std::cout << std::dec << "New Segment " << new_seg_num << std::hex
-            << " with binary offset 0x" << base_offset <<std::endl;
+        TDEBUG(std::cerr << std::dec << "New Segment " << new_seg_num << std::hex       \
+            << " with binary offset 0x" << base_offset <<std::endl;)
 
-        //
         // Merge relocs to new merged hunks. We use the property of sdt::set to
         // keep reloc entries in an ascending order.
-        //
 
         for (int old_seg_num = 0; old_seg_num < num_old_seg; old_seg_num++) {
-            int mapped_to_seg = hunk_list[old_seg_num].new_seg_num;
-
-            if (mapped_to_seg == new_seg_num) {
-                char* base_addr = merged_hunk_start[new_seg_num];
-                
+            if (hunk_list[old_seg_num].new_seg_num == new_seg_num) {
                 for (auto& reloc : hunk_list[old_seg_num].relocs) {
                     int old_dst_seg = reloc.first;
                     int new_dst_seg = hunk_list[old_dst_seg].new_seg_num;
-                    int new_dst_offs = merged_old_seg_offs[old_dst_seg];
-                    int merged_bin_offs = merged_old_seg_offs[old_seg_num];
 
                     // The intermediate hunk reloc structure is keyed by the 
                     // new_seg_num and new_dst_seg pair.. When encoding to the file
@@ -577,41 +662,48 @@ int amiga_hunks::merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, cha
                     std::set<uint32_t>& old_dst_relocs = reloc.second;
                     std::set<uint32_t>& new_dst_relocs = new_relocs[new_dst_key];
                 
-                    std::cout << std::dec << "  Mapping old dst segment " << old_dst_seg << " relocs to new "
-                        << "dst segment " << new_dst_seg << " relocs with key 0x" << std::hex << new_dst_key 
-                        << "\n";
+                    TDEBUG(std::cerr << std::dec << "  Mapping old dst segment " << old_dst_seg         \
+                        << " relocs to new " << "dst segment " << new_dst_seg << " relocs with key 0x"  \
+                        << std::hex << new_dst_key  << ", old seg size 0x"                              \
+                        << merged_old_seg_size[old_dst_seg] << "\n";                                    \
+                    )
 
-                    
                     for (auto& entry : old_dst_relocs) {
-                        std::cout << "    0x" << entry << " + 0x" << merged_bin_offs
-                            << " == 0x" << entry+merged_bin_offs;
-                        
+                        TDEBUG(std::cerr << "    0x" << entry << " + 0x"                                \
+                            << merged_old_seg_offs[old_seg_num]                                         \
+                            << " == 0x" << entry+merged_old_seg_offs[old_seg_num];                      \
+                        )
+
                         // Insert the offsetted reloc entry into the new hunk..
-                        new_dst_relocs.insert(entry+merged_bin_offs);  
+                        new_dst_relocs.insert(entry+merged_old_seg_offs[old_seg_num]);  
                         
                         // Fix offset within the file
-                        char* addr = base_addr + merged_bin_offs + entry; 
+                        char* addr = merged_hunk_start[new_seg_num] + merged_old_seg_offs[old_seg_num] + entry; 
                         uint32_t offs = read32be(addr,false);
 
-                        std::cout << ", reloc offset 0x" << offs << " + 0x" << new_dst_offs << std::endl; 
+                        TDEBUG(std::cerr << ", reloc offset 0x" << offs << " + 0x"                      \
+                            << merged_old_seg_offs[old_dst_seg] << "\n";)
 
-                        if (offs >= old_seg_size[old_seg_num]) {
+                        //if (old_seg_num == old_dst_seg && offs >= merged_old_seg_size[old_seg_num]) {
+                        if (offs >= merged_old_seg_size[old_dst_seg]) {
                             // we hit the BSS area..
-                            //std::cout << "    -> into BSS, offset with 0x" << old_seg_bss_offs[old_seg_num]
-                            //    << std::endl;
-
-                            offs += old_seg_bss_offs[old_seg_num];
+                            TDEBUG(std::cerr << "    >> into BSS, offset with 0x"                       \
+                                << merged_old_seg_bss_offs[old_dst_seg] << std::endl;)
+                            offs += merged_old_seg_bss_offs[old_dst_seg];
                         } else {
+                            TDEBUG(std::cerr << "    -- offset with 0x"                                 \
+                                << merged_old_seg_offs[old_dst_seg] << std::endl;)
+                            offs += merged_old_seg_offs[old_dst_seg]; 
                         }
+                        
+                        // Fix offset in exe binary
+                        write32be(addr,offs);
+    }   }   }   }   }
 
-
-
-        }   }   }   }
-        write32be(p_total_relocs,num_total_relocs);
-    }
-
+    // Compress relocation information..
+    ptr = compress_relocs(ptr,new_relocs);
     n = (ptr-new_exe);
-    std::cout << ">> New exe size after reloc data: " << n << std::endl;
+    TDEBUG(std::cerr << ">> New exe size after reloc data: " << n << std::endl;)
 
 #if 1   // just for the debug
     std::ofstream ofs;
@@ -622,35 +714,87 @@ int amiga_hunks::merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, cha
 
     //
 
-    for (auto& aa : new_relocs) {
-        uint32_t rel_info = aa.first;
+    TDEBUG(                                                                         \
+        for (auto& aa : new_relocs) {                                               \
+            uint32_t rel_info = aa.first;                                           \
+            std::cerr << std::hex << "** new relocs 0x" << rel_info << "\n";        \
+            for (auto& bb : aa.second) {                                            \
+                std::cerr << "   0x" << bb << "\n";                                 \
+            }                                                                       \
+    })
 
-        std::cout << std::hex << "** new rolocs 0x" << rel_info << "\n";
-        for (auto& bb : aa.second) {
-            std::cout << "   0x" << bb << "\n";
-        }
-
-
-    }
-
-
-
-
-
-    m = 0;
-
+    // clean up
     delete[] merged_hunk_start;
     delete[] merged_data_size;
     delete[] merged_data_offs;
     delete[] merged_hunk_type;
     delete[] merged_mem_size;
     delete[] merged_bss_size;
-    delete[] old_seg_size;
+    delete[] merged_old_seg_size;
     delete[] merged_old_seg_offs;
     delete[] old_seg_bss;
-    delete[] old_seg_bss_offs;
-    return 0;
+    delete[] merged_old_seg_bss_offs;
+    return ptr-exe;
 }
 
 
+char* amiga_hunks::compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_t> >& new_relocs, bool debug)
+{
+    uint32_t scr_seg;
+    uint32_t dst_seg;
+    uint32_t base;
+    uint32_t delta, value;
 
+    for (auto& reloc : new_relocs) {
+        scr_seg = reloc.first >> 16;
+        dst_seg = reloc.first & 0xffff;
+        std::set<uint32_t>::iterator it = reloc.second.begin();
+        base = *it++;
+
+        assert(base <= MAX_RELOC_OFFSET); 
+        dst = write16be(dst,scr_seg);
+        dst = write16be(dst,dst_seg);
+        *dst++ = base >> 16;
+        *dst++ = base >> 8;
+        *dst++ = base;
+        
+        std::cout << std::dec << "Segment " << scr_seg << ", destination " << dst_seg
+            << std::hex << ", base 0x" << base << ", entries " 
+            << std::dec << reloc.second.size() << std::endl;
+
+        // The assumption is that entries are in ascending order..
+        for (; it != reloc.second.end(); it++) {
+            value = *it;
+            assert(value > base);
+            delta = value - base;
+            std::cout << std::hex << "  delta 0x" << delta << "\n";
+            base = value;
+            delta >>= 1;
+       
+            if (delta < 0x80) {
+            } else if (delta < 0x4000) {
+                *dst++ = (delta >> 7) | 0x80;
+            } else if (delta < 0x200000) {
+                *dst++ = (delta >> 14) | 0x80;
+                *dst++ = (delta >> 7) | 0x80;
+            } else if (delta < 0x10000000) {
+                *dst++ = (delta >> 21) | 0x80;
+                *dst++ = (delta >> 14) | 0x80;
+                *dst++ = (delta >> 7) | 0x80;
+            } else {
+                assert (delta < 0x10000000);
+            }
+
+            *dst++ = delta & 0x7f;
+        }
+        // end mark
+        *dst++ = 0x00;
+
+        if (reinterpret_cast<uint64_t>(dst) & 1) {
+            *dst++ = 0x00;
+        }
+    }
+
+    dst = write16be(dst,0xffff);
+    return dst;
+}
