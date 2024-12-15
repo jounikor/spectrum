@@ -273,7 +273,7 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
 
         switch (hunk_type) {
         case HUNK_SYMBOL:
-            TDEBUG(std::cout << "  Removing.." << std::endl;)
+            TDEBUG(std::cerr << "  Removing.." << std::endl;)
             do {
                 hunk_size = read32be(ptr) & 0x00ffffff;
                 if (hunk_size == 0) {
@@ -320,7 +320,7 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
                 }
                 
                 j = read32be(ptr);
-                TDEBUG(std::cout << std::dec << "  " << m << " relocs to segment " << j << std::endl;)
+                TDEBUG(std::cerr << std::dec << "  " << m << " relocs to segment " << j << std::endl;)
                 
                 // Since destination segmentt are using map a reoccurrance of relocations into an
                 // existing segment are all combined into one..
@@ -555,7 +555,6 @@ int amiga_hunks::merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, cha
     for (m = 0; m < num_old_seg; m++) {
         merged_old_seg_bss_offs[m] = merged_data_size[hunk_list[m].new_seg_num] + merged_bss_size[hunk_list[m].new_seg_num];
         merged_bss_size[hunk_list[m].new_seg_num] += old_seg_bss[m];
-   
         TDEBUG(std::cerr << "Binnary pointers: " << reinterpret_cast<uint64_t>(hunk_list[m].seg_start) << "\n";)
     }
 
@@ -762,16 +761,16 @@ char* amiga_hunks::compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_
         dst = write16be(dst,scr_seg);
         dst = write24be(dst,dst_seg);
         
-        std::cout << std::dec << "Segment " << scr_seg << ", destination " << dst_seg
-            << std::hex << ", base 0x" << base << ", entries " 
-            << std::dec << reloc.second.size() << std::endl;
+        TDEBUG(std::cerr << std::dec << "Segment " << scr_seg << ", destination "   \
+            << dst_seg << std::hex << ", base 0x" << base << ", entries "           \
+            << std::dec << reloc.second.size() << std::endl;)
 
         // The assumption is that entries are in ascending order..
         for (; it != reloc.second.end(); it++) {
             value = *it;
             assert(value > base);
             delta = value - base;
-            std::cout << std::hex << "  delta 0x" << delta << "\n";
+            TDEBUG(std::cerr << std::hex << "  delta 0x" << delta << "\n";)
             base = value;
             delta >>= 1;
        

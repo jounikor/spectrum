@@ -137,7 +137,7 @@ namespace amiga_hunks {
   Hunk types:
     01nnnnnnnnnnnnnn + nnnnnnnnnnnnnnnn  -> HUNK_CODE (data size nnnnnnnnnnnnnnnnnnnnnnnnnnnnnn << 2)
     10nnnnnnnnnnnnnn + nnnnnnnnnnnnnnnn  -> HUNK_DATA
-    1100000000000000                     -> HUNK_BSS
+    1100000000000000                     -> HUNK_BSS (size is implicitly known)
     1111111111111111                     -> EOF
 
   All segments' data is together followed but all relocation data. Unlinke in normal executable
@@ -146,7 +146,7 @@ namespace amiga_hunks {
   Relocation information:
     ssssssssssssssss + dddddddddddddddd  -> reloc within "ss...s" segment to "dd..d" segment
                                          -> if "sss.s" is 0xffff then EOF
-    rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr     -> first 32bit reloc to which deltas are applied to
+    rrrrrrrrrrrrrrrrrrrrrrrr             -> first 24bit reloc to which deltas are applied to
   Reloc entry
     0rrrrrrr                             -> 7 lowest bits of reloc delta
     1rrrrrrr                             -> 7 upper bits of reloc delta and read next byte for next 7bits
