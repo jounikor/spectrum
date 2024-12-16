@@ -58,6 +58,7 @@ Usage: ./build/zxpac4 target [options] infile [outfile]
   --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).
   --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.
   --exe,-X              Self-extracting decruncher (Amiga target).
+  --merge_hunks,-m      Merge hunks (Amiga target). 
   --overlay,-O          Self-extracting overlay decruncher (Amiga target).
   --debug,-d            Output a LOT OF debug prints to stderr.
   --DEBUG,-D            Output EVEN MORE debug prints to stderr.
@@ -224,11 +225,15 @@ Some notes on the supported algorithms:
  version of the optimal parser with the S405 some day.
 
 Target specific options and features:
- Amiga target..
-   - hunk preprocessor
-   - relocatable exe decompressor
-   - overlay relocatable decompressor
-   - absolute address exe decompressor with hunk relocator
+ Amiga:
+  Amiga target has two executable file preprocessors. The default and a hunk
+  merger. Both of them use the same relocation information delta encoder.
+  The hunk merger combines hunks of the same type and memory requirements.
+  The default hunk preprocessor just strips all extra fat it can. The
+  relocation information delta encoder does some combining (when there are
+  more than one RELOC HUNKS to the same segment) and delta encodes all 
+  relocation indices to 1 to 3 (or in theory 4) bytes each. Encoding is
+  dynamic so that all lengths of deltas can be mixed.
 
 Z80 Decompressors:
  * z80dec.asm      - zxpac4(_32k) normal from lower to higher memory decompressor

@@ -243,16 +243,16 @@ int handle_file(lz_base* lz, lz_config_t* cfg, std::ifstream& ifs, std::ofstream
 
 
     std::vector<amiga_hunks::hunk_info_t> hunk_list(0);
-    char* bbb;
+    char* amiga_exe = NULL;
     bool debug_on = cfg->debug_level > DEBUG_LEVEL_NONE ? true : false;
 
 
     n = amiga_hunks::parse_hunks(buf,len,hunk_list,debug_on);
     
     if (cfg->merge_hunks) {
-        n = amiga_hunks::merge_hunks(buf,len,hunk_list,bbb,debug_on);
+        n = amiga_hunks::merge_hunks(buf,len,hunk_list,amiga_exe,debug_on);
     } else {
-        n = amiga_hunks::optimize_hunks(buf,len,hunk_list,bbb,debug_on);
+        n = amiga_hunks::optimize_hunks(buf,len,hunk_list,amiga_exe,debug_on);
     }
     free_hunk_info(hunk_list);
 
@@ -260,7 +260,7 @@ int handle_file(lz_base* lz, lz_config_t* cfg, std::ifstream& ifs, std::ofstream
     lz->lz_parse(buf,len,0); 
     n = lz->lz_encode(buf,len,ofs); 
 
-    delete[] bbb;
+    delete[] amiga_exe;
     delete[] buf;
     return n;
 }
