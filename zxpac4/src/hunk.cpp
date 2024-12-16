@@ -56,7 +56,11 @@ static const char* s_memtype_str[] = {
     "??",
 };
 
+static char* compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_t> >& new_relocs, bool debug=false); 
 
+//
+//
+//
 
 uint32_t amiga_hunks::read32be(char*& ptr, bool inc=true)
 {
@@ -706,7 +710,10 @@ int amiga_hunks::merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, cha
     }   }   }   }   }
 
     // Compress relocation information..
-    ptr = compress_relocs(ptr,new_relocs);
+    ptr = compress_relocs(ptr,new_relocs,debug);
+    // Write EOF
+    ptr = write16be(ptr,0x0000);
+    
     n = (ptr-new_exe);
     TDEBUG(std::cerr << ">> New exe size after reloc data: " << n << std::endl;)
 
@@ -743,7 +750,7 @@ int amiga_hunks::merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, cha
 }
 
 
-char* amiga_hunks::compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_t> >& new_relocs, bool debug)
+static char* compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_t> >& new_relocs, bool debug)
 {
     uint32_t scr_seg;
     uint32_t dst_seg;
@@ -757,9 +764,9 @@ char* amiga_hunks::compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_
         base = *it++;
 
         assert(base <= MAX_RELOC_OFFSET); 
-        dst = write16be(dst,scr_seg);
-        dst = write16be(dst,scr_seg);
-        dst = write24be(dst,dst_seg);
+        dst = write16be(dst,scr_seg+1);
+        dst = write16be(dst,dst_seg+1);
+        dst = write24be(dst,base);
         
         TDEBUG(std::cerr << std::dec << "Segment " << scr_seg << ", destination "   \
             << dst_seg << std::hex << ", base 0x" << base << ", entries "           \
@@ -798,6 +805,5 @@ char* amiga_hunks::compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_
         }
     }
 
-    dst = write16be(dst,0xffff);
     return dst;
 }

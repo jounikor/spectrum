@@ -105,7 +105,6 @@ namespace amiga_hunks {
     uint32_t parse_hunks(char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool debug=false);
     void free_hunk_info(std::vector<hunk_info_t>& hunk_list);
     int merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len, bool debug=false);
-    char* compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_t> >& new_relocs, bool debug=false); 
 };
 
 #define TDEBUG(x) {if (debug) {x}}
@@ -138,14 +137,14 @@ namespace amiga_hunks {
     01nnnnnnnnnnnnnn + nnnnnnnnnnnnnnnn  -> HUNK_CODE (data size nnnnnnnnnnnnnnnnnnnnnnnnnnnnnn << 2)
     10nnnnnnnnnnnnnn + nnnnnnnnnnnnnnnn  -> HUNK_DATA
     1100000000000000                     -> HUNK_BSS (size is implicitly known)
-    1111111111111111                     -> EOF
+    0000000000000000                     -> EOF
 
   All segments' data is together followed but all relocation data. Unlinke in normal executable
   layout the relocation information is not after each segment.
 
   Relocation information:
-    ssssssssssssssss + dddddddddddddddd  -> reloc within "ss...s" segment to "dd..d" segment
-                                         -> if "sss.s" is 0xffff then EOF
+    ssssssssssssssss + dddddddddddddddd  -> reloc within "ss...s" segment+1 to "dd..d" segment+1
+                                         -> if "sss.s" is 0x0000 then EOF
     rrrrrrrrrrrrrrrrrrrrrrrr             -> first 24bit reloc to which deltas are applied to
   Reloc entry
     0rrrrrrr                             -> 7 lowest bits of reloc delta
