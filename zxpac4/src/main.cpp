@@ -65,6 +65,7 @@ static struct option longopts[] = {
     {"algo",        required_argument,  NULL, 'a'},
     {"abs",         required_argument,  NULL, 'A'},
     {"exe",         no_argument,        NULL, 'X'},
+    {"merge-hunks", no_argument,        NULL, 'm'},
     {"help",        no_argument,        NULL, 'h'},
     {0,0,0,0}
 };
@@ -95,7 +96,8 @@ void usage( char *prg ) {
     std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --exe,-X              Self-extracting decruncher (Amiga target).\n";
-    std::cerr << "  --overlay,-O          Self-extracting overlay decruncher (Amiga target).\n";
+    std::cerr << "  --merge-hunks,-m      Merge hunks (Amiga target).\n";
+    //std::cerr << "  --overlay,-O          Self-extracting overlay decruncher (Amiga target).\n";
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
     std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
     std::cerr << "  --verbose,-v          Output some additional information to stdout.\n";
@@ -165,31 +167,40 @@ lz_config algos[] {
     {   ZXPAC4_WINDOW_MAX,  DEF_CHAIN, ZXPAC4_MATCH_MIN, ZXPAC4_MATCH_MAX, ZXPAC4_MATCH_GOOD,
         DEF_BACKWARD_STEPS, ZXPAC4_OFFSET_MATCH2_THRESHOLD, ZXPAC4_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4_INIT_PMR_OFFSET,
+        DEBUG_LEVEL_NONE,
         false,      // only_better_matches
         false,      // reverse_file
         false,      // reverse_encoded
         false,      // is_ascii
-        false
+        false,      // preshift_last_ascii_literal
+        false,      // merge_hunks
+        false,      // verbose
     },
     // ZXPAC4B
     {   ZXPAC4B_WINDOW_MAX,  DEF_CHAIN, ZXPAC4B_MATCH_MIN, ZXPAC4B_MATCH_MAX, ZXPAC4B_MATCH_GOOD,
         DEF_BACKWARD_STEPS, ZXPAC4B_OFFSET_MATCH2_THRESHOLD, ZXPAC4B_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4B_INIT_PMR_OFFSET,
+        DEBUG_LEVEL_NONE,
         false,      // only_better_matches
         false,      // reverse_file
         false,      // reverse_encoded
         false,      // is_ascii
-        false
+        false,      // preshift_last_ascii_literal
+        false,      // merge_hunks
+        false,      // verbose
     },
     // ZXPAC4_32K - max 32K window
     {   ZXPAC4_32K_WINDOW_MAX,  DEF_CHAIN, ZXPAC4_32K_MATCH_MIN, ZXPAC4_32K_MATCH_MAX, ZXPAC4_32K_MATCH_GOOD,
         DEF_BACKWARD_STEPS, ZXPAC4_32K_OFFSET_MATCH2_THRESHOLD, ZXPAC4_32K_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4_32K_INIT_PMR_OFFSET,
+        DEBUG_LEVEL_NONE,
         false,      // only_better_matches
         false,      // reverse_file
         false,      // reverse_encoded
         false,      // is_ascii
-        false,
+        false,      // preshift_last_ascii_literal
+        false,      // merge_hunks
+        false,      // verbose
     },
 };
 
@@ -201,7 +212,7 @@ lz_config algos[] {
  *
  *
  */
-int handle_file(lz_base* lz, std::ifstream& ifs, std::ofstream& ofs, int len)
+int handle_file(lz_base* lz, lz_config_t* cfg, std::ifstream& ifs, std::ofstream& ofs, int len)
 {
     // extra 2 characters to avoid buffer overrun with 3 byte hash function..
     char* buf = new (std::nothrow) char[len+2];
@@ -233,14 +244,23 @@ int handle_file(lz_base* lz, std::ifstream& ifs, std::ofstream& ofs, int len)
 
     std::vector<amiga_hunks::hunk_info_t> hunk_list(0);
     char* bbb;
-    n = amiga_hunks::parse_hunks(buf,len,hunk_list,true);
-    n = amiga_hunks::merge_hunks(buf,hunk_list,bbb,len,true);
+    bool debug_on = cfg->debug_level > DEBUG_LEVEL_NONE ? true : false;
+
+
+    n = amiga_hunks::parse_hunks(buf,len,hunk_list,debug_on);
+    
+    if (cfg->merge_hunks) {
+        n = amiga_hunks::merge_hunks(buf,len,hunk_list,bbb,debug_on);
+    } else {
+        n = amiga_hunks::optimize_hunks(buf,len,hunk_list,bbb,debug_on);
+    }
     free_hunk_info(hunk_list);
 
     lz->lz_search_matches(buf,len,0); 
     lz->lz_parse(buf,len,0); 
     n = lz->lz_encode(buf,len,ofs); 
 
+    delete[] bbb;
     delete[] buf;
     return n;
 }
@@ -269,6 +289,7 @@ int main(int argc, char** argv)
     bool cfg_only_better_matches = false;
     bool cfg_reverse_file = false;
     bool cfg_reverse_encoded = false;
+    bool cfg_merge_hunks = false;
     lz_base* lz = NULL;
 
     target trg;
@@ -295,7 +316,7 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hPvdDa:X:ArRb:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hPvdDa:X:AmrRb:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'h':
                 usage(argv[0]);
@@ -381,6 +402,9 @@ int main(int argc, char** argv)
                 //printf("%04x, %04x, %02x\n",load_addr,jump_addr,page);
                 //exe = true;
                 break;
+            case 'm':   // --merge-hunks
+                cfg_merge_hunks = true;
+                break;
 			case 'X':
                 break;
             case '?':
@@ -423,6 +447,9 @@ int main(int argc, char** argv)
     cfg.reverse_file = cfg_reverse_file;
     cfg.reverse_encoded = cfg_reverse_encoded;
     cfg.is_ascii = trg.is_ascii;
+    cfg.merge_hunks = cfg_merge_hunks;
+    cfg.verbose = cfg_verbose_on;
+    cfg.debug_level = cfg_debug_level;
 
     // The following stuff is horrible.. Needs to be hidden under
     // multiple functions to avoid recurring cleanup due initialization
@@ -493,7 +520,7 @@ int main(int argc, char** argv)
 
     ofs.open(cfg_outfile_name,std::ios::binary|std::ios::out);
     if (ofs.is_open()) {
-        compressed_len = handle_file(lz,ifs,ofs,file_len);
+        compressed_len = handle_file(lz,&cfg,ifs,ofs,file_len);
         
         if (compressed_len < 0) {
             std::cerr << "**Error: compression failed\n";

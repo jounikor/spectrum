@@ -96,15 +96,16 @@ namespace amiga_hunks {
         std::map<int,std::set<uint32_t> > relocs;    ///< Key is dst_segment, value is reloc
     } hunk_info_t;
 
-    uint32_t read32be(char*& ptr, bool inc);
-    uint16_t read16be(char*& ptr, bool inc);
-    uint32_t readbe(char*& ptr, int bytes, bool inc);
-    char* write32be(char* ptr, uint32_t v, bool inc);
-    char* write24be(char* ptr, uint32_t r, bool inc);
-    char* write16be(char* ptr, uint16_t v, bool inc);
+    uint32_t read32be(char*& ptr, bool inc=true);
+    uint16_t read16be(char*& ptr, bool inc=true);
+    uint32_t readbe(char*& ptr, int bytes, bool inc=true);
+    char* write32be(char* ptr, uint32_t v, bool inc=true);
+    char* write24be(char* ptr, uint32_t r, bool inc=true);
+    char* write16be(char* ptr, uint16_t v, bool inc=true);
     uint32_t parse_hunks(char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool debug=false);
     void free_hunk_info(std::vector<hunk_info_t>& hunk_list);
-    int merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len, bool debug=false);
+    int merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list, char*& new_exe, bool debug=false);
+    int optimize_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list, char*& new_exe, bool debug=false);
 };
 
 #define TDEBUG(x) {if (debug) {x}}

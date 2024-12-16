@@ -62,7 +62,7 @@ static char* compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_t> >& 
 //
 //
 
-uint32_t amiga_hunks::read32be(char*& ptr, bool inc=true)
+uint32_t amiga_hunks::read32be(char*& ptr, bool inc)
 {
     uint32_t r;
     const uint8_t* p = reinterpret_cast<uint8_t*>(ptr);
@@ -78,7 +78,7 @@ uint32_t amiga_hunks::read32be(char*& ptr, bool inc=true)
     return r;
 }
 
-uint32_t amiga_hunks::readbe(char*& ptr, int bytes, bool inc=true)
+uint32_t amiga_hunks::readbe(char*& ptr, int bytes, bool inc)
 {
     uint32_t r = 0;
     const uint8_t* p = reinterpret_cast<uint8_t*>(ptr);
@@ -94,7 +94,7 @@ uint32_t amiga_hunks::readbe(char*& ptr, int bytes, bool inc=true)
     return r;
 }
 
-uint16_t amiga_hunks::read16be(char*& ptr, bool inc=true)
+uint16_t amiga_hunks::read16be(char*& ptr, bool inc)
 {
     uint16_t r;
     const uint8_t* p = reinterpret_cast<uint8_t*>(ptr);
@@ -107,7 +107,7 @@ uint16_t amiga_hunks::read16be(char*& ptr, bool inc=true)
     return r;
 }
 
-char* amiga_hunks::write24be(char* ptr, uint32_t r, bool inc=true)
+char* amiga_hunks::write24be(char* ptr, uint32_t r, bool inc)
 {
     uint8_t* p = reinterpret_cast<uint8_t*>(ptr);
     *p++ = r >> 16;
@@ -120,7 +120,7 @@ char* amiga_hunks::write24be(char* ptr, uint32_t r, bool inc=true)
     return ptr;
 }
 
-char* amiga_hunks::write32be(char* ptr, uint32_t r, bool inc=true)
+char* amiga_hunks::write32be(char* ptr, uint32_t r, bool inc)
 {
     uint8_t* p = reinterpret_cast<uint8_t*>(ptr);
     *p++ = r >> 24;
@@ -134,7 +134,7 @@ char* amiga_hunks::write32be(char* ptr, uint32_t r, bool inc=true)
     return ptr;
 }
 
-char* amiga_hunks::write16be(char* ptr, uint16_t r, bool inc=true)
+char* amiga_hunks::write16be(char* ptr, uint16_t r, bool inc)
 {
     uint8_t* p = reinterpret_cast<uint8_t*>(ptr);
     *p++ = r >> 8;
@@ -396,6 +396,98 @@ void amiga_hunks::free_hunk_info(std::vector<hunk_info_t>& hunk_list)
     hunk_list.resize(0);
 }
 
+/**
+ * @brief Optimized AmigaDOS executable file hunk format to a slightly
+ *        more compact form. 
+ *
+ * 
+ * @return The length of the output file returned in @p new_exe.
+ *         Zero or negative in case of an error.
+ */
+int amiga_hunks::optimize_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list, char*& new_exe, bool debug)
+{
+    (void)exe;
+    (void)debug;
+
+    std::map<uint32_t,std::set<uint32_t>> new_relocs;
+    char* ptr;
+    int m,n;
+    uint32_t seg_num = hunk_list.size(); 
+    
+    new_exe = new char[len];
+    ptr = new_exe;
+
+    ptr = write16be(ptr,seg_num);
+    for (seg_num = 0; seg_num < hunk_list.size(); seg_num++) {
+        ptr = write32be(ptr,(hunk_list[seg_num].memory_size & 0xfffffffc) | 
+                            (hunk_list[seg_num].combined_type >> 30));
+    }
+
+    // Output each new segment
+    for (seg_num = 0; seg_num < hunk_list.size(); seg_num++) {
+        bool move_data = true;
+        // output segment memory type and data size in 32bit long words
+        switch (hunk_list[seg_num].combined_type & 0x3fffffff) {
+            case HUNK_CODE:
+                ptr = write32be(ptr,hunk_list[seg_num].combined_type | SEGMENT_TYPE_CODE);
+                break;
+            case HUNK_DATA:
+                ptr = write32be(ptr,hunk_list[seg_num].combined_type | SEGMENT_TYPE_DATA);
+                break;
+            case HUNK_BSS:
+                ptr = write16be(ptr,SEGMENT_TYPE_BSS);
+                move_data = false;
+                break;
+            default:
+                assert("Unknown hunk type" == NULL);
+                break;
+        }
+       
+        if (hunk_list[seg_num].reloc_start) {
+            for (auto& reloc : hunk_list[seg_num].relocs) {
+                uint32_t key = (seg_num << 16) | reloc.first;
+                std::set<uint32_t>& entries = new_relocs[key];
+                
+                for (auto& entry : reloc.second) {
+                    entries.insert(entry);
+        }   }   }
+        if (move_data) {
+            m = hunk_list[seg_num].data_size;
+            n = 0;
+
+            while (m-- > 0) {
+                *ptr++ = hunk_list[seg_num].seg_start[n++];
+    }   }   }
+
+    // Compress relocation information..
+    ptr = compress_relocs(ptr,new_relocs,debug);
+    // Write EOF
+    ptr = write16be(ptr,0x0000);
+    
+    n = (ptr-new_exe);
+    TDEBUG(std::cerr << ">> New exe size after reloc data: " << n << std::endl;)
+
+#if 1   // just for the debug
+    std::ofstream ofs;
+    ofs.open("H.bin",std::ios::binary|std::ios::out);
+    ofs.write(new_exe,n);
+    ofs.close();
+#endif
+    TDEBUG(                                                                         \
+        for (auto& aa : new_relocs) {                                               \
+            uint32_t rel_info = aa.first;                                           \
+            std::cerr << std::hex << "** new relocs 0x" << rel_info << "\n";        \
+            for (auto& bb : aa.second) {                                            \
+                std::cerr << "   0x" << bb << "\n";                                 \
+            }                                                                       \
+    })
+
+
+    return -1;
+}
+
+
+
 
 /**
  *
@@ -406,7 +498,8 @@ void amiga_hunks::free_hunk_info(std::vector<hunk_info_t>& hunk_list)
  *
  *
  */
-int amiga_hunks::merge_hunks(char* exe, std::vector<hunk_info_t>& hunk_list, char*& new_exe, int len, bool debug) {
+int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list, char*& new_exe, bool debug)
+{
     (void)len;
 
     int o, p, m, n;

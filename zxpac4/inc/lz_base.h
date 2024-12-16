@@ -51,7 +51,7 @@ struct cost {
  * @brief A structure containing basic LZ engine configurations.
  */
 
-struct lz_config {
+typedef struct lz_config {
     int window_size;            // power of two allowed
     int max_chain;
     int min_match;
@@ -61,13 +61,16 @@ struct lz_config {
     int min_match2_threshold;   // currently not used
     int min_match3_threshold;   // currently not used
     int initial_pmr_offset;
+    int debug_level;            // 
     //
     bool only_better_matches:1;
     bool reverse_file:1;
     bool reverse_encoded:1;
     bool is_ascii:1;
     bool preshift_last_ascii_literal:1;
-};
+    bool merge_hunks:1;         // Amiga specific
+    bool verbose:1;
+} lz_config_t;
 
 /**
  *
