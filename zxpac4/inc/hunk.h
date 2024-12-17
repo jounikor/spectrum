@@ -104,8 +104,10 @@ namespace amiga_hunks {
     char* write16be(char* ptr, uint16_t v, bool inc=true);
     uint32_t parse_hunks(char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool debug=false);
     void free_hunk_info(std::vector<hunk_info_t>& hunk_list);
-    int merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list, char*& new_exe, bool debug=false);
-    int optimize_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list, char*& new_exe, bool debug=false);
+    int merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list, char*& new_exe,
+        std::vector<uint32_t>& new_segments, bool debug=false);
+    int optimize_hunks(char* exe, int len, const std::vector<hunk_info_t>& hunk_list, char*& new_exe,
+        std::vector<uint32_t>& new_segments, bool debug=false);
 };
 
 #define TDEBUG(x) {if (debug) {x}}

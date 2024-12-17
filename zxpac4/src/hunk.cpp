@@ -404,7 +404,8 @@ void amiga_hunks::free_hunk_info(std::vector<hunk_info_t>& hunk_list)
  * @return The length of the output file returned in @p new_exe.
  *         Zero or negative in case of an error.
  */
-int amiga_hunks::optimize_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list, char*& new_exe, bool debug)
+int amiga_hunks::optimize_hunks(char* exe, int len, const std::vector<hunk_info_t>& hunk_list,
+                                char*& new_exe, std::vector<uint32_t>& new_segments,bool debug)
 {
     (void)exe;
     (void)debug;
@@ -417,10 +418,11 @@ int amiga_hunks::optimize_hunks(char* exe, int len, std::vector<hunk_info_t>& hu
     new_exe = new char[len];
     ptr = new_exe;
 
-    ptr = write16be(ptr,seg_num);
+    // For the HUNK_HEADER but not part of the to be compressed new
+    // executable, which has a proprietary format.
     for (seg_num = 0; seg_num < hunk_list.size(); seg_num++) {
-        ptr = write32be(ptr,(hunk_list[seg_num].memory_size & 0xfffffffc) | 
-                            (hunk_list[seg_num].combined_type >> 30));
+        new_segments.push_back((hunk_list[seg_num].memory_size >> 2) | 
+                            (hunk_list[seg_num].combined_type & 0xc0000000));
     }
 
     // Output each new segment
@@ -429,10 +431,10 @@ int amiga_hunks::optimize_hunks(char* exe, int len, std::vector<hunk_info_t>& hu
         // output segment memory type and data size in 32bit long words
         switch (hunk_list[seg_num].combined_type & 0x3fffffff) {
             case HUNK_CODE:
-                ptr = write32be(ptr,hunk_list[seg_num].combined_type | SEGMENT_TYPE_CODE);
+                ptr = write32be(ptr,(hunk_list[seg_num].data_size >> 2) | SEGMENT_TYPE_CODE);
                 break;
             case HUNK_DATA:
-                ptr = write32be(ptr,hunk_list[seg_num].combined_type | SEGMENT_TYPE_DATA);
+                ptr = write32be(ptr,(hunk_list[seg_num].data_size >> 2) | SEGMENT_TYPE_DATA);
                 break;
             case HUNK_BSS:
                 ptr = write16be(ptr,SEGMENT_TYPE_BSS);
@@ -498,7 +500,8 @@ int amiga_hunks::optimize_hunks(char* exe, int len, std::vector<hunk_info_t>& hu
  *
  *
  */
-int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list, char*& new_exe, bool debug)
+int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list,
+                            char*& new_exe, std::vector<uint32_t>& new_segments, bool debug)
 {
     (void)len;
 
@@ -685,12 +688,9 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
         std::cerr << "Combined mapping -> " << i.first << ": " << i.second << std::endl;        \
     })
 
-    // Merge datas..
-    // Output the "HUNK_HEADER"
-
-    ptr = write16be(ptr,num_new_seg);
+    // For the HUNK_HEADER..
     for (m = 0; m < num_new_seg; m++) {
-        ptr = write32be(ptr,(merged_mem_size[m] &0xfffffffc) | (merged_hunk_type[m] >> 30));
+        new_segments.push_back((merged_mem_size[m] >> 2) | (merged_hunk_type[m] & 0xc0000000));
     }
 
     // Output each new segment
@@ -699,10 +699,10 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
         // output segment memory type and data size in 32bit long words
         switch (merged_hunk_type[m] & 0x3fffffff) {
             case HUNK_CODE:
-                ptr = write32be(ptr,merged_data_size[m] | SEGMENT_TYPE_CODE);
+                ptr = write32be(ptr,(merged_data_size[m] >> 2) | SEGMENT_TYPE_CODE);
                 break;
             case HUNK_DATA:
-                ptr = write32be(ptr,merged_data_size[m] | SEGMENT_TYPE_DATA);
+                ptr = write32be(ptr,(merged_data_size[m] >> 2) | SEGMENT_TYPE_DATA);
                 break;
             case HUNK_BSS:
                 ptr = write16be(ptr,SEGMENT_TYPE_BSS);

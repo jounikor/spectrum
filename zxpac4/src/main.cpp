@@ -29,6 +29,11 @@
 #include "lz_base.h"
 #include "hunk.h"
 
+#include "target_bin.h"
+#include "target_asc.h"
+#include "target_amiga.h"
+
+
 // Constants for LZ stuff
 //
 //
@@ -108,22 +113,23 @@ void usage( char *prg ) {
 
 
 struct target;
-typedef int (*func_t)(std::ofstream& ofs, target& trg, ...);
+typedef int (*preamble_t)(lz_config_t* cfg, char*& buf_in, int& len_in, void*& aux);
+typedef int (*midamble_t)(lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux);
+typedef int (*postamble_t)(lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux);
+typedef int (*done_t)(void* aux);
 
 struct target {
     const char* target_name;
     bool is_ascii;
     int max_file_size;
     int algorithm;
-    func_t init_add_header;
-    func_t post_header_fix;
-    func_t post_trailer_fix;
+    preamble_t  preprocess;
+    postamble_t save;
 } static const targets[] = {
     {   "asc",
         true,
         1<<24,
         ZXPAC4,
-        NULL,
         NULL,
         NULL
     },
@@ -131,15 +137,13 @@ struct target {
         false,
         1<<24,
         ZXPAC4,
-        NULL,
-        NULL,
-        NULL
+        preamble_bin,
+        postamble_bin
     },
     {   "zx",
         false,
         1<<16,
         ZXPAC4_32K,
-        NULL,
         NULL,
         NULL
     },
@@ -148,14 +152,12 @@ struct target {
         1<<16,
         ZXPAC4_32K,
         NULL,
-        NULL,
         NULL
     },
     {   "ami",
         false,
         1<<24,
         ZXPAC4,
-        NULL,
         NULL,
         NULL
     }   
@@ -212,12 +214,23 @@ lz_config algos[] {
  *
  *
  */
-int handle_file(lz_base* lz, lz_config_t* cfg, std::ifstream& ifs, std::ofstream& ofs, int len)
+int handle_file(const target* trg, lz_base* lz, lz_config_t* cfg, std::ifstream& ifs, std::ofstream& ofs, int len)
 {
     // extra 2 characters to avoid buffer overrun with 3 byte hash function..
     char* buf = new (std::nothrow) char[len+2];
     int n = 0;
+    void* aux = NULL;
 
+    if (trg->preprocess == NULL) {
+        if (cfg->verbose) {
+            std::cout << "No preprocessing of the input file" << std::endl;
+        }
+    }
+    if (trg->save == NULL) {
+        std::cerr << "**Error: No saving function implemented for '" <<
+            trg->target_name << "' target" << std::endl;
+        return -1;
+    }
     if (buf == NULL) {
         std::cerr << "**Error: failed to allocate memory for the input file\n";
         return -1;
@@ -240,9 +253,18 @@ int handle_file(lz_base* lz, lz_config_t* cfg, std::ifstream& ifs, std::ofstream
             }
         }
     }
+    if (trg->preprocess) {
+        n = trg->preprocess(cfg,buf,len,aux);
+    }
+    if (n < 0) {
+        std::cerr << "**Error: Preprocessing failed" << std::endl;
+        delete[] buf;
+        return -1;
+    }
 
-
+#if 0
     std::vector<amiga_hunks::hunk_info_t> hunk_list(0);
+    std::vector<uint32_t> new_hunks;
     char* amiga_exe = NULL;
     bool debug_on = cfg->debug_level > DEBUG_LEVEL_NONE ? true : false;
 
@@ -250,17 +272,18 @@ int handle_file(lz_base* lz, lz_config_t* cfg, std::ifstream& ifs, std::ofstream
     n = amiga_hunks::parse_hunks(buf,len,hunk_list,debug_on);
     
     if (cfg->merge_hunks) {
-        n = amiga_hunks::merge_hunks(buf,len,hunk_list,amiga_exe,debug_on);
+        n = amiga_hunks::merge_hunks(buf,len,hunk_list,amiga_exe,new_hunks,debug_on);
     } else {
-        n = amiga_hunks::optimize_hunks(buf,len,hunk_list,amiga_exe,debug_on);
+        n = amiga_hunks::optimize_hunks(buf,len,hunk_list,amiga_exe,new_hunks,debug_on);
     }
     free_hunk_info(hunk_list);
-
+    delete[] amiga_exe;
+#endif
+    
     lz->lz_search_matches(buf,len,0); 
     lz->lz_parse(buf,len,0); 
     n = lz->lz_encode(buf,len,ofs); 
 
-    delete[] amiga_exe;
     delete[] buf;
     return n;
 }
@@ -292,7 +315,7 @@ int main(int argc, char** argv)
     bool cfg_merge_hunks = false;
     lz_base* lz = NULL;
 
-    target trg;
+    const target* trg = NULL;
 
     // Check target..
 
@@ -302,17 +325,17 @@ int main(int argc, char** argv)
 
     for (n = 0; n < LZ_TARGET_SIZE; n++) {
         if (!strcmp(argv[1],targets[n].target_name)) {
-            trg = targets[n];
+            trg = &targets[n];
             break;
         }
     }
 
-    if (n == LZ_TARGET_SIZE) {
+    if (trg == NULL) {
         usage(argv[0]);
     }
 
     // target specific default algo
-    cfg_algo = trg.algorithm;
+    cfg_algo = trg->algorithm;
     optind = 2;
 
     // 
@@ -322,7 +345,7 @@ int main(int argc, char** argv)
                 usage(argv[0]);
                 break;
 			case 'P':   // --preshift
-                if (trg.is_ascii == true) { 
+                if (trg->is_ascii == true) { 
                     cfg_preshift = true;
                 } else {
                     std::cerr << "**Error: preshift applies only to ASCII files" << std::endl;
@@ -446,7 +469,7 @@ int main(int argc, char** argv)
     cfg.only_better_matches = cfg_only_better_matches;
     cfg.reverse_file = cfg_reverse_file;
     cfg.reverse_encoded = cfg_reverse_encoded;
-    cfg.is_ascii = trg.is_ascii;
+    cfg.is_ascii = trg->is_ascii;
     cfg.merge_hunks = cfg_merge_hunks;
     cfg.verbose = cfg_verbose_on;
     cfg.debug_level = cfg_debug_level;
@@ -475,8 +498,8 @@ int main(int argc, char** argv)
             << "' failed" << std::endl;
         goto error_exit;
     }
-    if (file_len > trg.max_file_size) {
-        std::cerr << "**Error: maximum file length is " << trg.max_file_size
+    if (file_len > trg->max_file_size) {
+        std::cerr << "**Error: maximum file length is " << trg->max_file_size
             << " bytes" << std::endl;
         goto error_exit;
     }
@@ -512,7 +535,7 @@ int main(int argc, char** argv)
     if (cfg_verbose_on) {
         std::cout << "Loading from file '" << cfg_infile_name << "'\n";
         std::cout << "Saving to file '" << cfg_outfile_name << "'\n";
-        std::cout << "Using target '" << trg.target_name << "' and algorithm " << cfg_algo << "\n";
+        std::cout << "Using target '" << trg->target_name << "' and algorithm " << cfg_algo << "\n";
         std::cout << "Min match is " << cfg.min_match << "\n";
         std::cout << "Max match is " << cfg.max_match << "\n";
         std::cout << "Good match is " << cfg.good_match << "\n";
@@ -520,7 +543,7 @@ int main(int argc, char** argv)
 
     ofs.open(cfg_outfile_name,std::ios::binary|std::ios::out);
     if (ofs.is_open()) {
-        compressed_len = handle_file(lz,&cfg,ifs,ofs,file_len);
+        compressed_len = handle_file(trg,lz,&cfg,ifs,ofs,file_len);
         
         if (compressed_len < 0) {
             std::cerr << "**Error: compression failed\n";
