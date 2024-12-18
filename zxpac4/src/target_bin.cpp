@@ -16,19 +16,31 @@
 #include "lz_base.h"
 #include "target_bin.h"
 
-
-int preamble_bin(lz_config_t* cfg, char*& buf, int& len, void*& aux)
+int  preprocess_bin(const lz_config_t* cfg, char* buf, int len, void*& aux)
 {
-    std::cerr << "Binary preamble_bin\n";
-
+    std::cerr << "Binary preproces()\n";
     return 0;
 }
 
-int postamble_bin(lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux)
+int  save_header_bin(const lz_config_t* cfg, const char* buf, int len, std::ofstream& ofs, void* aux)
 {
-    std::cerr << "Binary postamble_bin\n";
+    std::cerr << "Binary save_header()\n";
     return 0;
 }
 
+int  post_save_bin(const lz_config_t* cfg, const char* buf, int len, std::ofstream& ofs, void* aux)
+{
+    std::cerr << "Binary post_save()\n";
+    return 0;
+}
 
+void done_bin(void* aux)
+{
+    std::cerr << "Binary done()\n";
+    
+    if (aux) {
+        std::cerr << "Free AUX" << std::endl;
+    }
+
+}
 

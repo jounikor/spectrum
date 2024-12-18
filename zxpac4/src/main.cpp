@@ -113,23 +113,89 @@ void usage( char *prg ) {
 
 
 struct target;
-typedef int (*preamble_t)(lz_config_t* cfg, char*& buf_in, int& len_in, void*& aux);
-typedef int (*midamble_t)(lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux);
-typedef int (*postamble_t)(lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux);
-typedef int (*done_t)(void* aux);
+
+/**
+ * @brief Does preprocessing to the input file. 
+ *
+ *  The preprocessor may change the content of the input file. The
+ *  retuned buffer length may be shorted or equal to the original
+ *  buffer size but never longer.
+ * 
+ * @param cfg[in]    A ptr to lz_config for this file and target.
+ * @param buf[inout] A ptr to the input buffer. The preprocessor
+ *                   may change the content of the buffer.
+ * @param len[in]    The length of the input buffer.
+ * @param aux[out]   A ptx to an internal target specific context
+ *                   data. If the returned @aux is not NULL then
+ *                   it must be freed by calling the func3_t upon
+ *                   exit the target specific file handling.
+ *
+ * @return New length of the input buffer afther preprocessing.
+ *         Negative value if there was an error.
+ */
+typedef int (*func0_t)(const lz_config_t* cfg, char* buf, int len, void*& aux);
+
+/**
+ * @brief Saved the new file header into the output file. 
+ *
+ * @param cfg[in]    A ptr to lz_config for this file and target.
+ * @param buf[inout] A ptr to the input buffer. The header saving
+ *                   must not change the content of the buffer.
+ * @param len[in]    The length of the input buffer.
+ * @param ofs[in]    The ouput file stream.  
+ * @param aux[out]   A ptx to an internal target specific context
+ *                   data.
+ *
+ * @return The number of saved bytes. Negative value if there was
+ *         an error.
+ */
+typedef int (*func1_t)(const lz_config_t* cfg, const char* buf, int len, std::ofstream& ofs, void* aux);
+
+/**
+ * @brief Save a possible postamble or fix the header in the output file.
+ *
+ *  The preprocessor may change the content of the input file. The
+ *  retuned buffer length may be shorted or equal to the original
+ *  buffer size but never longer.
+ * 
+ * @param cfg[in]    A ptr to lz_config for this file and target.
+ * @param buf[inout] A ptr to the input buffer. The header saving
+ *                   must not change the content of the buffer.
+ * @param len[in]    The length of the input buffer.
+ * @param ofs[in]    The ouput file stream.  
+ * @param aux[out]   A ptx to an internal target specific context
+ *                   data.
+ *
+ * @return The number of saved bytes. Negative value if there was
+ *         an error.
+ */
+typedef int (*func2_t)(const lz_config_t* cfg, const char* buf, int len, std::ofstream& ofs, void* aux);
+
+/**
+ * @brief Free the target specific context data.
+ *
+ * @param aux[in]   A ptx to an internal target specific context
+ *                  data. The @aux may be NULL.
+ *
+ */
+typedef void (*func3_t)(void* aux);
 
 struct target {
     const char* target_name;
     bool is_ascii;
     int max_file_size;
     int algorithm;
-    preamble_t  preprocess;
-    postamble_t save;
+    func0_t preprocess;
+    func1_t save_header;
+    func2_t post_save;
+    func3_t done;
 } static const targets[] = {
     {   "asc",
         true,
         1<<24,
         ZXPAC4,
+        NULL,
+        NULL,
         NULL,
         NULL
     },
@@ -137,13 +203,17 @@ struct target {
         false,
         1<<24,
         ZXPAC4,
-        preamble_bin,
-        postamble_bin
+        preprocess_bin,
+        save_header_bin,
+        post_save_bin,
+        done_bin
     },
     {   "zx",
         false,
         1<<16,
         ZXPAC4_32K,
+        NULL,
+        NULL,
         NULL,
         NULL
     },
@@ -152,12 +222,16 @@ struct target {
         1<<16,
         ZXPAC4_32K,
         NULL,
+        NULL,
+        NULL,
         NULL
     },
     {   "ami",
         false,
         1<<24,
         ZXPAC4,
+        NULL,
+        NULL,
         NULL,
         NULL
     }   
@@ -226,7 +300,7 @@ int handle_file(const target* trg, lz_base* lz, lz_config_t* cfg, std::ifstream&
             std::cout << "No preprocessing of the input file" << std::endl;
         }
     }
-    if (trg->save == NULL) {
+    if (trg->save_header == NULL) {
         std::cerr << "**Error: No saving function implemented for '" <<
             trg->target_name << "' target" << std::endl;
         return -1;
