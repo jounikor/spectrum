@@ -301,9 +301,19 @@ int handle_file(const target* trg, lz_base* lz, lz_config_t* cfg, std::ifstream&
         }
     }
     if (trg->save_header == NULL) {
-        std::cerr << "**Error: No saving function implemented for '" <<
-            trg->target_name << "' target" << std::endl;
-        return -1;
+        if (cfg->verbose) {
+            std::cout << "No saving function implemented" << std::endl;
+        }
+    }
+    if (trg->post_save == NULL) {
+        if (cfg->verbose) {
+            std::cout << "No post saving function implemented" << std::endl;
+        }
+    }
+    if (trg->done == NULL) {
+        if (cfg->verbose) {
+            std::cout << "No aux data cleanup function implemented" << std::endl;
+        }
     }
     if (buf == NULL) {
         std::cerr << "**Error: failed to allocate memory for the input file\n";
@@ -328,12 +338,18 @@ int handle_file(const target* trg, lz_base* lz, lz_config_t* cfg, std::ifstream&
         }
     }
     if (trg->preprocess) {
-        n = trg->preprocess(cfg,buf,len,aux);
+        len = trg->preprocess(cfg,buf,len,aux);
     }
-    if (n < 0) {
+    if (len < 0) {
         std::cerr << "**Error: Preprocessing failed" << std::endl;
-        delete[] buf;
-        return -1;
+        n = len;
+        goto error_exit;
+    }
+    if (trg->save_header) {
+        if ((n = trg->save_header(cfg,buf,len,ofs,aux)) < 0) {
+            std::cerr << "**Error: Saving file header failed" << std::endl;
+            goto error_exit;
+        }
     }
 
 #if 0
@@ -358,6 +374,15 @@ int handle_file(const target* trg, lz_base* lz, lz_config_t* cfg, std::ifstream&
     lz->lz_parse(buf,len,0); 
     n = lz->lz_encode(buf,len,ofs); 
 
+    if (trg->post_save) {
+        if ((n = trg->post_save(cfg,buf,n,ofs,aux)) < 0) {
+            std::cerr << "**Error: Post save failed" << std::endl;
+        }
+    }
+error_exit: 
+    if (trg->done) {
+        trg->done(aux);
+    }
     delete[] buf;
     return n;
 }

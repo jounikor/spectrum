@@ -19,7 +19,7 @@
 int  preprocess_bin(const lz_config_t* cfg, char* buf, int len, void*& aux)
 {
     std::cerr << "Binary preproces()\n";
-    return 0;
+    return len;
 }
 
 int  save_header_bin(const lz_config_t* cfg, const char* buf, int len, std::ofstream& ofs, void* aux)
