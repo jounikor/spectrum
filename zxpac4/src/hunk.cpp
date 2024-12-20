@@ -405,7 +405,7 @@ void amiga_hunks::free_hunk_info(std::vector<hunk_info_t>& hunk_list)
  *         Zero or negative in case of an error.
  */
 int amiga_hunks::optimize_hunks(char* exe, int len, const std::vector<hunk_info_t>& hunk_list,
-                                char*& new_exe, std::vector<uint32_t>& new_segments,bool debug)
+                                char*& new_exe, std::vector<uint32_t>* new_segments,bool debug)
 {
     (void)exe;
     (void)debug;
@@ -421,8 +421,10 @@ int amiga_hunks::optimize_hunks(char* exe, int len, const std::vector<hunk_info_
     // For the HUNK_HEADER but not part of the to be compressed new
     // executable, which has a proprietary format.
     for (seg_num = 0; seg_num < hunk_list.size(); seg_num++) {
-        new_segments.push_back((hunk_list[seg_num].memory_size >> 2) | 
+        new_segments->push_back((hunk_list[seg_num].memory_size >> 2) | 
                             (hunk_list[seg_num].combined_type & 0xc0000000));
+        new_segments->push_back(hunk_list[seg_num].hunk_type);
+        new_segments->push_back(hunk_list[seg_num].data_size >> 2);
     }
 
     // Output each new segment
@@ -501,7 +503,7 @@ int amiga_hunks::optimize_hunks(char* exe, int len, const std::vector<hunk_info_
  *
  */
 int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list,
-                            char*& new_exe, std::vector<uint32_t>& new_segments, bool debug)
+                            char*& new_exe, std::vector<uint32_t>* new_segments, bool debug)
 {
     (void)len;
 
@@ -690,7 +692,9 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
 
     // For the HUNK_HEADER..
     for (m = 0; m < num_new_seg; m++) {
-        new_segments.push_back((merged_mem_size[m] >> 2) | (merged_hunk_type[m] & 0xc0000000));
+        new_segments->push_back((merged_mem_size[m] >> 2) | (merged_hunk_type[m] & 0xc0000000));
+        new_segments->push_back(merged_hunk_type[m] & 0x3fffffff);
+        new_segments->push_back(merged_data_size[m] >> 2);
     }
 
     // Output each new segment
