@@ -17,6 +17,9 @@
 #define EXCEPTION(exp,str) throw(exp(std::string(__FILE__) + ":" +  \
             std::to_string(__LINE__) + " " + #str))
 
+#define ERR_PREAMBLE "**Error (" << __FILE__ << ":" << __LINE__ << "): "
+
+
 struct match {
     int32_t offset;                ///< Relative position of a match to the prefix string
     int32_t length;                ///< Length of a match

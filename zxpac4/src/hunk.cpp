@@ -13,6 +13,7 @@
 #include <fstream>
 #include <algorithm>
 #include "hunk.h"
+#include "lz_util.h"
 
 using namespace amiga_hunks;
 
@@ -154,7 +155,7 @@ char* amiga_hunks::write16be(char* ptr, uint16_t r, bool inc)
  *         Upper 16 bits: additional information like errors.
  */
 
-uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk_list, bool debug)
+int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk_list, bool debug)
 {
     char* end = ptr+size;
     uint32_t n, m, j;
@@ -171,11 +172,11 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
     TDEBUG(std::cerr << ">- Executable file Hunk Parser -------------------------" << std::endl;)
     
     if (size % 4) {
-        TDEBUG(std::cerr << "**Error: Amiga executable size must be 4 byte aligned." << std::endl;)
+        TDEBUG(std::cerr << ERR_PREAMBLE << "Amiga executable size must be 4 byte aligned." << std::endl;)
         return 0;
     }
     if (size < 6*4 || (hunk_type != HUNK_HEADER)) { 
-        TDEBUG(std::cerr << "**Error: not Amiga executable, no HUNK_HEADER found." << std::endl;)
+        TDEBUG(std::cerr << ERR_PREAMBLE << "not Amiga executable, no HUNK_HEADER found." << std::endl;)
         return 0;
     }
     TDEBUG(std::cerr << "HUNK_HEADER (0x" << std::hex << hunk_type << ")" << std::endl;)
@@ -303,10 +304,10 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
             hunk_list[n].hunk_type = hunk_type;
             hunk_list[n].combined_type |= hunk_type;
             TDEBUG(std::cerr << std::dec << "  segment: " << hunk_list[n].old_seg_num   \
-                    << std::hex << ", data size: 0x" << hunk_list[n].data_size                        \
-                    << ", memory size: 0x" << hunk_list[n].memory_size                    \
-                    << ", remaining: 0x" << hunk_list[n].hunks_remaining                  \
-                    << ", pointer: 0x" << (uint64_t)ptr << std::endl;                     \
+                    << std::hex << ", data size: 0x" << hunk_list[n].data_size          \
+                    << ", memory size: 0x" << hunk_list[n].memory_size                  \
+                    << ", remaining: 0x" << hunk_list[n].hunks_remaining                \
+                    << ", pointer: 0x" << (uint64_t)ptr << std::endl;                   \
             )
             break;
         case HUNK_END:
@@ -372,8 +373,7 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
             hunk_size = read32be(ptr) + 1;
             break;
         default:
-            std::cerr << "**Error: unsupported hunk 0x" << std::hex << hunk_type << std::endl;
-            free_hunk_info(hunk_list);
+            std::cerr << ERR_PREAMBLE << "unsupported hunk 0x" << std::hex << hunk_type << std::endl;
             return 0;
         }
 
@@ -390,11 +390,6 @@ uint32_t amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>&
     }
 }
 
-
-void amiga_hunks::free_hunk_info(std::vector<hunk_info_t>& hunk_list)
-{
-    hunk_list.resize(0);
-}
 
 /**
  * @brief Optimized AmigaDOS executable file hunk format to a slightly
@@ -420,6 +415,16 @@ int amiga_hunks::optimize_hunks(char* exe, int len, const std::vector<hunk_info_
 
     // For the HUNK_HEADER but not part of the to be compressed new
     // executable, which has a proprietary format.
+    //
+    // The exported new_segments vector has the following data:
+    //  [0] hunk memroy size in long words and memory type as in legacy
+    //  [0] legacy hunk type
+    //  [0] hunk data size in long words or in some cases the seek position..
+    //  ...
+    //  [n] hunk memroy size in long words and memory type as in legacy
+    //  [n] legacy hunk type
+    //  [n] hunk data size in long words or in some cases the seek postioon..
+    //
     for (seg_num = 0; seg_num < hunk_list.size(); seg_num++) {
         new_segments->push_back((hunk_list[seg_num].memory_size >> 2) | 
                             (hunk_list[seg_num].combined_type & 0xc0000000));
@@ -465,18 +470,13 @@ int amiga_hunks::optimize_hunks(char* exe, int len, const std::vector<hunk_info_
 
     // Compress relocation information..
     ptr = compress_relocs(ptr,new_relocs,debug);
+    
     // Write EOF
     ptr = write16be(ptr,0x0000);
     
+    // done.. 
     n = (ptr-new_exe);
     TDEBUG(std::cerr << ">> New exe size after reloc data: " << n << std::endl;)
-
-#if 1   // just for the debug
-    std::ofstream ofs;
-    ofs.open("H.bin",std::ios::binary|std::ios::out);
-    ofs.write(new_exe,n);
-    ofs.close();
-#endif
     TDEBUG(                                                                         \
         for (auto& aa : new_relocs) {                                               \
             uint32_t rel_info = aa.first;                                           \
@@ -486,8 +486,7 @@ int amiga_hunks::optimize_hunks(char* exe, int len, const std::vector<hunk_info_
             }                                                                       \
     })
 
-
-    return -1;
+    return n;
 }
 
 
@@ -515,13 +514,16 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     new_exe = new char[len];
     char* ptr = new_exe;
 
+    // Oh bummer.. I do not check if the memory allocations actually fail or
+    // not in the following temporary workspace allocations. Shame on me.
+
     // A list of original executable file hubk/segment code/data sizes.
     // The entries do not contain the possible associated BSS. The list
     // is indexed using the original executable file hunk/segment numbers.
     // The size of the list is the number of the original executable file
     // hunk/segments.
 
-    uint32_t* merged_old_seg_size = new uint32_t[num_old_seg];
+    uint32_t* merged_old_seg_size = new (std::nothrow) uint32_t[num_old_seg];
     
     // A list of the original executable file hubk/segment BSS sizes. Note,
     // not all code/data hunks contain an associated BSS.  The list
@@ -529,14 +531,14 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     // The size of the list is the number of the original executable file
     // hunk/segments.
 
-    int* old_seg_bss = new int[num_old_seg];
+    int* old_seg_bss = new (std::nothrow) int[num_old_seg];
     
     // A list of original executable file hunk offsets after all hunks have been
     // merged. The offsets are within the merged executable file but indexed using
     // the original hunk/segment numbers. The size of the list is the number of
     // segments in the original executable file.
 
-    int* merged_old_seg_offs = new int[num_old_seg];
+    int* merged_old_seg_offs = new (std::nothrow) int[num_old_seg];
 
     // This list is used with merged_old_seg_offs and indexes similarly using the 
     // original executable file hunk/segment numbers. If a code/data hunk had an
@@ -575,7 +577,7 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     // merged_old_seg_bss_offs[1] = n+m;
     // merged_old_seg_bss_offs[3] = n+m+N;
 
-    int* merged_old_seg_bss_offs = new int[num_old_seg];
+    int* merged_old_seg_bss_offs = new (std::nothrow) int[num_old_seg];
 
     // The hunk merging algorithms works as follows:
     //  1) Combine hunks with the same type and the memory requirement into a single merged hunk.
@@ -608,27 +610,27 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     // The list size is the number of total merged hunks, which is less of equal to the
     // original number of hunks.
    
-    char** merged_hunk_start   = new char*[num_new_seg];   
+    char** merged_hunk_start   = new (std::nothrow) char*[num_new_seg];   
 
     // A list of merged hunk data sizes type of uint32_t. Each merged hunk is a sum of
     // merged original hunks. Possible BSS attached to original HUNK_DATAs are not part
     // of these sizes. The size of the list is the number of new merged hunks.
   
-    uint32_t* merged_data_size = new uint32_t[num_new_seg];
+    uint32_t* merged_data_size = new (std::nothrow) uint32_t[num_new_seg];
    
     // A list of offsets to the start of each merged hunk and type of uint32_t. The 
     // first offset is always zero i.e. the beginning of the merged binary blob. The
     // size of the list is the number of merged hunks plus one (the last list entry
     // is not every used except during the calculation of the offsets).
  
-    uint32_t* merged_data_offs = new uint32_t[num_new_seg+1];
+    uint32_t* merged_data_offs = new (std::nothrow) uint32_t[num_new_seg+1];
     merged_data_offs[0] = 0;
     
     // A list of merged hunk types. Each entry contains the memory type in bits 31 & 30,
     // and the standard AmigaDOS hunk type in bits 29-0. The size of the list is the 
     // number of new merged hunks.
     
-    uint32_t* merged_hunk_type = new uint32_t[num_new_seg];
+    uint32_t* merged_hunk_type = new (std::nothrow) uint32_t[num_new_seg];
     
     // A list of merged hunk memory sized, which also include possible associated
     // BSS hunk. It is possible to have BSS associeated with HUNK_CODE and HUNK_DATA.
@@ -639,8 +641,18 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     // A list of merged hunk BSS sizes. Note that a merged code or data hunk may
     // also contain a BSS. The size of the list is the number of new merged hunks.
 
-    uint32_t* merged_bss_size  = new uint32_t[num_new_seg];
+    uint32_t* merged_bss_size  = new (std::nothrow) uint32_t[num_new_seg];
     
+    // We hav a memory allocation issue..? Kinda useless but for completeness ;)
+    if (!(merged_hunk_start && merged_data_size && merged_data_offs && merged_hunk_type &&
+          merged_mem_size && merged_bss_size && merged_old_seg_size && merged_old_seg_offs &&
+          old_seg_bss && merged_old_seg_bss_offs)) {
+    
+        std::cerr << ERR_PREAMBLE << "allocation of work space failed" << std::endl;
+        n = -1;
+        goto alloc_error;
+    }
+
     for (m = 0; m < num_new_seg; m++) {
         merged_data_size[m] = 0;
         merged_mem_size[m] = 0;
@@ -813,16 +825,6 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     
     n = (ptr-new_exe);
     TDEBUG(std::cerr << ">> New exe size after reloc data: " << n << std::endl;)
-
-#if 1   // just for the debug
-    std::ofstream ofs;
-    ofs.open("h.bin",std::ios::binary|std::ios::out);
-    ofs.write(new_exe,n);
-    ofs.close();
-#endif
-
-    //
-
     TDEBUG(                                                                         \
         for (auto& aa : new_relocs) {                                               \
             uint32_t rel_info = aa.first;                                           \
@@ -833,17 +835,18 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     })
 
     // clean up
-    delete[] merged_hunk_start;
-    delete[] merged_data_size;
-    delete[] merged_data_offs;
-    delete[] merged_hunk_type;
-    delete[] merged_mem_size;
-    delete[] merged_bss_size;
-    delete[] merged_old_seg_size;
-    delete[] merged_old_seg_offs;
-    delete[] old_seg_bss;
-    delete[] merged_old_seg_bss_offs;
-    return ptr-exe;
+alloc_error:
+    if (merged_hunk_start) delete[] merged_hunk_start;
+    if (merged_data_size) delete[] merged_data_size;
+    if (merged_data_offs) delete[] merged_data_offs;
+    if (merged_hunk_type) delete[] merged_hunk_type;
+    if (merged_mem_size) delete[] merged_mem_size;
+    if (merged_bss_size) delete[] merged_bss_size;
+    if (merged_old_seg_size) delete[] merged_old_seg_size;
+    if (merged_old_seg_offs) delete[] merged_old_seg_offs;
+    if (old_seg_bss) delete[] old_seg_bss;
+    if (merged_old_seg_bss_offs) delete[] merged_old_seg_bss_offs;
+    return n;
 }
 
 

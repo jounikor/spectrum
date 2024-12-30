@@ -469,7 +469,10 @@ int zxpac4::lz_encode(const char* buf, int len, std::ofstream& ofs)
             std::cout << "Compressed length: " << n << std::endl;
         }
 
-        ofs.write(p_out,n);
+        if (!(ofs.write(p_out,n))) {
+            std::cerr << ERR_PREAMBLE << "writing compressed file failed" << std::endl;
+            n = -1;
+        }
     } else {
         if (verbose()) {
             std::cout << "Compression failed.." << std::endl;

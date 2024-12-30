@@ -115,7 +115,7 @@ void usage( char *prg ) {
 struct target;
 
 /**
- * @brief Does preprocessing to the input file. 
+ * @brief Do preprocessing to the input file. 
  *
  *  The preprocessor may change the content of the input file. The
  *  retuned buffer length may be shorted or equal to the original
@@ -133,10 +133,11 @@ struct target;
  * @return New length of the input buffer afther preprocessing.
  *         Negative value if there was an error.
  */
-typedef int (*func0_t)(const lz_config_t* cfg, char* buf, int len, void*& aux);
+typedef int (*func0_t)(lz_config_t* cfg, char* buf, int len, void*& aux);
 
 /**
- * @brief Saved the new file header into the output file. 
+ * @brief Save the new file header into the output file. The function may
+ *        also modify the file buffer.
  *
  * @param cfg[in]    A ptr to lz_config for this file and target.
  * @param buf[inout] A ptr to the input buffer. The header saving
@@ -149,27 +150,24 @@ typedef int (*func0_t)(const lz_config_t* cfg, char* buf, int len, void*& aux);
  * @return The number of saved bytes. Negative value if there was
  *         an error.
  */
-typedef int (*func1_t)(const lz_config_t* cfg, const char* buf, int len, std::ofstream& ofs, void* aux);
+typedef int (*func1_t)(const lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux);
 
 /**
  * @brief Save a possible postamble or fix the header in the output file.
  *
- *  The preprocessor may change the content of the input file. The
- *  retuned buffer length may be shorted or equal to the original
- *  buffer size but never longer.
+ *  The postamble function may change the content of the input file. The
+ *  retuned buffer length may be longer than the original buffer size.
  * 
  * @param cfg[in]    A ptr to lz_config for this file and target.
- * @param buf[inout] A ptr to the input buffer. The header saving
- *                   must not change the content of the buffer.
- * @param len[in]    The length of the input buffer.
- * @param ofs[in]    The ouput file stream.  
+ * @param len[in]    The length of the compressed file.
+ * @param ofs[in]    The ouput file stream, which contains the compressed data already.
  * @param aux[out]   A ptx to an internal target specific context
  *                   data.
  *
- * @return The number of saved bytes. Negative value if there was
+ * @return The final size of the saved file. Negative value if there was
  *         an error.
  */
-typedef int (*func2_t)(const lz_config_t* cfg, const char* buf, int len, std::ofstream& ofs, void* aux);
+typedef int (*func2_t)(const lz_config_t* cfg, int len, std::ofstream& ofs, void* aux);
 
 /**
  * @brief Free the target specific context data.
@@ -181,36 +179,65 @@ typedef int (*func2_t)(const lz_config_t* cfg, const char* buf, int len, std::of
 typedef void (*func3_t)(void* aux);
 
 struct target {
-    const char* target_name;
-    bool is_ascii;
-    int max_file_size;
-    int algorithm;
-    func0_t preprocess;
-    func1_t save_header;
-    func2_t post_save;
-    func3_t done;
+    // Target string. Currently supported:
+    const char* target_name;    //< Target string. Currently supported:
+                                //<  "asc" for 7bit ASCII
+                                //<  "bin" for raw binary data - no headers to be included
+                                //<  "zx"  for ZX Spectrum self-extracting TAP files
+                                //<  "bbc" for BBC Model A/B self-extracting files
+
+    int max_file_size;          //< Maximum original file size for the target..
+                                //< zxpac4 algorithm limit is 2^24-1 bytes
+
+    uint64_t supported_algorithms;  //< A bit field of supported algoriths.
+
+    int algorithm;              //> Default algorithm used with this target. Currently supported:
+                                //>  ZXPAC4      The 8bit optimized algorithm with 2^17-1 bit
+                                //>              sliding window.
+                                //>  ZXPAC4B     A variation of ZXPAC4 with runlen literal
+                                //>              encoding. Number of uncompressible bytes is
+                                //>              limited to 255, though.
+                                //>  ZXPAC4_32K  A variation of ZXPAC4 with maximum slidng
+                                //>              window of 2^15-1 bytes.
+                                //> There's a separeate data structure, which contains 
+                                //> default values for each alforithm.
+
+    func0_t preprocess;         //> A ptr to a preprocessing function that is called after
+                                //> loading the file but befire compressing it. The function
+                                //> ia allowed to modify the loaded file buffer and its size.
+                                //> This function, if not NULL, is called before compression
+
+    func1_t save_header;        //> A ptr to function, which saves the header for the compressed
+                                //> file. This function, if not NUL, is called before compresison.
+    
+    func2_t post_save;          //> A ptr to function, which does post compression fixes to the
+                                //> header and possible saves the trailer. This funcgtion is
+                                //> called after compressing the file.
+    
+    func3_t done;               //> A ptr to a function, which frees the resources of the optional
+                                //> AUX data. This function, if not NULL, is called last.
 } static const targets[] = {
     {   "asc",
-        true,
         1<<24,
+        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
-        NULL,
+        ascii::preprocess,
         NULL,
         NULL,
         NULL
     },
     {   "bin",
-        false,
         1<<24,
+        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
-        preprocess_bin,
-        save_header_bin,
-        post_save_bin,
-        done_bin
+        binary::preprocess,
+        binary::save_header,
+        binary::post_save,
+        binary::done
     },
     {   "zx",
-        false,
         1<<16,
+        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4_32K,
         NULL,
         NULL,
@@ -218,8 +245,8 @@ struct target {
         NULL
     },
     {   "bbc",
-        false,
         1<<16,
+        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4_32K,
         NULL,
         NULL,
@@ -227,13 +254,13 @@ struct target {
         NULL
     },
     {   "ami",
-        false,
         1<<24,
+        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
-        NULL,
-        NULL,
-        NULL,
-        NULL
+        amiga::preprocess,
+        amiga::save_header,
+        amiga::post_save,
+        amiga::done
     }   
 };
 
@@ -295,6 +322,10 @@ int handle_file(const target* trg, lz_base* lz, lz_config_t* cfg, std::ifstream&
     int n = 0;
     void* aux = NULL;
 
+    if (buf == NULL) {
+        std::cerr << ERR_PREAMBLE << "failed to allocate memory for the input file\n";
+        return -1;
+    }
     if (trg->preprocess == NULL) {
         if (cfg->verbose) {
             std::cout << "No preprocessing of the input file" << std::endl;
@@ -315,68 +346,33 @@ int handle_file(const target* trg, lz_base* lz, lz_config_t* cfg, std::ifstream&
             std::cout << "No aux data cleanup function implemented" << std::endl;
         }
     }
-    if (buf == NULL) {
-        std::cerr << "**Error: failed to allocate memory for the input file\n";
-        return -1;
-    }
     if (!ifs.read(buf,len)) {
-        std::cerr << "**Error: reading the input file failed\n";
+        std::cerr << ERR_PREAMBLE << "reading the input file failed\n";
         delete[] buf;
         return -1;
-    }
-    if (lz->lz_get_config()->is_ascii) {
-        if (lz->verbose()) {
-            std::cout << "Checking for ASCII only content" << std::endl;
-        }
-
-        for (n = 0; n < len; n++) {
-            if (buf[n] < 0) {
-                std::cerr << "**Error: ASCII only file contains bytes greater than 127\n";
-                delete[] buf;
-                return -1;
-            }
-        }
     }
     if (trg->preprocess) {
         len = trg->preprocess(cfg,buf,len,aux);
     }
     if (len < 0) {
-        std::cerr << "**Error: Preprocessing failed" << std::endl;
+        std::cerr << ERR_PREAMBLE << "Preprocessing failed" << std::endl;
         n = len;
         goto error_exit;
     }
     if (trg->save_header) {
         if ((n = trg->save_header(cfg,buf,len,ofs,aux)) < 0) {
-            std::cerr << "**Error: Saving file header failed" << std::endl;
+            std::cerr << ERR_PREAMBLE << "Saving file header failed" << std::endl;
             goto error_exit;
         }
     }
 
-#if 0
-    std::vector<amiga_hunks::hunk_info_t> hunk_list(0);
-    std::vector<uint32_t> new_hunks;
-    char* amiga_exe = NULL;
-    bool debug_on = cfg->debug_level > DEBUG_LEVEL_NONE ? true : false;
-
-
-    n = amiga_hunks::parse_hunks(buf,len,hunk_list,debug_on);
-    
-    if (cfg->merge_hunks) {
-        n = amiga_hunks::merge_hunks(buf,len,hunk_list,amiga_exe,new_hunks,debug_on);
-    } else {
-        n = amiga_hunks::optimize_hunks(buf,len,hunk_list,amiga_exe,new_hunks,debug_on);
-    }
-    free_hunk_info(hunk_list);
-    delete[] amiga_exe;
-#endif
-    
     lz->lz_search_matches(buf,len,0); 
     lz->lz_parse(buf,len,0); 
     n = lz->lz_encode(buf,len,ofs); 
 
     if (trg->post_save) {
-        if ((n = trg->post_save(cfg,buf,n,ofs,aux)) < 0) {
-            std::cerr << "**Error: Post save failed" << std::endl;
+        if ((n = trg->post_save(cfg,n,ofs,aux)) < 0) {
+            std::cerr << ERR_PREAMBLE << "Post save failed" << std::endl;
         }
     }
 error_exit: 
@@ -444,12 +440,7 @@ int main(int argc, char** argv)
                 usage(argv[0]);
                 break;
 			case 'P':   // --preshift
-                if (trg->is_ascii == true) { 
-                    cfg_preshift = true;
-                } else {
-                    std::cerr << "**Error: preshift applies only to ASCII files" << std::endl;
-                    usage(argv[0]);
-                }
+                cfg_preshift = true;
 				break;
 			case 'd':   // --debug
                 cfg_debug_level = DEBUG_LEVEL_NORMAL;
@@ -463,7 +454,12 @@ int main(int argc, char** argv)
             case 'a':   // --algo
                 cfg_algo = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_algo < 0 || cfg_algo > LZ_ALGO_SIZE) {
-                    std::cerr << "**Error: Invalid parameter value '" << optarg << "'\n";
+                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
+                    usage(argv[0]);
+                }
+                if (!(trg->supported_algorithms & (1 << cfg_algo))) {
+                    std::cerr << ERR_PREAMBLE << "not supported algorithm "
+                        << "for the target" << std::endl;
                     usage(argv[0]);
                 }
                 break;
@@ -480,28 +476,28 @@ int main(int argc, char** argv)
             case 'p':   // --pmr-offset
                 cfg_initial_pmr_offset = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_initial_pmr_offset > 127 || cfg_initial_pmr_offset < 1) {
-                    std::cerr << "**Error: Invalid parameter value '" << optarg << "'\n";
+                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
                     usage(argv[0]);
                 }
                 break;
             case 'c':   // --max-chain
                 cfg_max_chain = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_max_chain > MAX_CHAIN || cfg_max_chain < 1) {
-                    std::cerr << "**Error: Invalid parameter value '" << optarg << "'\n";
+                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
                     usage(argv[0]);
                 }
                 break;
             case 'g':   // --good-match
                 cfg_good_match = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0') {
-                    std::cerr << "**Error: Invalid parameter value '" << optarg << "'\n";
+                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
                     usage(argv[0]);
                 }
                 break;
             case 'B':   // --backsteps
                 cfg_backward_steps = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_backward_steps > MAX_BACKWARD_STEPS || cfg_backward_steps < 0) {
-                    std::cerr << "**Error: Invalid parameter value '" << optarg << "'\n";
+                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
                     usage(argv[0]);
                 }
                 break;
@@ -549,7 +545,7 @@ int main(int argc, char** argv)
     if (cfg_good_match > -1) {
         if (cfg_good_match > cfg.max_match || 
             cfg_good_match < cfg.min_match) {
-            std::cerr << "**Error: Invalid parameter value '" << cfg_good_match  << "'\n";
+            std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << cfg_good_match  << "'\n";
             usage(argv[0]);
         }
         cfg.good_match = cfg_good_match;
@@ -568,7 +564,6 @@ int main(int argc, char** argv)
     cfg.only_better_matches = cfg_only_better_matches;
     cfg.reverse_file = cfg_reverse_file;
     cfg.reverse_encoded = cfg_reverse_encoded;
-    cfg.is_ascii = trg->is_ascii;
     cfg.merge_hunks = cfg_merge_hunks;
     cfg.verbose = cfg_verbose_on;
     cfg.debug_level = cfg_debug_level;
@@ -585,7 +580,7 @@ int main(int argc, char** argv)
 
     ifs.open(cfg_infile_name,std::ios::binary|std::ios::in|std::ios::ate);
     if (ifs.is_open() == false) {
-        std::cerr << "**Error: failed to open input file '" << cfg_infile_name << "'\n";
+        std::cerr << ERR_PREAMBLE << "failed to open input file '" << cfg_infile_name << "'\n";
         goto error_exit;
     }
 
@@ -593,12 +588,12 @@ int main(int argc, char** argv)
     ifs.seekg(0);
 
     if (file_len < 0) {
-        std::cerr << "**Error: getting file length  of '" << cfg_infile_name 
+        std::cerr << ERR_PREAMBLE << "getting file length  of '" << cfg_infile_name 
             << "' failed" << std::endl;
         goto error_exit;
     }
     if (file_len > trg->max_file_size) {
-        std::cerr << "**Error: maximum file length is " << trg->max_file_size
+        std::cerr << ERR_PREAMBLE << "maximum file length is " << trg->max_file_size
             << " bytes" << std::endl;
         goto error_exit;
     }
@@ -617,14 +612,14 @@ int main(int argc, char** argv)
             break;
         }
     } catch (std::exception& e) {
-        std::cerr << "**Error1: " << e.what() << "\n";
+        std::cerr << ERR_PREAMBLE << e.what() << "\n";
         lz = NULL;
         goto error_exit;
     }
     try {
         lz->lz_cost_array_get(file_len);
     } catch (std::exception& e) {
-        std::cerr << "**Error2: " << e.what() << "\n";
+        std::cerr << ERR_PREAMBLE << e.what() << "\n";
         goto error_exit;
     }
    
@@ -645,7 +640,7 @@ int main(int argc, char** argv)
         compressed_len = handle_file(trg,lz,&cfg,ifs,ofs,file_len);
         
         if (compressed_len < 0) {
-            std::cerr << "**Error: compression failed\n";
+            std::cerr << ERR_PREAMBLE << "compression failed\n";
             goto error_exit;
         }
 
@@ -662,7 +657,7 @@ int main(int argc, char** argv)
             std::cout << "Security distance: " << lz->get_security_distance() << std::endl;
         }
     } else {
-        std::cerr << "**Error: opening output file '" << cfg_outfile_name << "' failed\n";
+        std::cerr << ERR_PREAMBLE << "opening output file '" << cfg_outfile_name << "' failed\n";
     }
 
 error_exit:

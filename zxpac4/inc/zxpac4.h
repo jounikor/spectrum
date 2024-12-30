@@ -1,7 +1,7 @@
 /**
  * @file zxpac4.h
  * @brief ZX Pac v4 class definitions
- * @author Jouni 'Mr.SpivKorhonen
+ * @author Jouni 'Mr.Spiv' Korhonen
  * @version 0.1
  * @date fall 2024
  * @copyright The Unlicense
