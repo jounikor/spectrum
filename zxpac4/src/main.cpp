@@ -353,6 +353,10 @@ int handle_file(const target* trg, lz_base* lz, lz_config_t* cfg, std::ifstream&
     }
     if (trg->preprocess) {
         len = trg->preprocess(cfg,buf,len,aux);
+
+        if (cfg->verbose) {
+            std::cout << "File size after preprocessing is " << len << std::endl;
+        }
     }
     if (len < 0) {
         std::cerr << ERR_PREAMBLE << "Preprocessing failed" << std::endl;
@@ -623,13 +627,15 @@ int main(int argc, char** argv)
         goto error_exit;
     }
    
+    cfg.algorithm = cfg_algo;
     lz->set_debug_level(cfg_debug_level);
     lz->enable_verbose(cfg_verbose_on);
     
     if (cfg_verbose_on) {
         std::cout << "Loading from file '" << cfg_infile_name << "'\n";
+        std::cout << "File length is " << file_len << "\n";
         std::cout << "Saving to file '" << cfg_outfile_name << "'\n";
-        std::cout << "Using target '" << trg->target_name << "' and algorithm " << cfg_algo << "\n";
+        std::cout << "Using target '" << trg->target_name << "' and algorithm " << cfg.algorithm << "\n";
         std::cout << "Min match is " << cfg.min_match << "\n";
         std::cout << "Max match is " << cfg.max_match << "\n";
         std::cout << "Good match is " << cfg.good_match << "\n";

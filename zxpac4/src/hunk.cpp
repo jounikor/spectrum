@@ -476,7 +476,7 @@ int amiga_hunks::optimize_hunks(char* exe, int len, const std::vector<hunk_info_
     
     // done.. 
     n = (ptr-new_exe);
-    TDEBUG(std::cerr << ">> New exe size after reloc data: " << n << std::endl;)
+    TDEBUG(std::cerr << ">> New exe size after reloc data: 0x" << n << std::endl;)
     TDEBUG(                                                                         \
         for (auto& aa : new_relocs) {                                               \
             uint32_t rel_info = aa.first;                                           \

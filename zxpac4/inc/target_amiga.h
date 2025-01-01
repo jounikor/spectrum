@@ -9,11 +9,17 @@
 #include <fstream>
 #include "lz_base.h"
 
+
 namespace amiga {
     int preprocess(lz_config_t* cfg, char* buf, int len, void*& aux);
     int save_header(const lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux);
     int post_save(const lz_config_t* cfg, int len, std::ofstream& ofs, void* aux);
     void done(void* aux);
+
+    struct decompressor {
+        int length;
+        uint8_t* code;
+    };
 };
 
 typedef std::vector<uint32_t> segment_size_t;
