@@ -18,28 +18,31 @@
 
 int  binary::preprocess(lz_config_t* cfg, char* buf, int len, void*& aux)
 {
-    std::cerr << "Binary preproces()\n";
+    (void)cfg;
+    (void)buf;
+    (void)aux;
     return len;
 }
 
 int  binary::save_header(const lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux)
 {
-    std::cerr << "Binary save_header()\n";
-    return 0;
+    (void)cfg;
+    (void)buf;
+    (void)ofs;
+    (void)aux;
+    return len;
 }
 
 int  binary::post_save(const lz_config_t* cfg, int len, std::ofstream& ofs, void* aux)
 {
-    std::cerr << "Binary post_save()\n";
+    (void)cfg;
+    (void)ofs;
+    (void)aux;
     return len;
 }
 
 void binary::done(void* aux)
 {
-    std::cerr << "Binary done()\n";
-    
-    if (aux) {
-        std::cerr << "Free AUX" << std::endl;
-    }
+    (void)aux;
 }
 

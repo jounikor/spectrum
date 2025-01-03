@@ -86,6 +86,9 @@ int amiga::preprocess(lz_config_t* cfg, char* buf, int len, void*& aux)
 
 int amiga::save_header(const lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux)
 {
+    (void)buf;
+    (void)len;
+
     int n;
     std::vector<uint32_t>* segs = reinterpret_cast<std::vector<uint32_t>*>(aux);
     int num_seg = segs->size() / 3;     // See src/hunk.cpp for content of the aux data 
@@ -162,10 +165,16 @@ int amiga::save_header(const lz_config_t* cfg, char* buf, int len, std::ofstream
 }
 
 
-//
-//
-//
-//
+/**
+ * @brief The post compression header/trailer fixing function.
+ *
+ * @param[in] cfg A ptr to generic configuration.
+ * @param[in] len The final length of the compressed file.
+ * @param     ofs A reference to output file stream.
+ * @param[in] A ptr to target specific auxilatory data.
+ *
+ * @return Final length of the output file or negative is an error took place.
+ */
 
 int amiga::post_save(const lz_config_t* cfg, int len, std::ofstream& ofs, void* aux)
 {

@@ -63,7 +63,7 @@ typedef struct lz_config {
     int min_match3_threshold;   // currently not used
     int initial_pmr_offset;
     int debug_level;            // 
-    int algorithm;
+    int algorithm;              // Selected algorithm..
     //
     bool only_better_matches:1;
     bool reverse_file:1;

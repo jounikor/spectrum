@@ -44,7 +44,8 @@
 #define MAX_BACKWARD_STEPS  16
 #define DEF_BACKWARD_STEPS  0
 
-// Algorithms
+// Algorithms - these should be moved to somewhere common place
+// accessible to different targets as well.
 #define ZXPAC4              0
 #define ZXPAC4B             1
 #define ZXPAC4_32K          2
@@ -271,40 +272,43 @@ lz_config algos[] {
         DEF_BACKWARD_STEPS, ZXPAC4_OFFSET_MATCH2_THRESHOLD, ZXPAC4_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4_INIT_PMR_OFFSET,
         DEBUG_LEVEL_NONE,
+        ZXPAC4,
         false,      // only_better_matches
         false,      // reverse_file
         false,      // reverse_encoded
         false,      // is_ascii
         false,      // preshift_last_ascii_literal
         false,      // merge_hunks
-        false,      // verbose
+        false       // verbose
     },
     // ZXPAC4B
     {   ZXPAC4B_WINDOW_MAX,  DEF_CHAIN, ZXPAC4B_MATCH_MIN, ZXPAC4B_MATCH_MAX, ZXPAC4B_MATCH_GOOD,
         DEF_BACKWARD_STEPS, ZXPAC4B_OFFSET_MATCH2_THRESHOLD, ZXPAC4B_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4B_INIT_PMR_OFFSET,
         DEBUG_LEVEL_NONE,
+        ZXPAC4B,
         false,      // only_better_matches
         false,      // reverse_file
         false,      // reverse_encoded
         false,      // is_ascii
         false,      // preshift_last_ascii_literal
         false,      // merge_hunks
-        false,      // verbose
+        false       // verbose
     },
     // ZXPAC4_32K - max 32K window
     {   ZXPAC4_32K_WINDOW_MAX,  DEF_CHAIN, ZXPAC4_32K_MATCH_MIN, ZXPAC4_32K_MATCH_MAX, ZXPAC4_32K_MATCH_GOOD,
         DEF_BACKWARD_STEPS, ZXPAC4_32K_OFFSET_MATCH2_THRESHOLD, ZXPAC4_32K_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4_32K_INIT_PMR_OFFSET,
         DEBUG_LEVEL_NONE,
+        ZXPAC4_32K,
         false,      // only_better_matches
         false,      // reverse_file
         false,      // reverse_encoded
         false,      // is_ascii
         false,      // preshift_last_ascii_literal
         false,      // merge_hunks
-        false,      // verbose
-    },
+        false       // verbose
+    }
 };
 
 #define LZ_TARGET_SIZE static_cast<int>((sizeof(targets)/sizeof(target)))

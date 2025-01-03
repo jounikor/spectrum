@@ -18,6 +18,7 @@
 
 int  ascii::preprocess(lz_config_t* cfg, char* buf, int len, void*& aux)
 {
+    (void)aux;
     int n;
 
     if (cfg->verbose) {
@@ -37,23 +38,26 @@ int  ascii::preprocess(lz_config_t* cfg, char* buf, int len, void*& aux)
 
 int  ascii::save_header(const lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux)
 {
-    std::cerr << "ascii save_header()\n";
-    return 0;
+    (void)cfg;
+    (void)buf;
+    (void)len;
+    (void)ofs;
+    (void)aux;
+    return len;
 }
 
 int  ascii::post_save(const lz_config_t* cfg, int len, std::ofstream& ofs, void* aux)
 {
-    std::cerr << "ascii post_save()\n";
+    (void)cfg;
+    (void)len;
+    (void)ofs;
+    (void)aux;
     return len;
 }
 
 void ascii::done(void* aux)
 {
-    std::cerr << "ascii done()\n";
-    
-    if (aux) {
-        std::cerr << "Free AUX" << std::endl;
-    }
+    (void)aux;
 }
 
 
