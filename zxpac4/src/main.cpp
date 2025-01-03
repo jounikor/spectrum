@@ -28,11 +28,7 @@
 #include "lz_util.h"
 #include "lz_base.h"
 #include "hunk.h"
-
-#include "target_bin.h"
-#include "target_asc.h"
-#include "target_amiga.h"
-
+#include "target.h"
 
 // Constants for LZ stuff
 //
@@ -76,7 +72,7 @@ static struct option longopts[] = {
     {0,0,0,0}
 };
 
-void usage( char *prg ) {
+static void usage( char *prg ) {
     std::cerr << "Usage: " << prg << " target [options] infile [outfile]\n";
 	std::cerr << " Targets:\n";
     std::cerr << "  bin - Binary data file\n"
@@ -113,160 +109,36 @@ void usage( char *prg ) {
 }
 
 
-struct target;
-
-/**
- * @brief Do preprocessing to the input file. 
- *
- *  The preprocessor may change the content of the input file. The
- *  retuned buffer length may be shorted or equal to the original
- *  buffer size but never longer.
- * 
- * @param cfg[in]    A ptr to lz_config for this file and target.
- * @param buf[inout] A ptr to the input buffer. The preprocessor
- *                   may change the content of the buffer.
- * @param len[in]    The length of the input buffer.
- * @param aux[out]   A ptx to an internal target specific context
- *                   data. If the returned @aux is not NULL then
- *                   it must be freed by calling the func3_t upon
- *                   exit the target specific file handling.
- *
- * @return New length of the input buffer afther preprocessing.
- *         Negative value if there was an error.
- */
-typedef int (*func0_t)(lz_config_t* cfg, char* buf, int len, void*& aux);
-
-/**
- * @brief Save the new file header into the output file. The function may
- *        also modify the file buffer.
- *
- * @param cfg[in]    A ptr to lz_config for this file and target.
- * @param buf[inout] A ptr to the input buffer. The header saving
- *                   must not change the content of the buffer.
- * @param len[in]    The length of the input buffer.
- * @param ofs[in]    The ouput file stream.  
- * @param aux[out]   A ptx to an internal target specific context
- *                   data.
- *
- * @return The number of saved bytes. Negative value if there was
- *         an error.
- */
-typedef int (*func1_t)(const lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux);
-
-/**
- * @brief Save a possible postamble or fix the header in the output file.
- *
- *  The postamble function may change the content of the input file. The
- *  retuned buffer length may be longer than the original buffer size.
- * 
- * @param cfg[in]    A ptr to lz_config for this file and target.
- * @param len[in]    The length of the compressed file.
- * @param ofs[in]    The ouput file stream, which contains the compressed data already.
- * @param aux[out]   A ptx to an internal target specific context
- *                   data.
- *
- * @return The final size of the saved file. Negative value if there was
- *         an error.
- */
-typedef int (*func2_t)(const lz_config_t* cfg, int len, std::ofstream& ofs, void* aux);
-
-/**
- * @brief Free the target specific context data.
- *
- * @param aux[in]   A ptx to an internal target specific context
- *                  data. The @aux may be NULL.
- *
- */
-typedef void (*func3_t)(void* aux);
-
-struct target {
-    // Target string. Currently supported:
-    const char* target_name;    //< Target string. Currently supported:
-                                //<  "asc" for 7bit ASCII
-                                //<  "bin" for raw binary data - no headers to be included
-                                //<  "zx"  for ZX Spectrum self-extracting TAP files
-                                //<  "bbc" for BBC Model A/B self-extracting files
-
-    int max_file_size;          //< Maximum original file size for the target..
-                                //< zxpac4 algorithm limit is 2^24-1 bytes
-
-    uint64_t supported_algorithms;  //< A bit field of supported algoriths.
-
-    int algorithm;              //> Default algorithm used with this target. Currently supported:
-                                //>  ZXPAC4      The 8bit optimized algorithm with 2^17-1 bit
-                                //>              sliding window.
-                                //>  ZXPAC4B     A variation of ZXPAC4 with runlen literal
-                                //>              encoding. Number of uncompressible bytes is
-                                //>              limited to 255, though.
-                                //>  ZXPAC4_32K  A variation of ZXPAC4 with maximum slidng
-                                //>              window of 2^15-1 bytes.
-                                //> There's a separeate data structure, which contains 
-                                //> default values for each alforithm.
-
-    func0_t preprocess;         //> A ptr to a preprocessing function that is called after
-                                //> loading the file but befire compressing it. The function
-                                //> ia allowed to modify the loaded file buffer and its size.
-                                //> This function, if not NULL, is called before compression
-
-    func1_t save_header;        //> A ptr to function, which saves the header for the compressed
-                                //> file. This function, if not NUL, is called before compresison.
-    
-    func2_t post_save;          //> A ptr to function, which does post compression fixes to the
-                                //> header and possible saves the trailer. This funcgtion is
-                                //> called after compressing the file.
-    
-    func3_t done;               //> A ptr to a function, which frees the resources of the optional
-                                //> AUX data. This function, if not NULL, is called last.
-} static const targets[] = {
+static const targets::target my_targets[] = {
     {   "asc",
-        1<<24,
+        (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
-        ZXPAC4,
-        ascii::preprocess,
-        NULL,
-        NULL,
-        NULL
+        ZXPAC4
     },
     {   "bin",
-        1<<24,
+        (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
-        ZXPAC4,
-        binary::preprocess,
-        binary::save_header,
-        binary::post_save,
-        binary::done
+        ZXPAC4
     },
     {   "zx",
-        1<<16,
+        (1<<16) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
-        ZXPAC4_32K,
-        NULL,
-        NULL,
-        NULL,
-        NULL
+        ZXPAC4_32K
     },
     {   "bbc",
-        1<<16,
+        (1<<16) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
-        ZXPAC4_32K,
-        NULL,
-        NULL,
-        NULL,
-        NULL
+        ZXPAC4_32K
     },
     {   "ami",
-        1<<24,
+        (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
-        ZXPAC4,
-        amiga::preprocess,
-        amiga::save_header,
-        amiga::post_save,
-        amiga::done
+        ZXPAC4
     }   
 };
 
 
-lz_config algos[] {
+static const lz_config algos[] {
     // ZXPAC4
     {   ZXPAC4_WINDOW_MAX,  DEF_CHAIN, ZXPAC4_MATCH_MIN, ZXPAC4_MATCH_MAX, ZXPAC4_MATCH_GOOD,
         DEF_BACKWARD_STEPS, ZXPAC4_OFFSET_MATCH2_THRESHOLD, ZXPAC4_OFFSET_MATCH3_THRESHOLD,
@@ -311,82 +183,95 @@ lz_config algos[] {
     }
 };
 
-#define LZ_TARGET_SIZE static_cast<int>((sizeof(targets)/sizeof(target)))
+#define LZ_TARGET_SIZE static_cast<int>((sizeof(my_targets)/sizeof(targets::target)))
 #define LZ_ALGO_SIZE static_cast<int>((sizeof(algos)/sizeof(lz_config)))
 
 /**
- * @brief Driver function for a generic LZ compression..
+ * @brief A factory function to instantiate a required target.
+ * @param[in]    trg_name A ptr to the target name C-string.
+ * @param[inout] cfg A ptr to LZ-config.
+ * @param[in]    ofd A reference to output file.
  *
- *
+ * @return A ptr to target object.
  */
-int handle_file(const target* trg, lz_base* lz, lz_config_t* cfg, std::ifstream& ifs, std::ofstream& ofs, int len)
+static target_base* create_target(const char* trg_name, lz_config* cfg, std::ofstream& ofs)
 {
-    // extra 2 characters to avoid buffer overrun with 3 byte hash function..
-    char* buf = new (std::nothrow) char[len+2];
+    target_base* ptr;
+
+    if (!(strcmp(trg_name,"asc"))) {
+        ptr = new (std::nothrow) target_ascii(cfg,ofs);
+    } else if (!(strcmp(trg_name,"bin"))) {
+        ptr = new (std::nothrow) target_binary(cfg,ofs);
+    } else if (!(strcmp(trg_name,"ami"))) {
+        ptr = new (std::nothrow) target_amiga(cfg,ofs);
+    } else if (!(strcmp(trg_name,"zx"))) {
+        ptr = new (std::nothrow) target_spectrum(cfg,ofs);
+    } else if (!(strcmp(trg_name,"bbc"))) {
+        ptr = new (std::nothrow) target_bbc(cfg,ofs);
+    } else {
+        ptr = NULL;
+    }
+    return ptr;
+}
+
+/**
+ * @brief Driver function for a generic LZ compression..
+ * @param[in] trg A const ptr to targets::target for this file.
+ * @param[in] lz  A ptr to lz_base for this file.
+ * @param[in] cfg A ptr to lz_cinfig for this file.
+ * @param[in] ifs A reference to input file (=this file).
+ * @param[in] ofs A reference to output file.
+ * @param[in] len The length of the input file (=length of this file).
+ *                (This is actually redundant information).
+ *
+ * @return Final saved file length or negative in case of an error.
+ */
+static int handle_file(const targets::target* trg, lz_base* lz, lz_config_t* cfg, std::ifstream& ifs, std::ofstream& ofs, int len)
+{
     int n = 0;
-    void* aux = NULL;
+    // extra N characters to avoid buffer overrun with 3 byte hash function..
+    char* buf = new (std::nothrow) char[len+3];
+    target_base* trg_ptr = create_target(trg->target_name,cfg,ofs);
+    //target_base* trg_ptr = new (std::nothrow) target_amiga(cfg,ofs);
 
     if (buf == NULL) {
         std::cerr << ERR_PREAMBLE << "failed to allocate memory for the input file\n";
         return -1;
     }
-    if (trg->preprocess == NULL) {
-        if (cfg->verbose) {
-            std::cout << "No preprocessing of the input file" << std::endl;
-        }
-    }
-    if (trg->save_header == NULL) {
-        if (cfg->verbose) {
-            std::cout << "No saving function implemented" << std::endl;
-        }
-    }
-    if (trg->post_save == NULL) {
-        if (cfg->verbose) {
-            std::cout << "No post saving function implemented" << std::endl;
-        }
-    }
-    if (trg->done == NULL) {
-        if (cfg->verbose) {
-            std::cout << "No aux data cleanup function implemented" << std::endl;
-        }
+    if (trg_ptr == NULL) {
+        std::cerr << ERR_PREAMBLE << "failed to instantiate a target object\n";
+        delete[] buf;
+        return -1;
     }
     if (!ifs.read(buf,len)) {
         std::cerr << ERR_PREAMBLE << "reading the input file failed\n";
         delete[] buf;
         return -1;
     }
-    if (trg->preprocess) {
-        len = trg->preprocess(cfg,buf,len,aux);
-
-        if (cfg->verbose) {
-            std::cout << "File size after preprocessing is " << len << std::endl;
-        }
+    
+    len = trg_ptr->preprocess(buf,len);
+    if (cfg->verbose) {
+        std::cout << "File size after preprocessing is " << len << std::endl;
     }
     if (len < 0) {
         std::cerr << ERR_PREAMBLE << "Preprocessing failed" << std::endl;
         n = len;
         goto error_exit;
     }
-    if (trg->save_header) {
-        if ((n = trg->save_header(cfg,buf,len,ofs,aux)) < 0) {
-            std::cerr << ERR_PREAMBLE << "Saving file header failed" << std::endl;
-            goto error_exit;
-        }
+    if ((n = trg_ptr->save_header(buf,len)) < 0) {
+        std::cerr << ERR_PREAMBLE << "Saving file header failed" << std::endl;
+        goto error_exit;
     }
 
     lz->lz_search_matches(buf,len,0); 
     lz->lz_parse(buf,len,0); 
     n = lz->lz_encode(buf,len,ofs); 
 
-    if (trg->post_save) {
-        if ((n = trg->post_save(cfg,n,ofs,aux)) < 0) {
-            std::cerr << ERR_PREAMBLE << "Post save failed" << std::endl;
-        }
+    if ((n = trg_ptr->post_save(n)) < 0) {
+        std::cerr << ERR_PREAMBLE << "Post save failed" << std::endl;
     }
 error_exit: 
-    if (trg->done) {
-        trg->done(aux);
-    }
+    delete trg_ptr;
     delete[] buf;
     return n;
 }
@@ -418,7 +303,7 @@ int main(int argc, char** argv)
     bool cfg_merge_hunks = false;
     lz_base* lz = NULL;
 
-    const target* trg = NULL;
+    const targets::target* trg = NULL;
 
     // Check target..
 
@@ -427,8 +312,8 @@ int main(int argc, char** argv)
     }
 
     for (n = 0; n < LZ_TARGET_SIZE; n++) {
-        if (!strcmp(argv[1],targets[n].target_name)) {
-            trg = &targets[n];
+        if (!strcmp(argv[1],my_targets[n].target_name)) {
+            trg = &my_targets[n];
             break;
         }
     }

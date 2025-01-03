@@ -1,5 +1,5 @@
 /**
- * @file src/targte_bin.cpp
+ * @file src/target_bin.cpp
  * @brief Handle binary target specific handling
  * @author Jouni 'Mr.Spiv' Korhonen
  * @version 0.1
@@ -11,38 +11,30 @@
 
 #include <iomanip>
 #include <iosfwd>
-#include <fstream>
+#include "target.h"
 
-#include "lz_base.h"
-#include "target_bin.h"
+target_binary::target_binary(lz_config_t* cfg, std::ofstream& ofs) : target_base(cfg,ofs) {
+}
 
-int  binary::preprocess(lz_config_t* cfg, char* buf, int len, void*& aux)
+target_binary::~target_binary(void) {
+}
+
+int  target_binary::preprocess(char* buf, int len)
 {
-    (void)cfg;
     (void)buf;
-    (void)aux;
     return len;
 }
 
-int  binary::save_header(const lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux)
+int  target_binary::save_header(const char* buf, int len)
 {
-    (void)cfg;
     (void)buf;
-    (void)ofs;
-    (void)aux;
-    return len;
+    (void)len;
+    return 0;
 }
 
-int  binary::post_save(const lz_config_t* cfg, int len, std::ofstream& ofs, void* aux)
+int  target_binary::post_save(int len)
 {
-    (void)cfg;
-    (void)ofs;
-    (void)aux;
-    return len;
-}
-
-void binary::done(void* aux)
-{
-    (void)aux;
+    (void)len;
+    return 0;
 }
 

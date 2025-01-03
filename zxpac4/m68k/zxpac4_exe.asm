@@ -32,7 +32,7 @@ file_size:
 ; first segment + 6
 j:
         subq.l      #6,(sp)
-        movem.l     d0-a6,-(sp)         ; 15*4 + 4
+        movem.l     d0-a5,-(sp)         ; 15*4 + 4
 
         ; eventually return to the first bytes of the first
         ; segment.. 
@@ -116,28 +116,28 @@ j:
 
 
 
-; Exit decompressor and run the code.  This is a leap of faith.. ;-)
+; Exit decompressor and run the code. 
 ;
         move.l      $4.w,a6
-        cmp.b       #37,LIB_VERSION(a6)
+        cmp.b       #37,__LIB_VERSION(a6)
         blo.b       .too_low_kick
-        jsr         _LVOCacheClearU()
+        jsr         __LVOCacheClearU()
 .too_low_kick:
+        jsr         __LVOForbid(a6)
         move.l      (a0),a1
         clr.l       (a0)
         add.l       a1,a1
         add.l       a1,a1
         move.l      -(a1),d0
-        jsr         _LVOFreeMem(a6)
-        ; Uhh.. we are running code from an unallocated memory now..
-        movem.l     (sp)+,d0-a6
-        ret
+        jsr         __LVOFreeMem(a6)
+        movem.l     (sp)+,d0-a5
+        jmp         __LVOPermit(a6)
 
 ; D0 = segment number..
 ; return A0 segment address
 ;
 get_segment_address:
-        move.l      64(sp),a0
+        move.l      60(sp),a0
         subq.l      #4,a0
 
 .loop:  move.l      (a0),d1

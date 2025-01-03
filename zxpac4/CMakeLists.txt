@@ -58,6 +58,7 @@ set(COMMON_SRC  src/cost4.cpp
                 src/hunk.cpp
                 src/target_bin.cpp
                 src/target_asc.cpp
+                src/target_bbc.cpp
                 src/target_amiga.cpp
                 src/target_spectrum.cpp
 
@@ -71,10 +72,7 @@ set(COMMON_SRC  src/cost4.cpp
                 inc/lz_base.h
                 inc/hash.h
                 inc/hunk.h
-                inc/target_bin.h
-                inc/target_asc.h
-                inc/target_amiga.h
-                inc/target_spectrum.h
+                inc/target.h
 )
 
 add_executable(${TARGET} ${COMMON_SRC})

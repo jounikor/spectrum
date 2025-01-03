@@ -1,5 +1,5 @@
 /**
- * @file src/targte_asc.cpp
+ * @file src/target_asc.cpp
  * @brief Handle ASCII target specific handling
  * @author Jouni 'Mr.Spiv' Korhonen
  * @version 0.1
@@ -13,51 +13,47 @@
 #include <iosfwd>
 #include <fstream>
 
-#include "lz_base.h"
-#include "target_asc.h"
+#include "target.h"
 
-int  ascii::preprocess(lz_config_t* cfg, char* buf, int len, void*& aux)
+
+target_ascii::target_ascii(lz_config* cfg, std::ofstream& ofs) : target_base(cfg,ofs)
 {
-    (void)aux;
+}
+
+target_ascii::~target_ascii(void)
+{
+}
+
+
+int  target_ascii::preprocess(char* buf, int len)
+{
     int n;
 
-    if (cfg->verbose) {
+    if (m_cfg->verbose) {
         std::cout << "Checking for ASCII only content" << std::endl;
     }
 
     for (n = 0; n < len; n++) {
         if (buf[n] < 0) {
-            std::cerr << "**Error (" << __FILE__ << ":" << __LINE__ << "): ASCII only file contains bytes greater than 127\n";
+            std::cerr << "**Error (" << __FILE__ << ":" << __LINE__ << "): ASCII only file contains bytes greater than 0x7f\n";
             return -1;
         }
     }
 
-    cfg->is_ascii = true;
+    m_cfg->is_ascii = true;
     return len;
 }
 
-int  ascii::save_header(const lz_config_t* cfg, char* buf, int len, std::ofstream& ofs, void* aux)
+int  target_ascii::save_header(const char* buf, int len)
 {
-    (void)cfg;
     (void)buf;
     (void)len;
-    (void)ofs;
-    (void)aux;
-    return len;
+    return 0;
 }
 
-int  ascii::post_save(const lz_config_t* cfg, int len, std::ofstream& ofs, void* aux)
+int  target_ascii::post_save(int len)
 {
-    (void)cfg;
     (void)len;
-    (void)ofs;
-    (void)aux;
-    return len;
+    return 0;
 }
-
-void ascii::done(void* aux)
-{
-    (void)aux;
-}
-
 
