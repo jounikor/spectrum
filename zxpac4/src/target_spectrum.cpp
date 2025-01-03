@@ -13,7 +13,7 @@
 #include <iosfwd>
 #include "target.h"
 
-target_spectrum::target_spectrum(lz_config_t* cfg, std::ofstream& ofs) : target_base(cfg,ofs) {
+target_spectrum::target_spectrum(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs) : target_base(trg,cfg,ofs) {
 }
 
 target_spectrum::~target_spectrum(void) {

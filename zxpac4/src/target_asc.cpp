@@ -16,7 +16,7 @@
 #include "target.h"
 
 
-target_ascii::target_ascii(lz_config* cfg, std::ofstream& ofs) : target_base(cfg,ofs)
+target_ascii::target_ascii(const targets::target* trg, lz_config* cfg, std::ofstream& ofs) : target_base(trg,cfg,ofs)
 {
 }
 

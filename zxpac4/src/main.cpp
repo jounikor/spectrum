@@ -216,15 +216,15 @@ static target_base* create_target(const targets::target* trg, lz_config* cfg, st
     target_base* ptr;
 
     if (!(strcmp(trg->target_name,"asc"))) {
-        ptr = new (std::nothrow) target_ascii(cfg,ofs);
+        ptr = new (std::nothrow) target_ascii(trg,cfg,ofs);
     } else if (!(strcmp(trg->target_name,"bin"))) {
-        ptr = new (std::nothrow) target_binary(cfg,ofs);
+        ptr = new (std::nothrow) target_binary(trg,cfg,ofs);
     } else if (!(strcmp(trg->target_name,"ami"))) {
         ptr = new (std::nothrow) target_amiga(trg,cfg,ofs);
     } else if (!(strcmp(trg->target_name,"zx"))) {
-        ptr = new (std::nothrow) target_spectrum(cfg,ofs);
+        ptr = new (std::nothrow) target_spectrum(trg,cfg,ofs);
     } else if (!(strcmp(trg->target_name,"bbc"))) {
-        ptr = new (std::nothrow) target_bbc(cfg,ofs);
+        ptr = new (std::nothrow) target_bbc(trg,cfg,ofs);
     } else {
         ptr = NULL;
     }

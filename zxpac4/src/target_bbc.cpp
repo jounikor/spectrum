@@ -11,7 +11,7 @@
 
 #include "target.h"
 
-target_bbc::target_bbc(lz_config_t* cfg, std::ofstream& ofs) : target_base(cfg,ofs) {
+target_bbc::target_bbc(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs) : target_base(trg,cfg,ofs) {
 }
 
 target_bbc::~target_bbc(void) {

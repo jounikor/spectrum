@@ -13,7 +13,7 @@
 #include <iosfwd>
 #include "target.h"
 
-target_binary::target_binary(lz_config_t* cfg, std::ofstream& ofs) : target_base(cfg,ofs) {
+target_binary::target_binary(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs) : target_base(trg,cfg,ofs) {
 }
 
 target_binary::~target_binary(void) {
