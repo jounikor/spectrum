@@ -13,7 +13,7 @@ GETBIT  MACRO
 \@notempty:
         ENDM
         
-
+MAX32K_WIN  EQU     0
 
 
 
@@ -102,6 +102,22 @@ j:
 .get_offset_tag_term:
         GETBIT
         addx.b      d2,d2
+        beq.b       ._get_offset_done
+.get_offset_bits_loop:
+        GETBIT
+        addx.l      d0,d0
+        subq.w      #1,d2
+        bne.b       .get_offset_bits_loop
+.get_offset_done:
+        move.l      d0,d7
+.tag_pmr_matchlen:
+        ;; solve the matchlength 1 vs 2 here.. later
+        ;
+        ; D0 = offset
+        ; 
+        ;
+
+
 
 
 
