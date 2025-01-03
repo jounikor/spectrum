@@ -99,7 +99,7 @@ static void usage( char *prg ) {
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --exe,-X              Self-extracting decruncher (Amiga target).\n";
     std::cerr << "  --merge-hunks,-m      Merge hunks (Amiga target).\n";
-    //std::cerr << "  --overlay,-O          Self-extracting overlay decruncher (Amiga target).\n";
+    std::cerr << "  --overlay,-O          Self-extracting overlay decruncher (Amiga target).\n";
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
     std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
     std::cerr << "  --verbose,-v          Output some additional information to stdout.\n";
@@ -109,31 +109,51 @@ static void usage( char *prg ) {
 }
 
 
-static const targets::target my_targets[] = {
+static targets::target my_targets[] = {
     {   "asc",
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
-        ZXPAC4
+        ZXPAC4,
+        0x0,
+        0x0,
+        false,      // overlay
+        false,      // merge_hunks
     },
     {   "bin",
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
-        ZXPAC4
+        ZXPAC4,
+        0x0,
+        0x0,
+        false,      // overlay
+        false,      // merge_hunks
     },
     {   "zx",
         (1<<16) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
-        ZXPAC4_32K
+        ZXPAC4_32K,
+        0x0,
+        0x0,
+        false,      // overlay
+        false,      // merge_hunks
     },
     {   "bbc",
         (1<<16) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
-        ZXPAC4_32K
+        ZXPAC4_32K,
+        0x0,
+        0x0,
+        false,      // overlay
+        false,      // merge_hunks
     },
     {   "ami",
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
-        ZXPAC4
+        ZXPAC4,
+        0x0,
+        0x0,
+        false,      // overlay
+        false,      // merge_hunks
     }   
 };
 
@@ -150,7 +170,6 @@ static const lz_config algos[] {
         false,      // reverse_encoded
         false,      // is_ascii
         false,      // preshift_last_ascii_literal
-        false,      // merge_hunks
         false       // verbose
     },
     // ZXPAC4B
@@ -164,7 +183,6 @@ static const lz_config algos[] {
         false,      // reverse_encoded
         false,      // is_ascii
         false,      // preshift_last_ascii_literal
-        false,      // merge_hunks
         false       // verbose
     },
     // ZXPAC4_32K - max 32K window
@@ -178,7 +196,6 @@ static const lz_config algos[] {
         false,      // reverse_encoded
         false,      // is_ascii
         false,      // preshift_last_ascii_literal
-        false,      // merge_hunks
         false       // verbose
     }
 };
@@ -194,19 +211,19 @@ static const lz_config algos[] {
  *
  * @return A ptr to target object.
  */
-static target_base* create_target(const char* trg_name, lz_config* cfg, std::ofstream& ofs)
+static target_base* create_target(const targets::target* trg, lz_config* cfg, std::ofstream& ofs)
 {
     target_base* ptr;
 
-    if (!(strcmp(trg_name,"asc"))) {
+    if (!(strcmp(trg->target_name,"asc"))) {
         ptr = new (std::nothrow) target_ascii(cfg,ofs);
-    } else if (!(strcmp(trg_name,"bin"))) {
+    } else if (!(strcmp(trg->target_name,"bin"))) {
         ptr = new (std::nothrow) target_binary(cfg,ofs);
-    } else if (!(strcmp(trg_name,"ami"))) {
-        ptr = new (std::nothrow) target_amiga(cfg,ofs);
-    } else if (!(strcmp(trg_name,"zx"))) {
+    } else if (!(strcmp(trg->target_name,"ami"))) {
+        ptr = new (std::nothrow) target_amiga(trg,cfg,ofs);
+    } else if (!(strcmp(trg->target_name,"zx"))) {
         ptr = new (std::nothrow) target_spectrum(cfg,ofs);
-    } else if (!(strcmp(trg_name,"bbc"))) {
+    } else if (!(strcmp(trg->target_name,"bbc"))) {
         ptr = new (std::nothrow) target_bbc(cfg,ofs);
     } else {
         ptr = NULL;
@@ -231,7 +248,7 @@ static int handle_file(const targets::target* trg, lz_base* lz, lz_config_t* cfg
     int n = 0;
     // extra N characters to avoid buffer overrun with 3 byte hash function..
     char* buf = new (std::nothrow) char[len+3];
-    target_base* trg_ptr = create_target(trg->target_name,cfg,ofs);
+    target_base* trg_ptr = create_target(trg,cfg,ofs);
     //target_base* trg_ptr = new (std::nothrow) target_amiga(cfg,ofs);
 
     if (buf == NULL) {
@@ -300,10 +317,13 @@ int main(int argc, char** argv)
     bool cfg_only_better_matches = false;
     bool cfg_reverse_file = false;
     bool cfg_reverse_encoded = false;
-    bool cfg_merge_hunks = false;
+    bool trg_merge_hunks = false;
+    bool trg_overlay = false;
+    uint32_t trg_load_addr = 0;
+    uint32_t trg_jump_addr = 0;
     lz_base* lz = NULL;
 
-    const targets::target* trg = NULL;
+    targets::target* trg = NULL;
 
     // Check target..
 
@@ -327,8 +347,11 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hPvdDa:X:AmrRb:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hPvdDa:X:AOmrRb:", longopts, NULL)) != -1) {
 		switch (n) {
+            case 'O':   // --overlay
+                trg_overlay = true;
+                break;
             case 'h':
                 usage(argv[0]);
                 break;
@@ -395,26 +418,17 @@ int main(int argc, char** argv)
                 }
                 break;
             case 'A':
-                //n = sscanf(optarg,"%x,%x,%x",&load_addr,&jump_addr,&page);
+                n = sscanf(optarg,"%x,%x",&trg_load_addr,&trg_jump_addr);
 
-                if (n != 3) {
+                if (n != 2) {
                     usage(argv[0]);
                     exit(EXIT_FAILURE);
                 }
-                /*
-                if (load_addr > 0xffff ||
-                    jump_addr > 0xffff ||
-                    page > 0xff) {
-                    //fprintf(stderr,"--exe parameters out of range.\n");
-                    exit(EXIT_FAILURE);;
-                }
-                */
-
-                //printf("%04x, %04x, %02x\n",load_addr,jump_addr,page);
+                //printf("%04x, %04x, %02x\n",trg_load_addr,trg_jump_addr);
                 //exe = true;
                 break;
             case 'm':   // --merge-hunks
-                cfg_merge_hunks = true;
+                trg_merge_hunks = true;
                 break;
 			case 'X':
                 break;
@@ -457,7 +471,10 @@ int main(int argc, char** argv)
     cfg.only_better_matches = cfg_only_better_matches;
     cfg.reverse_file = cfg_reverse_file;
     cfg.reverse_encoded = cfg_reverse_encoded;
-    cfg.merge_hunks = cfg_merge_hunks;
+    trg->merge_hunks = trg_merge_hunks;
+    trg->overlay = trg_overlay;
+    trg->load_addr = trg_load_addr;
+    trg->jump_addr = trg_jump_addr;
     cfg.verbose = cfg_verbose_on;
     cfg.debug_level = cfg_debug_level;
 

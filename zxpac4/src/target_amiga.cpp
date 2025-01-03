@@ -44,7 +44,11 @@ static struct decompressor {
 
 
 
-target_amiga::target_amiga(lz_config_t* cfg, std::ofstream& ofs) : target_base(cfg,ofs) {
+target_amiga::target_amiga(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs) : target_base(cfg,ofs) {
+    m_merge_hunks = trg->merge_hunks;
+    m_overlay = trg->overlay;
+    m_load = trg->load_addr;
+    m_jump = trg->jump_addr;
 }
 
 target_amiga::~target_amiga(void) {
@@ -61,7 +65,7 @@ int target_amiga::preprocess(char* buf, int len)
     if (n <= 0) {
         std::cerr << ERR_PREAMBLE << "Amiga target hunk parsing failed (" << n << " <= " << len  << std::endl;
     } else {
-        if (m_cfg->merge_hunks) {
+        if (m_merge_hunks) {
             n = amiga_hunks::merge_hunks(buf,len,hunk_list,amiga_exe,&m_new_hunks,debug_on);
         } else {
             n = amiga_hunks::optimize_hunks(buf,len,hunk_list,amiga_exe,&m_new_hunks,debug_on);

@@ -70,7 +70,6 @@ typedef struct lz_config {
     bool reverse_encoded:1;
     bool is_ascii:1;
     bool preshift_last_ascii_literal:1;
-    bool merge_hunks:1;         // Amiga specific
     bool verbose:1;
 } lz_config_t;
 
