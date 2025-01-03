@@ -93,7 +93,7 @@ public:
      * @param len[in]    The length of the input buffer.
      *
      * @return New length of the input buffer afther preprocessing.
-     *         Negative value if there was an error.
+     *         Zero or negative value if there was an error.
      */
     virtual int preprocess(char* buf, int len) = 0;
     
