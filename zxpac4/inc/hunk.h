@@ -117,37 +117,32 @@ namespace amiga_hunks {
 #define MEMORY_TYPE_MEMF_RESV   0x03
 
 #define SEGMENT_TYPE_RELOC      0x0000
-#define SEGMENT_TYPE_CODE       0x40000000
+#define SEGMENT_TYPE_CODE       0xc0000000
 #define SEGMENT_TYPE_DATA       0x80000000
-#define SEGMENT_TYPE_BSS        0xc000
+#define SEGMENT_TYPE_BSS        0x4000
 #define SEGMENT_TYPE_MASK       0xc000
-#define SEGMENT_TYPE_EOF        0xffff
+#define SEGMENT_TYPE_EOF        0x0000
+#define MAX_SEGMENT_NUM         0x3ffe
 
 #define MAX_RELOC_OFFSET        0x00ffffff
 
 /*
  *
-  Hunk header
-    nnnnnnnnnnnnnnnn                     -> 16bit number of segments
-    'mm..m' times
-    mmmmmmmmmmmmmmmmmmmmmmmmmmmmm00      -> MEMF_PUBLIC memory size (multiple by 4)
-    mmmmmmmmmmmmmmmmmmmmmmmmmmmmm01      -> MEMF_CHIP memory size
-    mmmmmmmmmmmmmmmmmmmmmmmmmmmmm10      -> MEMF_FAST memory size
-    nnnnnnnnnnnnnnnnnnnnnnnnnnnnn11      -> reserved
-    
   Hunk types:
-    01nnnnnnnnnnnnnn + nnnnnnnnnnnnnnnn  -> HUNK_CODE (data size nnnnnnnnnnnnnnnnnnnnnnnnnnnnnn << 2)
+    11nnnnnnnnnnnnnn + nnnnnnnnnnnnnnnn  -> HUNK_CODE (data size nnnnnnnnnnnnnnnnnnnnnnnnnnnnnn << 2)
     10nnnnnnnnnnnnnn + nnnnnnnnnnnnnnnn  -> HUNK_DATA
-    1100000000000000                     -> HUNK_BSS (size is implicitly known)
+    0100000000000000                     -> HUNK_BSS (size is implicitly known)
     0000000000000000                     -> EOF
+    00nnnnnnnnnnnnnn                     -> RELOCS (nnnnnnnnnnnnnn > 0)
 
   All segments' data is together followed but all relocation data. Unlinke in normal executable
   layout the relocation information is not after each segment.
 
   Relocation information:
-    ssssssssssssssss + dddddddddddddddd  -> reloc within "ss...s" segment+1 to "dd..d" segment+1
+    00dddddddddddddd + 00ssssssssssssss  -> reloc within "ss...s" segment+1 to "dd..d" segment+1
                                          -> if "sss.s" is 0x0000 then EOF
-    rrrrrrrrrrrrrrrrrrrrrrrr             -> first 24bit reloc to which deltas are applied to
+    rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr      -> First 32bit reloc to which deltas are applied to.
+                                            It could be 24bits but 32 is easier to decompressor.
   Reloc entry
     0rrrrrrr                             -> 7 lowest bits of reloc delta
     1rrrrrrr                             -> 7 upper bits of reloc delta and read next byte for next 7bits

@@ -383,6 +383,16 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
     if (++n < tsize) {
         TDEBUG(std::cerr << "Number of parsed segments does not match with the header information.." << std::endl;)
     }
+    if (n > MAX_SEGMENT_NUM) {
+        std::cerr << ERR_PREAMBLE << "too many segments (" << n << ")\n";
+        return -1;
+    }
+    if (hunk_list[0].data_size < 8) {
+        // We need at least 8 bytes of data size in the first hunk to host the
+        // decompressor tramboline code..
+        std::cerr << ERR_PREAMBLE << "the first huml must be at least 8 bytes\n";
+        return -1;
+    }
     if (overlay) {
         return n | MASK_OVERLAY_EXE;
     } else {
@@ -469,10 +479,9 @@ int amiga_hunks::optimize_hunks(char* exe, int len, const std::vector<hunk_info_
     }   }   }
 
     // Compress relocation information..
+    ptr = write16be(ptr,SEGMENT_TYPE_EOF);
     ptr = compress_relocs(ptr,new_relocs,debug);
-    
-    // Write EOF
-    ptr = write16be(ptr,0x0000);
+    ptr = write16be(ptr,SEGMENT_TYPE_EOF);
     
     // done.. 
     n = (ptr-new_exe);
@@ -819,9 +828,9 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     }   }   }   }   }
 
     // Compress relocation information..
+    ptr = write16be(ptr,SEGMENT_TYPE_EOF);
     ptr = compress_relocs(ptr,new_relocs,debug);
-    // Write EOF
-    ptr = write16be(ptr,0x0000);
+    ptr = write16be(ptr,SEGMENT_TYPE_EOF);
     
     n = (ptr-new_exe);
     TDEBUG(std::cerr << ">> New exe size after reloc data: " << n << std::endl;)
@@ -852,23 +861,23 @@ alloc_error:
 
 static char* compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_t> >& new_relocs, bool debug)
 {
-    uint32_t scr_seg;
+    uint32_t src_seg;
     uint32_t dst_seg;
     uint32_t base;
     uint32_t delta, value;
 
     for (auto& reloc : new_relocs) {
-        scr_seg = reloc.first >> 16;
+        src_seg = reloc.first >> 16;
         dst_seg = reloc.first & 0xffff;
         std::set<uint32_t>::iterator it = reloc.second.begin();
         base = *it++;
 
         assert(base <= MAX_RELOC_OFFSET); 
-        dst = write16be(dst,scr_seg+1);
         dst = write16be(dst,dst_seg+1);
-        dst = write24be(dst,base);
+        dst = write16be(dst,src_seg+1);
+        dst = write32be(dst,base);
         
-        TDEBUG(std::cerr << std::dec << "Segment " << scr_seg << ", destination "   \
+        TDEBUG(std::cerr << std::dec << "Segment " << src_seg << ", destination "   \
             << dst_seg << std::hex << ", base 0x" << base << ", entries "           \
             << std::dec << reloc.second.size() << std::endl;)
 

@@ -5,11 +5,12 @@ ZXPAC4 version 0.1 (c) 2024 Jouni 'Mr.Spiv' Korhonen
 
 
 Work-in-Progress. Quite few optios/features are still not done:
- * zxpac4b algorithm
- * --abs option support
- * --exe option support
+ * BBC Master A/B target
+ * ZX Spectrum target
+ * Amiga target overlay decompressor
+ * Finish Amiga target decompressors (draft exists)
+ * Automated reverse file support with Amiga target with non-overlay decompressors
  * --backward support has not been implemented
- * No other target than 'asc' and 'bin' are done
 
 Some notes on the targets:
  * 'asc' is an 7bit ASCII target. The file will be tested that it is 7bit only.
