@@ -92,7 +92,6 @@ tag_match_or_literal:
 get_offset_tag_loop:
         addq.w      #1,d1
         GETBIT
-        ;bcc.b      get_offset_tag_term
         dbcc        d2,get_offset_tag_loop
 get_offset_tag_term:
         GETBIT

@@ -173,11 +173,11 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
     
     if (size % 4) {
         TDEBUG(std::cerr << ERR_PREAMBLE << "Amiga executable size must be 4 byte aligned." << std::endl;)
-        return 0;
+        return -1;
     }
     if (size < 6*4 || (hunk_type != HUNK_HEADER)) { 
         TDEBUG(std::cerr << ERR_PREAMBLE << "not Amiga executable, no HUNK_HEADER found." << std::endl;)
-        return 0;
+        return -1;
     }
     TDEBUG(std::cerr << "HUNK_HEADER (0x" << std::hex << hunk_type << ")" << std::endl;)
 
@@ -202,7 +202,7 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
     )
     if (num_residents != tnum) {
         std::cerr << "  First root hunk (" << tnum << ") does not match the number of residents" << std::endl;
-        return 0;
+        return -1;
     }
     if (tsize - 1 > tmax) {
         TDEBUG(std::cerr << "  Likely an OVERLAY file" << std::endl;)
@@ -374,7 +374,7 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
             break;
         default:
             std::cerr << ERR_PREAMBLE << "unsupported hunk 0x" << std::hex << hunk_type << std::endl;
-            return 0;
+            return -1;
         }
 
         ptr += (hunk_size * 4);
@@ -394,7 +394,7 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
         return -1;
     }
     if (overlay) {
-        return n | MASK_OVERLAY_EXE;
+        return -1;
     } else {
         return n;
     }

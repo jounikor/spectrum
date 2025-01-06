@@ -64,9 +64,9 @@ static struct option longopts[] = {
 	{"verbose",     no_argument,        NULL, 'v'},
 	{"DEBUG",       no_argument,        NULL, 'D'},
 	{"debug",       no_argument,        NULL, 'd'},
+	{"overlay",     no_argument,        NULL, 'O'},
     {"algo",        required_argument,  NULL, 'a'},
     {"abs",         required_argument,  NULL, 'A'},
-    {"exe",         no_argument,        NULL, 'X'},
     {"merge-hunks", no_argument,        NULL, 'm'},
     {"help",        no_argument,        NULL, 'h'},
     {0,0,0,0}
@@ -97,7 +97,6 @@ static void usage( char *prg ) {
               << "                        (default depends on the target)\n";
     std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
-    std::cerr << "  --exe,-X              Self-extracting decruncher (Amiga target).\n";
     std::cerr << "  --merge-hunks,-m      Merge hunks (Amiga target).\n";
     std::cerr << "  --overlay,-O          Self-extracting overlay decruncher (Amiga target).\n";
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
@@ -150,8 +149,8 @@ static targets::target my_targets[] = {
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
-        0x0,
-        0x0,
+        0x0,        // load address
+        0x0,        // jump address
         false,      // overlay
         false,      // merge_hunks
     }   
@@ -249,7 +248,6 @@ static int handle_file(const targets::target* trg, lz_base* lz, lz_config_t* cfg
     // extra N characters to avoid buffer overrun with 3 byte hash function..
     char* buf = new (std::nothrow) char[len+3];
     target_base* trg_ptr = create_target(trg,cfg,ofs);
-    //target_base* trg_ptr = new (std::nothrow) target_amiga(cfg,ofs);
 
     if (buf == NULL) {
         std::cerr << ERR_PREAMBLE << "failed to allocate memory for the input file\n";
@@ -347,7 +345,7 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hPvdDa:X:AOmrRb:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hPvdDa:A:OmrRb:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'O':   // --overlay
                 trg_overlay = true;
@@ -424,13 +422,9 @@ int main(int argc, char** argv)
                     usage(argv[0]);
                     exit(EXIT_FAILURE);
                 }
-                //printf("%04x, %04x, %02x\n",trg_load_addr,trg_jump_addr);
-                //exe = true;
                 break;
             case 'm':   // --merge-hunks
                 trg_merge_hunks = true;
-                break;
-			case 'X':
                 break;
             case '?':
 			case ':':
@@ -466,7 +460,14 @@ int main(int argc, char** argv)
     if (cfg_max_chain > -1) {
         cfg.max_chain = cfg_max_chain;
     }
-    
+    if (trg_overlay && (trg_load_addr || trg_jump_addr)) {
+        trg_overlay = false;
+        if (cfg_verbose_on) {
+            std::cout << "**Warning: absolute address decompression overrides overlay\n";
+        }
+    }
+
+    // We do not check for all possible dump combinations..
     cfg.preshift_last_ascii_literal = cfg_preshift;
     cfg.only_better_matches = cfg_only_better_matches;
     cfg.reverse_file = cfg_reverse_file;

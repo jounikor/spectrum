@@ -45,6 +45,22 @@ static struct decompressor {
 
 
 target_amiga::target_amiga(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs) : target_base(trg,cfg,ofs) {
+    // check target and config.. some parameter changes based settings
+    // force reverse file if not an overlaid decompression used
+    
+    if (!trg->overlay) {
+        if (cfg->verbose) {
+            std::cout << "Forcing reverse file and encoding for Amiga target\n";
+        }
+
+        cfg->reverse_file = true;
+        cfg->reverse_encoded = true;
+    }
+    if (trg->load_addr == 0 && trg->jump_addr == 0) {
+        m_nohunks = false;
+    } else {
+        m_nohunks = true;
+    }
 }
 
 target_amiga::~target_amiga(void) {
@@ -55,11 +71,16 @@ int target_amiga::preprocess(char* buf, int len)
     std::vector<amiga_hunks::hunk_info_t> hunk_list(0);
     bool debug_on = m_cfg->debug_level > DEBUG_LEVEL_NONE ? true : false;
     char* amiga_exe = NULL;
-    int n = amiga_hunks::parse_hunks(buf,len,hunk_list,debug_on);
-    int memory_len, m;
+    int m, n, memory_len;
 
-    if (n <= 0) {
-        std::cerr << ERR_PREAMBLE << "Amiga target hunk parsing failed (" << n << " <= " << len  << std::endl;
+    if (m_nohunks) {
+        return len;
+    }
+    
+    n = amiga_hunks::parse_hunks(buf,len,hunk_list,debug_on);
+    
+    if (n < 0) {
+        std::cerr << ERR_PREAMBLE << "Amiga target hunk parsing failed (" << n << ")" << std::endl;
     } else {
         if (m_trg->merge_hunks) {
             n = amiga_hunks::merge_hunks(buf,len,hunk_list,amiga_exe,&m_new_hunks,debug_on);
@@ -94,10 +115,16 @@ int target_amiga::save_header(const char* buf, int len)
     (void)len;
 
     int n;
-    int num_seg = m_new_hunks.size() / 3;     // See src/hunk.cpp for content of the aux data 
+    int num_seg;
     char* hdr;
     char* ptr;
+    
+    if (m_nohunks) {
+        std::cerr << ERR_PREAMBLE << "absolute addresses not supported yet\n";
+        return -1;
+    }
 
+    num_seg = m_new_hunks.size() / 3;     // See src/hunk.cpp for content of the aux data 
     assert(m_new_hunks.size() % 3 == 0);
     hdr = new (std::nothrow) char[sizeof(uint32_t) * (5 + num_seg + 10
         + (3 * num_seg)) + decompressors[m_cfg->algorithm].length + 4]; 

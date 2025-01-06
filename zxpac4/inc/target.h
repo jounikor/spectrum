@@ -70,6 +70,7 @@ protected:
     const targets::target* m_trg;
     lz_config* m_cfg;
     std::ofstream& m_ofs;
+    bool m_nohunks;
 public:
     /**
      * @brief A constructor for all targets.
