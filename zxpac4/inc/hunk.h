@@ -123,8 +123,9 @@ namespace amiga_hunks {
 #define SEGMENT_TYPE_MASK       0xc000
 #define SEGMENT_TYPE_EOF        0x0000
 #define MAX_SEGMENT_NUM         0x3ffe
+#define MAX_RELOC_NUM           0x3fff
 
-#define MAX_RELOC_OFFSET        0x00ffffff
+#define MAX_RELOC_OFFSET        0x7fffffff
 
 /*
  *
@@ -134,6 +135,7 @@ namespace amiga_hunks {
     0100000000000000                     -> HUNK_BSS (size is implicitly known)
     0000000000000000                     -> EOF
     00nnnnnnnnnnnnnn                     -> RELOCS (nnnnnnnnnnnnnn > 0)
+                                            Maximum number of relocs in one hunk is 16383.
 
   All segments' data is together followed but all relocation data. Unlinke in normal executable
   layout the relocation information is not after each segment.
@@ -143,6 +145,11 @@ namespace amiga_hunks {
                                          -> if "sss.s" is 0x0000 then EOF
     rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr      -> First 32bit reloc to which deltas are applied to.
                                             It could be 24bits but 32 is easier to decompressor.
+    alternative
+
+    0rrrrrrrrrrrrrrr                     -> rrrrrrrrrrrrrrr0 is the first reloc offset
+    1rrrrrrrrrrrrrrr + ssssssssssssssss  -> rrrrrrrrrrrrrrrssssssssssssssss0 is the first reloc offset
+
   Reloc entry
     0rrrrrrr                             -> 7 lowest bits of reloc delta
     1rrrrrrr                             -> 7 upper bits of reloc delta and read next byte for next 7bits

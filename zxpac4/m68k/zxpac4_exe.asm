@@ -21,6 +21,9 @@ __LVOFreeMem        equ     -210
 __LVOCacheClearU    equ     -636
 __LIB_VERSION       equ     20
 
+
+        org         $0
+
 ; The compressed size of the file is in the 4 first bytes
 file_size:
         dc.l        0
@@ -57,9 +60,9 @@ j:
         lea         64(a0,d6.l),a3
         lea         64(a0),a0
         moveq       #-128,d6
-        bra.b       .tag_literal
+        bra.b       tag_literal
         ;
-.main_loop:
+main_loop:
         ;
         ; D6 = bit buffer
         ; D7 = pmr offset
@@ -69,9 +72,9 @@ j:
         ; A3 = destination
         ; A4 = tmp regisrer
         GETBIT
-        bcc.b       .tag_literal
+        bcc.b       tag_literal
         ;
-.tag_match_or_literal:
+tag_match_or_literal:
     IF MAX32K_WIN
         moveq       #3-1,d2
     ELSE
@@ -80,7 +83,7 @@ j:
         moveq       #-1,d1
         ;
         GETBIT
-        bcs.b       .tag_pmr_matchlen 
+        bcs.b       tag_pmr_matchlen 
         ;
         ; Match found:
         ;  min = 2
@@ -88,24 +91,24 @@ j:
         ;
         moveq       #0,d0
         move.b      -(a2),d0
-        bpl.b       .get_offset_done
-.get_offset_tag_loop:
+        bpl.b       get_offset_done
+get_offset_tag_loop:
         addq.w      #1,d1
         GETBIT
-        ;bcc.b       .get_offset_tag_term
+        ;bcc.b      get_offset_tag_term
         dbcc        d2,get_offset_tag_loop
-.get_offset_tag_term:
+get_offset_tag_term:
         GETBIT
         addx.b      d1,d1
-        beq.b       ._get_offset_done
-.get_offset_bits_loop:
+        beq.b       get_offset_done
+get_offset_bits_loop:
         GETBIT
         addx.l      d0,d0
         subq.w      #1,d1
-        bne.b       .get_offset_bits_loop
-.get_offset_done:
+        bne.b       get_offset_bits_loop
+get_offset_done:
         move.l      d0,d7
-.tag_pmr_matchlen:
+tag_pmr_matchlen:
         ;; solve the matchlength 1 vs 2 here.. later
         ;
         ; D0 = offset
@@ -114,13 +117,13 @@ j:
         ;
         moveq       #1,d2
         moveq       #7-1,d3
-.get_matchlen_loop:
+get_matchlen_loop:
         GETBIT
-        bcc.b       .get_matchlen_exit
+        bcc.b       get_matchlen_exit
         GETBIT
         addx.b      d2,d2
-        dbra        d3,.get_matchlen_loop
-.get_matchlen_exit:
+        dbra        d3,get_matchlen_loop
+get_matchlen_exit:
         add.w       d2,d1
         ;
         ; A0 = decompressed data start
@@ -130,14 +133,14 @@ j:
         ; D1 = adjusted match lenght
         ;
         lea         0(a3,d7.l),a4
-.copy_loop:
+copy_loop:
         move.b      -(a4),-(a3)
-        dbra        d1,.copy_loop
+        dbra        d1,copy_loop
         dc.w        $b07c           ; CMP.W #$xxxx,D0
-.tag_literal:
+tag_literal:
         move.b      -(a2),-(a3) 
         cmp.l       a0,a3
-        bhi.b       .main_loop
+        bhi.b       main_loop
         ;
         ; A1 = ptr to the first segment
         ; A3 = start of the decompressed data
@@ -145,22 +148,21 @@ j:
         ;
 reloc_main_or_bss_hunk:
         move.w      (a3)+,d0
-        beq.b       reloc_main_loop
-        bmi.b       .code_or_data_hunk
-        and.w       #$3fff,d0
-        beq.b       .bss_hunk
-        bne.b       do_all_relocs
-.code_or_data_hunk:
+        beq.b       reloc_done_exit
+        cmp.w       #$4000,d0
+        beq.b       bss_hunk
+        blo.b       reloc_first_start
+code_or_data_hunk:
         swap        d0
         move.w      (a3)+,d0
         add.l       d0,d0
         add.l       d0,d0
         lea         4(a1),a4
-.copy_code_or_data:
+copy_code_or_data:
         move.l      (a3)+,(a4)+
         subq.l      #4,d0
-        bne.b       .copy_code_or_data
-.bss_hunk:
+        bne.b       copy_code_or_data
+bss_hunk:
         move.l      a1,a5
         move.l      (a1),a1
         add.l       a1,a1
@@ -174,39 +176,50 @@ reloc_check_alignment:
 reloc_main_loop:
         move.w      (a3)+,d0
         beq.b       reloc_done_exit
+reloc_first_start:
         bsr.b       get_segment_address
         move.l      a0,d1
         move.w      (a3)+,d0
         bsr.b       get_segment_address
+    IF 1
         move.l      (a3)+,d3
+    ELSE
+        moveq       #0,d3
+        move.w      (a3)+,d3
+        bpl.b       base_16_bits
+        swap        d3
+        move.w      (a3)+,d3
+base_16_bits:
+        add.l       d3,d3
+    ENDIF
         ;
         ; D1 = destination hunk address
         ; D3 = base for delta relocs
         ; A0 = source hunk address
         ; A1 = a ptr to the last segment
         ; A5 = a ptr to the second last segment
-.reloc_loop:
+reloc_loop:
         moveq       #0,d0
-.reloc_delta:
+reloc_delta:
         lsl.l       #7,d0
         move.b      (a3)+,d2
         beq.b       reloc_check_alignment
         bclr        #7,d2
-        beq.b       .delta_done
+        beq.b       delta_done
         or.b        d2,d0
-        bra.b       .reloc_delta
-.delta_done:
+        bra.b       reloc_delta
+delta_done:
         or.b        d2,d0
         add.l       d0,d0
         add.l       d0,d3
         add.l       d1,0(a0,d3.l)
-        bra.b       .reloc_loop
+        bra.b       reloc_loop
 reloc_done_exit:
         move.l      $4.w,a6
         cmp.b       #37,__LIB_VERSION(a6)
-        blo.b       .too_low_kick
+        blo.b       too_low_kick
         jsr         __LVOCacheClearU(a6)
-.too_low_kick:
+too_low_kick:
         jsr         __LVOForbid(a6)     ; Dirty but we know A1 is preserved.
         clr.l       (a5)
         move.l      -(a1),d0
@@ -221,12 +234,13 @@ get_segment_address:
         move.l      15*4(sp),a0
         subq.l      #4,a0
 
-.loop:  move.l      (a0),a0
+get_loop:
+        move.l      (a0),a0
         add.l       a0,a0
         add.l       a0,a0
         subq.w      #1,d0
-        bne.b       .loop
+        bne.b       get_loop
         addq.l      #4,a0
-        ret
+        rts
 
 compressed_data:
