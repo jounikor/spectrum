@@ -68,7 +68,7 @@ namespace targets {
 class target_base {
 protected:
     const targets::target* m_trg;
-    lz_config* m_cfg;
+    const lz_config* m_cfg;
     std::ofstream& m_ofs;
     bool m_nohunks;
 public:
@@ -78,7 +78,7 @@ public:
      * @param[in] cfg A ptr to lz_config for this file and target.
      * @param[in] ofs The ouput file stream.  
      */
-    target_base(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs) : 
+    target_base(const targets::target* trg, const lz_config_t* cfg, std::ofstream& ofs) : 
         m_trg(trg), m_cfg(cfg), m_ofs(ofs) {}
     virtual ~target_base(void) {}
 
@@ -128,7 +128,7 @@ public:
 class target_amiga : public target_base {
     std::vector<uint32_t> m_new_hunks; 
 public:
-    target_amiga(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs);
+    target_amiga(const targets::target* trg, const lz_config_t* cfg, std::ofstream& ofs);
     ~target_amiga(void);
     int preprocess(char* buf, int len);
     int save_header(const char* buf, int len);
@@ -137,7 +137,7 @@ public:
 
 class target_ascii : public target_base {
 public:
-    target_ascii(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs);
+    target_ascii(const targets::target* trg, const lz_config_t* cfg, std::ofstream& ofs);
     ~target_ascii(void);
     int preprocess(char* buf, int len);
     int save_header(const char* buf, int len);
@@ -146,7 +146,7 @@ public:
 
 class target_binary : public target_base {
 public:
-    target_binary(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs);
+    target_binary(const targets::target* trg, const lz_config_t* cfg, std::ofstream& ofs);
     ~target_binary(void);
     int preprocess(char* buf, int len);
     int save_header(const char* buf, int len);
@@ -155,7 +155,7 @@ public:
 
 class target_spectrum : public target_base {
 public:
-    target_spectrum(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs);
+    target_spectrum(const targets::target* trg, const lz_config_t* cfg, std::ofstream& ofs);
     ~target_spectrum(void);
     int preprocess(char* buf, int len);
     int save_header(const char* buf, int len);
@@ -164,7 +164,7 @@ public:
 
 class target_bbc : public target_base {
 public:
-    target_bbc(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs);
+    target_bbc(const targets::target* trg, const lz_config_t* cfg, std::ofstream& ofs);
     ~target_bbc(void);
     int preprocess(char* buf, int len);
     int save_header(const char* buf, int len);

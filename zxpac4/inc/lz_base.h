@@ -53,23 +53,23 @@ struct cost {
  */
 
 typedef struct lz_config {
-    int window_size;            // power of two allowed
+    int window_size;                                // Only power of two allowed
     int max_chain;
     int min_match;
     int max_match;
     int good_match;
-    int backward_steps;         // currently not used
-    int min_match2_threshold;   // currently not used
-    int min_match3_threshold;   // currently not used
+    int backward_steps;                             // currently not used
+    int min_match2_threshold;                       // currently not used
+    int min_match3_threshold;                       // currently not used
     int initial_pmr_offset;
-    int debug_level;            // 
-    int algorithm;              // Selected algorithm..
+    int debug_level;                                // 
+    int algorithm;                                  // Selected algorithm..
     //
     bool only_better_matches:1;
-    bool reverse_file:1;
-    bool reverse_encoded:1;
-    bool is_ascii:1;
-    bool preshift_last_ascii_literal:1;
+    mutable bool reverse_file:1;                    // Safe to change by target constructor
+    mutable bool reverse_encoded:1;                 // Safe to change by target constructor
+    mutable bool is_ascii:1;                        // Safe to change by target constructor
+    mutable bool preshift_last_ascii_literal:1;     // Safe to change by target constructor
     bool verbose:1;
 } lz_config_t;
 

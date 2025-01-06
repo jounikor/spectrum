@@ -29,7 +29,7 @@ static uint8_t dec3[] = {0xff,0xff,0xff,0xff,0xff,0x62,0x72,0x82,0x92,0x02,
                          0x12,0x22,0x32,0x42,0x52,0x62,0x72,0x82,0x92,0x02,
                          0xff,0xff}; 
 
-// Length must be even modulo 4
+// Length must be even
 static struct decompressor {
     int length;
     uint8_t* code;
@@ -44,7 +44,7 @@ static struct decompressor {
 
 
 
-target_amiga::target_amiga(const targets::target* trg, lz_config_t* cfg, std::ofstream& ofs) : target_base(trg,cfg,ofs) {
+target_amiga::target_amiga(const targets::target* trg, const lz_config_t* cfg, std::ofstream& ofs) : target_base(trg,cfg,ofs) {
     // check target and config.. some parameter changes based settings
     // force reverse file if not an overlaid decompression used
     
@@ -164,8 +164,15 @@ int target_amiga::save_header(const char* buf, int len)
     
     // Write rest of the hunks minus the last (with compressed data) with data size of 0..
     for (n = 1; n < num_seg-1; n++) {
-        ptr = write32be(ptr,m_new_hunks[3*n + 1]);
-        ptr = write32be(ptr,0x00000000);
+        uint32_t hunk = m_new_hunks[3*n + 1];
+
+        ptr = write32be(ptr,hunk);
+        
+        if (hunk == HUNK_BSS) {
+            ptr = write32be(ptr,m_new_hunks[3*n]);
+        } else {
+            ptr = write32be(ptr,0x00000000);
+        }
         ptr = write32be(ptr,HUNK_END);
     }
 
