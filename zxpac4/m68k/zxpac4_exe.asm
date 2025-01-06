@@ -39,7 +39,7 @@ file_size:
 ; first segment + 6
 j:
         subq.l      #6,(sp)
-        movem.l     d0-a5,-(sp)         ; 15*4 + 4
+        movem.l     d0-a5,-(sp)
         move.l      14*4(sp),a1
         subq.l      #4,a1
         ; A1 = A ptr to the first segment
@@ -48,15 +48,12 @@ j:
         add.l       file_size(pc),a2
         
         ; parse compressed file header
-        moveq       #0,d6
-        moveq       #0,d7
-        move.b      -(a2),d7
-
-        move.b      -(a2),d6
-        lsl.w       #8,d6
-        move.b      -(a2),d6
-        lsl.l       #8,d6
-        move.b      -(a2),d6
+        moveq       #$7f,d7
+        move.l      -(a2),d6
+        and.b       d6,d7
+        lsr.w       #8,d6
+        swap        d6
+        ror.w       #8,d6
         lea         64(a0,d6.l),a3
         lea         64(a0),a0
         moveq       #-128,d6
@@ -234,12 +231,12 @@ get_segment_address:
         move.l      15*4(sp),a0
         subq.l      #4,a0
 
-get_loop:
+get_segment_loop:
         move.l      (a0),a0
         add.l       a0,a0
         add.l       a0,a0
         subq.w      #1,d0
-        bne.b       get_loop
+        bne.b       get_segment_loop
         addq.l      #4,a0
         rts
 
