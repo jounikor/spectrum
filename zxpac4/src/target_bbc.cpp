@@ -34,6 +34,6 @@ int  target_bbc::save_header(const char* buf, int len)
 int  target_bbc::post_save(int len)
 {
     (void)len;
-    return 0;
+    return len;
 }
 

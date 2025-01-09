@@ -36,6 +36,6 @@ int  target_spectrum::save_header(const char* buf, int len)
 int  target_spectrum::post_save(int len)
 {
     (void)len;
-    return 0;
+    return len;
 }
 

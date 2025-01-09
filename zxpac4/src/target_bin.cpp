@@ -35,6 +35,6 @@ int  target_binary::save_header(const char* buf, int len)
 int  target_binary::post_save(int len)
 {
     (void)len;
-    return 0;
+    return len;
 }
 
