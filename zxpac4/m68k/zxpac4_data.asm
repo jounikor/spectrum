@@ -1,18 +1,23 @@
-;;
+;APS00000019000000190000001900000019000000190000001900000019000000190000001900000019
+;
 ; @file zxpac4_data.asm
 ; @brief Data file decompressor for ZXPAC4
 ; @author Jouni 'Mr.Spiv' Korhonen
-; @version 0.1
+; @version 0.2
 ; @copyright The Unlicense
 ; 
-; 20250109 Initial version 0.1
+; 20250109 0.1 - Initial version
+; 20250109 0.2 - Fixed offset decoding bug
 ;
 ; Note:
 ;  - Reversed file
 ;  - Reversed encoding
 ;  - Selectable between 32K and 128K window
 ;  - 8bit bytes
-;
+
+
+	incdir	"sources:zxpac4/"
+
 
 GETBIT  MACRO
         add.b   d6,d6
@@ -22,8 +27,7 @@ GETBIT  MACRO
 \@notempty:
         ENDM
         
-MAX32K_WIN      EQU 0       ; 0=128K window, 1=32K window
-
+MAX32K_WIN          EQU     0	; 0=128K window, 1=32K window
 
 ;-----------------------------------------------------------------------------
 ;
@@ -67,24 +71,19 @@ tag_match_or_literal:
         ;
         GETBIT
         bcs.b   tag_pmr_matchlen 
-        ;
-        ; Match found:
-        ;  min = 2
-        ;  offset > 0
-        ;
         moveq   #0,d0
         move.b  -(a2),d0
         bpl.b   get_offset_done
 get_offset_tag_loop:
         addq.w  #1,d1
         GETBIT
-        dbcc    d2,get_offset_tag_loop
+	bcc.b	get_offset_tag_term
+        dbra    d2,get_offset_tag_loop
+	addq.w	#1,d1
 get_offset_tag_term:
         GETBIT
-        ;addx.w d1,d1       ; addx does not work bcos Z-flag is
-                            ; unchanged if result is 0
-        roxl.w	#1,d1       ; roxl sets Z-flag as intended
-        beq.b   get_offset_done
+	roxl.w	#1,d1
+	beq.b   get_offset_done
 get_offset_bits_loop:
         GETBIT
         addx.l  d0,d0
@@ -105,7 +104,7 @@ get_matchlen_loop:
         GETBIT
         bcc.b   get_matchlen_exit
         GETBIT
-        addx.b  d2,d2
+        addx.w  d2,d2
         dbra    d3,get_matchlen_loop
 get_matchlen_exit:
         add.w   d2,d1
@@ -120,12 +119,12 @@ get_matchlen_exit:
 copy_loop:
         move.b  -(a4),-(a3)
         dbra    d1,copy_loop
-        dc.w    $b07c       ; CMP.W #$xxxx,D0
+        dc.w    $b07c           ; CMP.W #$xxxx,D0
 tag_literal:
         move.b  -(a2),-(a3) 
         cmp.l   a0,a3
         bhi.b   main_loop
-        rts
+	rts
 
 compressed_data:
 compressed_data_end:
