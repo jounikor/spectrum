@@ -1,12 +1,12 @@
+;APS00000000000000000000000000000000000000000000000000000000000000000000000000000000
 ;
 ; @file zxpac4_exe.asm
 ; @brief Executable file decompressor for ZXPAC4
 ; @author Jouni 'Mr.Spiv' Korhonen
-; @version 0.2
+; @version 0.1
 ; @copyright The Unlicense
 ; 
-; 20250109 v0.1 - Initial version.
-; 20250109 v0.2 - decrunher and relocator fixes.
+; 20250109 Initial version 0.1
 ;
 ; Note:
 ;  - Reversed file
@@ -23,7 +23,6 @@ GETBIT  MACRO
 \@notempty:
         ENDM
         
-MAX32K_WIN          EQU     0
 
 __LVOForbid		    equ	    -132
 __LVOPermit         equ     -138
@@ -53,7 +52,7 @@ exe:
         move.l  14*4(sp),a1
         subq.l  #4,a1
         ; A1 = A ptr to the first segment
-        lea     compressed_data+136(pc),a0
+        lea     compressed_data(pc),a0
         move.l  a0,a2
         add.l   file_size(pc),a2
 	;
@@ -81,7 +80,7 @@ main_loop:
         bcc.b   tag_literal
         ;
 tag_match_or_literal:
-    IF MAX32K_WIN
+    IFD MAX32K_WIN
         moveq   #3-1,d2
     ELSE
         moveq   #4-1,d2
@@ -96,8 +95,8 @@ tag_match_or_literal:
 get_offset_tag_loop:
         addq.w  #1,d1
         GETBIT
+        dbcc    d2,get_offset_tag_loop
 	bcc.b	get_offset_tag_term
-        dbra    d2,get_offset_tag_loop
 	addq.w	#1,d1
 get_offset_tag_term:
         GETBIT
@@ -183,18 +182,7 @@ reloc_first_start:
         move.l  a0,d1
         move.w  (a3)+,d0
         bsr.b   get_segment_address
-    IF 1
-        move.l  (a3)+,d3
-	bra.b	delta_first
-    ELSE
-        moveq   #0,d3
-        move.w  (a3)+,d3
-        bpl.b   base_16_bits
-        swap    d3
-        move.w  (a3)+,d3
-base_16_bits:
-        add.l   d3,d3
-    ENDIF
+	moveq	#0,d3
         ;
         ; D1 = destination hunk address
         ; D3 = base for delta relocs
@@ -215,7 +203,6 @@ delta_done:
         or.b  	d2,d0
         add.l	d0,d0
         add.l   d0,d3
-delta_first:
         add.l   d1,0(a0,d3.l)
         bra.b   reloc_loop
 reloc_done_exit:

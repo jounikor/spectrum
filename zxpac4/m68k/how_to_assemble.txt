@@ -1,0 +1,8 @@
+# How to update the decompressor binaries for the Amiga target..
+# Apologies this to be such manual..
+
+vasmm68k_mot -pic -Fbin zxpac4_exe.asm -o zxpac4_exe.bin
+python3 bin2c.py zxpac4_32k_exe_bin zxpac4_exe.bin zxpac4_exe.h
+
+vasmm68k_mot -pic -DMAX32K_WIN -Fbin zxpac4_exe.asm -o zxpac4_32k_exe.bin
+python3 bin2c.py zxpac4_32k_exe_bin zxpac4_32k_exe.bin zxpac4_32k_exe.h

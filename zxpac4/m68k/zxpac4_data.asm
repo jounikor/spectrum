@@ -16,8 +16,6 @@
 ;  - 8bit bytes
 
 
-	incdir	"sources:zxpac4/"
-
 
 GETBIT  MACRO
         add.b   d6,d6
@@ -27,7 +25,6 @@ GETBIT  MACRO
 \@notempty:
         ENDM
         
-MAX32K_WIN          EQU     0	; 0=128K window, 1=32K window
 
 ;-----------------------------------------------------------------------------
 ;
@@ -62,7 +59,7 @@ main_loop:
         bcc.b   tag_literal
         ;
 tag_match_or_literal:
-    IF MAX32K_WIN
+    IFD MAX32K_WIN
         moveq   #3-1,d2
     ELSE
         moveq   #4-1,d2
@@ -77,8 +74,8 @@ tag_match_or_literal:
 get_offset_tag_loop:
         addq.w  #1,d1
         GETBIT
+        dbcc    d2,get_offset_tag_loop
 	bcc.b	get_offset_tag_term
-        dbra    d2,get_offset_tag_loop
 	addq.w	#1,d1
 get_offset_tag_term:
         GETBIT

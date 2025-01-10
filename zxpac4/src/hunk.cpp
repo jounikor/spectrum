@@ -868,21 +868,12 @@ static char* compress_relocs(char* dst, std::map<uint32_t,std::set<uint32_t> >& 
         src_seg = reloc.first >> 16;
         dst_seg = reloc.first & 0xffff;
         std::set<uint32_t>::iterator it = reloc.second.begin();
-        base = *it++;
+        base = 0;
 
         assert(base <= MAX_RELOC_OFFSET); 
         dst = write16be(dst,dst_seg+1);
         dst = write16be(dst,src_seg+1);
-#if 1
-        dst = write32be(dst,base);
-#else
-        if (base < 65536) {
-            dst = write16be(dst,base >> 1);
-        } else {
-            dst = write16be(dst,(base >> 17) | 0x8000);
-            dst = write16be(dst,base >> 1);
-        }
-#endif
+        
         TDEBUG(std::cerr << std::dec << "Segment " << src_seg << ", destination "   \
             << dst_seg << std::hex << ", base 0x" << base << ", entries "           \
             << std::dec << reloc.second.size() << std::endl;)
