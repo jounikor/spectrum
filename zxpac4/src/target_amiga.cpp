@@ -154,7 +154,7 @@ int target_amiga::save_header(const char* buf, int len)
     ptr = write32be(ptr,num_seg-1);
     ptr = write32be(ptr,2);
     ptr = write32be(ptr,0);
-    ptr = write32be(ptr,HUNK_END);
+    //ptr = write32be(ptr,HUNK_END);
     
     // Write rest of the hunks minus the last (with compressed data) with data size of 0..
     for (n = 1; n < num_seg-1; n++) {
@@ -167,7 +167,7 @@ int target_amiga::save_header(const char* buf, int len)
         } else {
             ptr = write32be(ptr,0x00000000);
         }
-        ptr = write32be(ptr,HUNK_END);
+        //ptr = write32be(ptr,HUNK_END);
     }
 
     // the last HUNK_CODE to host the compressed file. We do not know its data size yet..
