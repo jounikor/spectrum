@@ -243,7 +243,6 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
         hunk_list.push_back(hunk);
     }
 
-    hunk_size = 0;
     n = -1;
 
     // The algorithm for the hunk parser:
@@ -295,7 +294,11 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
         case HUNK_DATA:
         case HUNK_CODE:
             hunk_size = read32be(ptr);
+            goto process_code_data_bss;
         case HUNK_BSS:
+            ptr += 4;       // skip size..
+            hunk_size = 0;
+process_code_data_bss:
             if (hunk_end == false) {
                 std::cout << "**Warning: HUNK_CODE/DATA/BSS without closing HUNK_END\n";
             }
@@ -379,7 +382,7 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
             hunk_size = read32be(ptr) + 1;
             break;
         default:
-            std::cerr << ERR_PREAMBLE << "unsupported hunk 0x" << std::hex << hunk_type << std::endl;
+            std::cerr << std::dec << ERR_PREAMBLE << "unsupported hunk 0x" << std::hex << hunk_type << std::endl;
             return -1;
         }
 
@@ -490,7 +493,7 @@ int amiga_hunks::optimize_hunks(char* exe, int len, const std::vector<hunk_info_
     
     // done.. 
     n = (ptr-new_exe);
-    TDEBUG(std::cerr << ">> New exe size after reloc data: 0x" << n << std::endl;)
+    TDEBUG(std::cerr << ">> New exe size after reloc data: 0x" << std::hex << n << std::endl;)
     TDEBUG(                                                                         \
         for (auto& aa : new_relocs) {                                               \
             uint32_t rel_info = aa.first;                                           \
@@ -590,6 +593,10 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     // merged_old_seg_offs[3] = n;
     // merged_old_seg_bss_offs[1] = n+m;
     // merged_old_seg_bss_offs[3] = n+m+N;
+    //
+    // TODO: A bit sad operation here is that the current hunk merger cannot merge
+    //       a BSS hunk into a DATA or a CODE hunk. Need to be fixed at some point.
+    //
 
     int* merged_old_seg_bss_offs = new (std::nothrow) int[num_old_seg];
 
@@ -683,37 +690,37 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     for (m = 0; m < num_old_seg; m++) {
         merged_old_seg_bss_offs[m] = merged_data_size[hunk_list[m].new_seg_num] + merged_bss_size[hunk_list[m].new_seg_num];
         merged_bss_size[hunk_list[m].new_seg_num] += old_seg_bss[m];
-        TDEBUG(std::cerr << "Binnary pointers: " << reinterpret_cast<uint64_t>(hunk_list[m].seg_start) << "\n";)
+        TDEBUG(std::cerr << "Binnary pointers: " << std::hex << reinterpret_cast<uint64_t>(hunk_list[m].seg_start) << "\n";)
     }
 
-    TDEBUG(std::cerr << "Number of merged hunks is " << num_new_seg << std::endl;)
+    TDEBUG(std::cerr << "Number of merged hunks is " << std::dec << num_new_seg << std::endl;)
     
     for (m = 0; m < num_new_seg; m++) {
         merged_data_offs[m+1] = merged_data_offs[m] + merged_data_size[m];
 
         TDEBUG( \
-            std::cerr << "Merged new segment " << m << ":" << std::endl;                        \
-            std::cerr << "  Hunk type -> " << merged_hunk_type[m] << std::endl;                 \
-            std::cerr << "  Sizes  -> " << merged_data_size[m] << std::endl;                    \
-            std::cerr << "  Offset from beginning -> " << merged_data_offs[m] << std::endl;)
+            std::cerr << "Merged new segment " << std::dec << m << ":" << std::endl;                        \
+            std::cerr << "  Hunk type -> 0x" << std::hex << merged_hunk_type[m] << std::endl;                 \
+            std::cerr << "  Sizes  -> 0x" << merged_data_size[m] << std::endl;                    \
+            std::cerr << "  Offset from beginning -> 0x" << merged_data_offs[m] << std::endl;)
     }
     TDEBUG(for (m = 0; m < num_old_seg; m++) {                                                  \
-        std::cerr << "Old segment " << m << ":" << std::endl;                                   \
-        std::cerr << "  Mapped to -> " << hunk_list[m].new_seg_num << std::endl;                \
-        std::cerr << "  Offset -> " << merged_old_seg_offs[m] << std::endl;                     \
-        std::cerr << "  Size -> " << merged_old_seg_size[m] << std::endl;                              \
-        std::cerr << "  BSS -> " << old_seg_bss[m] << std::endl;                                \
-        std::cerr << "  BSS offset " << merged_old_seg_bss_offs[m] << std::endl; }                     \
+        std::cerr << "Old segment " << std::dec << m << ":" << std::endl;                                   \
+        std::cerr << "  Mapped to ->  " << hunk_list[m].new_seg_num << std::endl;                \
+        std::cerr << "  Offset ->     0x" << std::hex << merged_old_seg_offs[m] << std::endl;                     \
+        std::cerr << "  Size ->       0x" << merged_old_seg_size[m] << std::endl;                              \
+        std::cerr << "  BSS ->        0x" << old_seg_bss[m] << std::endl;                                \
+        std::cerr << "  BSS offset -> 0x" << merged_old_seg_bss_offs[m] << std::endl; }                     \
     
         for (m = 0; m < num_new_seg; m++) {                                                     \
-            std::cerr << "Merged segment " << m << " end  -> " << m << ": " << merged_data_size[m]  \
-                << ", " << merged_mem_size[m] << std::endl;                                     \
+            std::cerr << std::dec << "Merged segment " << m << " end  -> " << m << ": 0x" << std::hex << merged_data_size[m]  \
+                << ", 0x" << merged_mem_size[m] << std::endl;                                     \
     })
 
     // Just for my own education.. Did not remember this ;)
     // https://stackoverflow.com/questions/7648756/is-the-order-of-iterating-through-stdmap-known-and-guaranteed-by-the-standard
     TDEBUG(for (auto& i: new_hunks)  {                                                          \
-        std::cerr << "Combined mapping -> " << i.first << ": " << i.second << std::endl;        \
+        std::cerr << std::dec << "Combined mapping -> " << i.first << ": " << i.second << std::endl;        \
     })
 
     // For the HUNK_HEADER..

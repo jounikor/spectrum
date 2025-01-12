@@ -185,7 +185,7 @@ int target_amiga::preprocess_overlay(char* buf, int len)
        goto overlay_error;
     }
     
-    for (m = 0; m < m_new_hunks.size(); m += 3) {
+    for (m = 0; m < static_cast<int>(m_new_hunks.size()); m += 3) {
         if (m_new_hunks[m + 1] != HUNK_BSS) {
             if (++num_code_hunks > 1) {
                 std::cerr << ERR_PREAMBLE << "only single code/data hunk allowed";
@@ -231,7 +231,6 @@ int target_amiga::save_header_abs(const char* buf, int len)
     (void)len;
 
     int n;
-    int hunk_size;
     char* hdr;
     char* ptr;
     
@@ -338,7 +337,7 @@ int target_amiga::save_header_exe(const char* buf, int len)
         ptr = write32be(ptr,hunk);
         
         if (hunk == HUNK_BSS) {
-            ptr = write32be(ptr,m_new_hunks[3*n]);
+            ptr = write32be(ptr,m_new_hunks[3*n] & 0x3fffffff);
         } else {
             ptr = write32be(ptr,0x00000000);
         }
