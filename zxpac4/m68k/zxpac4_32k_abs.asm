@@ -30,6 +30,7 @@ __LVOCacheClearU    equ     -636
 __LIB_VERSION       equ     20
 __MIN_KICK_VERSION  equ     37
 
+MAX32K_WIN      equ 1
 
 ;-----------------------------------------------------------------------------
 ;

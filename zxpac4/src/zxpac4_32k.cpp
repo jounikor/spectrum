@@ -426,6 +426,12 @@ int zxpac4_32k::encode_history(const char* buf, char* p_out, int len, int pos)
     }
 
     n = pb.flush() - p_out;
+
+    if (n & 1) {
+        ++n;
+        pb.byte(0);
+    }
+
     return n;
 }
 

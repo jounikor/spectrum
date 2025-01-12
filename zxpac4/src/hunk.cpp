@@ -165,6 +165,7 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
     int hunk_size;
     int padding;
     bool overlay = false;
+    bool hunk_end = true;
 
     hunk_type = read32be(ptr);
     
@@ -295,6 +296,11 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
         case HUNK_CODE:
             hunk_size = read32be(ptr);
         case HUNK_BSS:
+            if (hunk_end == false) {
+                std::cout << "**Warning: HUNK_CODE/DATA/BSS without closing HUNK_END\n";
+            }
+            
+            hunk_end = false;
             // we increment to next segment due exe files that may not
             // contain HUNK_ENDs
             ++n;
@@ -311,6 +317,7 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
             break;
         case HUNK_END:
             hunk_size = 0;
+            hunk_end = true;
             break;
         case HUNK_RELOC32:
         case HUNK_RELRELOC32:

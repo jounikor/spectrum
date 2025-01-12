@@ -101,7 +101,24 @@ target_amiga::target_amiga(const target* trg, const lz_config_t* cfg, std::ofstr
 target_amiga::~target_amiga(void) {
 }
 
+// Amiga target Preprocessing functions:
+//  - normal  executable
+//  - absolute address executable has no preprocessing
+//  - overlay executable
 
+int target_amiga::preprocess(char* buf, int len)
+{
+    m_new_hunks.clear();
+
+    if (m_nohunks) {
+        return len;
+    }
+    if (m_trg->overlay) {
+        return preprocess_overlay(buf,len);
+    }
+    
+    return preprocess_exe(buf,len);
+}
 
 int target_amiga::preprocess_exe(char* buf, int len)
 {
@@ -173,10 +190,7 @@ int target_amiga::preprocess_overlay(char* buf, int len)
             if (++num_code_hunks > 1) {
                 std::cerr << ERR_PREAMBLE << "only single code/data hunk allowed";
                 goto overlay_error;
-            }
-        }
-    }
-
+    }   }   }
     for (m = 0; m < n; m++) {
         buf[m] = amiga_exe[m];
     }
@@ -194,19 +208,82 @@ overlay_error:
     return n;
 }
 
-int target_amiga::preprocess(char* buf, int len)
-{
-    if (m_nohunks) {
-        return len;
-    }
-    if (m_trg->overlay) {
-        return preprocess_overlay(buf,len);
-    }
-    
-    return preprocess_exe(buf,len);
-}
+// Amiga target header saving functions:
+//
+//
+//
 
 int target_amiga::save_header(const char* buf, int len)
+{
+    if (m_nohunks) {
+        return save_header_abs(buf,len);
+    }
+    if (m_trg->overlay) {
+        return save_header_overlay(buf,len);
+    }
+
+    return save_header_exe(buf,len);
+}
+
+int target_amiga::save_header_abs(const char* buf, int len)
+{
+    (void)buf;
+    (void)len;
+
+    int n;
+    int hunk_size;
+    char* hdr;
+    char* ptr;
+    
+    hdr = new (std::nothrow) char[sizeof(uint32_t) * (5 + 1 + 2)
+          + abs_decompressors[m_cfg->algorithm].length]; 
+    
+    if (hdr == NULL) {
+        std::cerr << ERR_PREAMBLE << "memory allocation failed" << std::endl;
+        return -1;
+    }
+
+    ptr = write32be(hdr,HUNK_HEADER);
+    ptr = write32be(ptr,0);
+    ptr = write32be(ptr,1);
+    ptr = write32be(ptr,0);
+    ptr = write32be(ptr,0);
+   
+    // Reserve space for hunk size
+    ptr = write32be(ptr,0xc0dedbad);        // Offset 20 needs patching
+
+    // Reserve space for the First hunk is always HUNK_CODE..
+    ptr = write32be(ptr,HUNK_CODE);
+    ptr = write32be(ptr,0xdeadbeef);        // Offset 28 needs patching
+    
+    // Write the decompressor..
+    for (n = 0; n < abs_decompressors[m_cfg->algorithm].length; n++) {
+        *ptr++ = abs_decompressors[m_cfg->algorithm].code[n];
+    }
+
+    // write it to the file
+    n = ptr - hdr;
+    m_ofs.write(hdr,n);
+    if (!m_ofs) {
+        std::cerr << ERR_PREAMBLE << "write failed (" << std::strerror(errno) << ")" << std::endl;
+        n = -1;
+    }
+
+    delete[] hdr;
+    return n;
+
+}
+
+int target_amiga::save_header_overlay(const char* buf, int len)
+{
+    (void)buf;
+    (void)len;
+
+    std::cerr << ERR_PREAMBLE << "overlay decompressor not implemented yet\n";
+    return -1;
+}
+
+int target_amiga::save_header_exe(const char* buf, int len)
 {
     (void)buf;
     (void)len;
@@ -216,11 +293,6 @@ int target_amiga::save_header(const char* buf, int len)
     char* hdr;
     char* ptr;
     
-    if (m_nohunks) {
-        std::cerr << ERR_PREAMBLE << "absolute addresses not supported yet\n";
-        return -1;
-    }
-
     num_seg = m_new_hunks.size() / 3;     // See src/hunk.cpp for content of the aux data 
     assert(m_new_hunks.size() % 3 == 0);
     hdr = new (std::nothrow) char[sizeof(uint32_t) * (5 + num_seg + 10
@@ -302,15 +374,21 @@ int target_amiga::save_header(const char* buf, int len)
 /**
  * @brief The post compression header/trailer fixing function.
  *
- * @param[in] cfg A ptr to generic configuration.
- * @param[in] len The final length of the compressed file.
- * @param     m_ofs A reference to output file stream.
- * @param[in] A ptr to target specific auxilatory data.
+ * This task of this function is to make the final adjustments to the compressed
+ * executable. For each type of decompressor there are dedicated functions:
+ * Normal executable decompressor, overlay executable decompressor and the
+ * absolute address decompressor.
  *
+ * @param[in] len The final length of the compressed file.
  * @return Final length of the output file or negative is an error took place.
+ *
+ * @note: These functions do seek around the output file and one has to make
+ *        sure the seek positions are maintained when ever the decompression
+ *        assembly routines are modified. There is no automated compile time
+ *        glue for that. The process is manual.. sorry.
  */
 
-int target_amiga::post_save(int len)
+int target_amiga::post_save_exe(int len)
 {
     char tmp[4] = {0};
     int original_len = len;
@@ -351,3 +429,80 @@ int target_amiga::post_save(int len)
     return n;
 }
 
+int target_amiga::post_save_abs(int len)
+{
+    char tmp[4] = {0};
+    int original_len = len;
+    int n;
+    
+    len += abs_decompressors[m_cfg->algorithm].length;
+
+    if (len % 4) {
+        // must align to 4..
+        n = 4 - (len % 4);
+        m_ofs.write(tmp,n);
+        len += n;
+    }
+
+    // Write HUNK_END
+    write32be(tmp,HUNK_END,false);
+    m_ofs.write(tmp,4);
+
+    // Patch the HUNK_HEADER and the HUNK_CODE size with the compressed data size in words..
+    write32be(tmp,len>>2,false);
+    
+    m_ofs.seekp(20,std::ios_base::beg);
+    m_ofs.write(tmp,4);
+    
+    m_ofs.seekp(28,std::ios_base::beg);
+    m_ofs.write(tmp,4);
+
+    // Patch the decompressor with the original byte size..
+    std::cerr << original_len << ", " << std::hex << original_len << std::endl;
+
+    write32be(tmp,original_len,false);
+    m_ofs.seekp(32+12,std::ios_base::beg);
+    m_ofs.write(tmp,4);
+
+    // Patch load address
+    write32be(tmp,m_trg->load_addr,false);
+    m_ofs.seekp(32+2,std::ios_base::beg);
+    m_ofs.write(tmp,4);
+
+    // Patch jump address
+    write32be(tmp,m_trg->jump_addr,false);
+    m_ofs.seekp(32+180,std::ios_base::beg);
+    m_ofs.write(tmp,4);
+
+    // Seek to the end end and return the final byte size
+    m_ofs.seekp(0,std::ios_base::end);
+    n = m_ofs.tellp();
+
+    if (!m_ofs) {
+        std::cerr << ERR_PREAMBLE << "post saving failed" << std::endl;
+        n = -1;
+    }
+
+    return n;
+}
+
+
+int target_amiga::post_save_overlay(int len)
+{
+    (void)len;
+
+    std::cerr << ERR_PREAMBLE << "post_save_overlay() not implemented\n";
+    return -1;
+}
+
+int target_amiga::post_save(int len)
+{
+    if (m_nohunks) {
+        return post_save_abs(len);
+    }
+    if (m_trg->overlay) {
+        return post_save_overlay(len);
+    }
+
+    return post_save_exe(len);
+}

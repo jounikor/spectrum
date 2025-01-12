@@ -46,6 +46,37 @@ include_directories(inc)
 #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DEXAMPLE_SET_RX_CONFIG")
 #set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 
+# Add cmakelist for Amiga target decompressors
+# I did not get this working as a separate CMakeLists.exe :(
+set (ZXPAC4_DECOMPRESSOR_ASM_LIST zxpac4_exe zxpac4_32k_exe zxpac4_abs zxpac4_32k_abs) 
+
+foreach(BASE ${ZXPAC4_DECOMPRESSOR_ASM_LIST})
+    string(CONCAT FILE_ASM ${BASE} ".asm")
+    string(CONCAT FILE_BIN ${BASE} ".bin")
+    string(CONCAT FILE_H ${BASE} ".h")
+    string(CONCAT FILE_LABEL ${BASE} "_bin")
+    string(CONCAT FILE_TARGET ${BASE} "_target")
+
+    # Large window
+    add_custom_command(
+        OUTPUT ${FILE_H}
+        COMMAND vasmm68k_mot -Fbin ${FILE_ASM} -o ${FILE_BIN}
+        COMMAND python3 bin2c.py ${FILE_LABEL} ${FILE_BIN} ${FILE_H}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/m68k/
+        COMMENT "Creating ${FILE_H} from ${FILE_ASM} and ${FILE_BIN} for target ${FILE_TARGET}"
+        VERBATIM
+    )
+    
+    add_custom_target(${FILE_TARGET} ALL
+        DEPENDS ${FILE_H}
+        COMMENT "Target ${FILE_TARGET} for  ${FILE_H}"
+        VERBATIM
+    )
+
+endforeach()
+
+
+
 # Common files for the adftools
 set(COMMON_SRC  src/cost4.cpp
                 src/cost4_32k.cpp
@@ -76,7 +107,6 @@ set(COMMON_SRC  src/cost4.cpp
 )
 
 add_executable(${TARGET} ${COMMON_SRC})
-
 
 # To install use 'cmake --install . --prefix "path-of-your-choice"'
 install(TARGETS ${TARGET}		DESTINATION bin)
