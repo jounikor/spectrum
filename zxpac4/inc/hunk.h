@@ -96,7 +96,15 @@ namespace amiga_hunks {
         std::map<int,std::set<uint32_t> > relocs;    ///< Key is dst_segment, value is reloc
     } hunk_info_t;
 
-    uint32_t read32be(char*& ptr, bool inc=true);
+    typedef struct {
+        uint32_t mem_size_typed_longs;
+        uint32_t hunk_type;
+        uint32_t data_size_longs;
+    } new_hunk_info_t;
+
+
+
+uint32_t read32be(char*& ptr, bool inc=true);
     uint16_t read16be(char*& ptr, bool inc=true);
     uint32_t readbe(char*& ptr, int bytes, bool inc=true);
     char* write32be(char* ptr, uint32_t v, bool inc=true);

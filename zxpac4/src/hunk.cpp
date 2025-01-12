@@ -151,8 +151,7 @@ char* amiga_hunks::write16be(char* ptr, uint16_t r, bool inc)
 /**
  *
  *
- * @return Lower 16 bits: 0 if error, otherwise number of found hunks
- *         Upper 16 bits: additional information like errors.
+ * @return The number of found hunks or <= 0 if an error.
  */
 
 int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk_list, bool debug)

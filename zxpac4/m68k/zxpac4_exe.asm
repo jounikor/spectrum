@@ -6,7 +6,9 @@
 ; @version 0.1
 ; @copyright The Unlicense
 ; 
-; 20250109 Initial version 0.1
+; 20250109 0.1 - Initial version.
+; 20250109 0.2 - Fixed offset decoding bug.
+; 20250111 0.3 - Added security length.
 ;
 ; Note:
 ;  - Reversed file
@@ -30,6 +32,8 @@ __LVOFreeMem        equ     -210
 __LVOCacheClearU    equ     -636
 __LIB_VERSION       equ     20
 
+
+SECURITY_LENGTH	equ	8
 
 
 ; The compressed size of the file is in the 4 first bytes
@@ -63,7 +67,9 @@ start:  moveq   #$7f,d7
         lsr.w   #8,d6
         swap    d6
         ror.w   #8,d6
-        lea     0(a0,d6.l),a3
+        addq.l	#SECURITY_LENGTH,a0
+	move.l	a0,a3
+	add.l	d6,a3
         moveq   #-128,d6
         bra.b   tag_literal
         ;
@@ -156,8 +162,7 @@ reloc_main_or_bss_hunk:
 code_or_data_hunk:
         swap    d0
         move.w  (a3)+,d0
-        add.l	d0,d0
-        add.l	d0,d0
+	lsl.l	#2,d0
         lea     4(a1),a4
 copy_code_or_data:
         move.l  (a3)+,(a4)+

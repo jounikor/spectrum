@@ -20,6 +20,9 @@
 #include "lz_util.h"
 #include "lz_base.h"
 
+#define AMIGA_EXE_SECURITY_DISTANCE     8
+#define AMIGA_OVERLAY_BUFFER_SIZE       2048
+
 namespace targets {
     
     /**
@@ -57,6 +60,11 @@ namespace targets {
 
         bool overlay:1;             /**< Amiga target specific: use overlay decompressor. */
         bool merge_hunks:1;         /**< Amiga target specific: merge executable file hunks when possible. */
+    };
+
+    struct decompressor {
+        int length;
+        uint8_t* code;
     };
 }
 
@@ -126,7 +134,22 @@ public:
 };
 
 class target_amiga : public target_base {
+private:
     std::vector<uint32_t> m_new_hunks; 
+    static const targets::decompressor exe_decompressors[]; 
+    static const targets::decompressor abs_decompressors[]; 
+    static const targets::decompressor overlay_decompressors[]; 
+
+    int preprocess_exe(char* buf, int len);
+    int preprocess_overlay(char* buf, int len);
+
+    int save_header_exe(const char* buf, int len);
+    int save_header_abs(const char* buf, int len);
+    int save_header_overlay(const char* buf, int len);
+    
+    int post_save_exe(int len);
+    int post_save_abs(int len);
+    int post_save_overlay(int len);
 public:
     target_amiga(const targets::target* trg, const lz_config_t* cfg, std::ofstream& ofs);
     ~target_amiga(void);

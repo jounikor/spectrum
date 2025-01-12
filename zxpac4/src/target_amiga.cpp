@@ -15,40 +15,81 @@
 #include "target.h"
 
 
-#define AMIGA_EXE_SECURITY_DISTANCE     64
 
 using namespace amiga_hunks;
+using namespace targets;
 
 // First 4 bytes is always reserved for the final compressed size of the file
 #include "../m68k/zxpac4_exe.h"
 #include "../m68k/zxpac4_32k_exe.h"
+#include "../m68k/zxpac4_abs.h"
+#include "../m68k/zxpac4_32k_abs.h"
 
 // Length must be even
-static struct decompressor {
-    int length;
-    uint8_t* code;
-} decompressors[] = {
-    {sizeof(zxpac4_exe_bin),zxpac4_exe_bin,
+decompressor const target_amiga::exe_decompressors[] = { 
+    {
+        sizeof(zxpac4_exe_bin),
+        zxpac4_exe_bin,
     },
-    {sizeof(zxpac4_32k_exe_bin),zxpac4_32k_exe_bin,
+    {
+        sizeof(zxpac4_32k_exe_bin),
+        zxpac4_32k_exe_bin,
     },
-    {32,NULL,   // This is still missing..
+    {
+        32,
+        NULL,   // This is still missing..
+    }
+};
+
+const decompressor target_amiga::abs_decompressors[] = { 
+    {
+        sizeof(zxpac4_abs_bin),
+        zxpac4_abs_bin,
+    },
+    {
+        sizeof(zxpac4_32k_abs_bin),
+        zxpac4_32k_abs_bin,
+    },
+    {
+        32,
+        NULL,   // This is still missing..
+    }
+};
+
+const decompressor target_amiga::overlay_decompressors[] = { 
+    {
+        sizeof(zxpac4_exe_bin),
+        zxpac4_exe_bin,
+    },
+    {
+        sizeof(zxpac4_32k_exe_bin),
+        zxpac4_32k_exe_bin,
+    },
+    {
+        32,
+        NULL,   // This is still missing..
     }
 };
 
 
 
-target_amiga::target_amiga(const targets::target* trg, const lz_config_t* cfg, std::ofstream& ofs) : target_base(trg,cfg,ofs) {
+target_amiga::target_amiga(const target* trg, const lz_config_t* cfg, std::ofstream& ofs) : target_base(trg,cfg,ofs) {
     // check target and config.. some parameter changes based settings
     // force reverse file if not an overlaid decompression used
     
     if (!trg->overlay) {
         if (cfg->verbose) {
-            std::cout << "Forcing reverse file and encoding for Amiga target\n";
+            std::cout << "Enabling reverse file and encoding for Amiga target\n";
         }
 
         cfg->reverse_file = true;
         cfg->reverse_encoded = true;
+    } else {
+        if (cfg->verbose) {
+            std::cout << "Disabling reverse file and encoding for Amiga target\n";
+        }
+        cfg->reverse_file = false;
+        cfg->reverse_encoded = false;
     }
     if (trg->load_addr == 0 && trg->jump_addr == 0) {
         m_nohunks = false;
@@ -60,17 +101,15 @@ target_amiga::target_amiga(const targets::target* trg, const lz_config_t* cfg, s
 target_amiga::~target_amiga(void) {
 }
 
-int target_amiga::preprocess(char* buf, int len)
+
+
+int target_amiga::preprocess_exe(char* buf, int len)
 {
     std::vector<amiga_hunks::hunk_info_t> hunk_list(0);
     bool debug_on = m_cfg->debug_level > DEBUG_LEVEL_NONE ? true : false;
     char* amiga_exe = NULL;
     int m, n, memory_len;
 
-    if (m_nohunks) {
-        return len;
-    }
-    
     n = amiga_hunks::parse_hunks(buf,len,hunk_list,debug_on);
     
     if (n < 0) {
@@ -90,7 +129,7 @@ int target_amiga::preprocess(char* buf, int len)
             }
         
             // Add decompressor size + some security length
-            memory_len = n + decompressors[m_cfg->algorithm].length + AMIGA_EXE_SECURITY_DISTANCE;
+            memory_len = n + exe_decompressors[m_cfg->algorithm].length + AMIGA_EXE_SECURITY_DISTANCE;
 
             // Fabricate a new hunk and insert the size of the compressed data
             m_new_hunks.push_back((memory_len+3) >> 2);
@@ -101,6 +140,70 @@ int target_amiga::preprocess(char* buf, int len)
         delete[] amiga_exe;
     }
     return n;
+}
+
+
+int target_amiga::preprocess_overlay(char* buf, int len)
+{
+    std::vector<amiga_hunks::hunk_info_t> hunk_list(0);
+    bool debug_on = m_cfg->debug_level > DEBUG_LEVEL_NONE ? true : false;
+    char* amiga_exe = NULL;
+    int m, n, memory_len;
+    int num_code_hunks = 0;
+
+    n = amiga_hunks::parse_hunks(buf,len,hunk_list,debug_on);
+    
+    if (n < 0) {
+        std::cerr << ERR_PREAMBLE << "Amiga target hunk parsing failed (" << n << ")" << std::endl;
+        return -1;
+    } 
+    if (m_trg->merge_hunks) {
+        n = amiga_hunks::merge_hunks(buf,len,hunk_list,amiga_exe,&m_new_hunks,debug_on);
+    } else {
+        n = amiga_hunks::optimize_hunks(buf,len,hunk_list,amiga_exe,&m_new_hunks,debug_on);
+    }
+    if (n < 0 || n > len) {
+       std::cerr << ERR_PREAMBLE << "Amiga target hunk preprocessing failed" << std::endl;
+       n = -1;
+       goto overlay_error;
+    }
+    
+    for (m = 0; m < m_new_hunks.size(); m += 3) {
+        if (m_new_hunks[m + 1] != HUNK_BSS) {
+            if (++num_code_hunks > 1) {
+                std::cerr << ERR_PREAMBLE << "only single code/data hunk allowed";
+                goto overlay_error;
+            }
+        }
+    }
+
+    for (m = 0; m < n; m++) {
+        buf[m] = amiga_exe[m];
+    }
+    
+    // Add decompressor size + filebuffer size
+    memory_len = overlay_decompressors[m_cfg->algorithm].length + AMIGA_OVERLAY_BUFFER_SIZE;
+
+    // Fabricate a new hunk and insert the size of the compressed data
+    m_new_hunks.push_back((memory_len+3) >> 2);
+    m_new_hunks.push_back(0xdeadbeef);
+    m_new_hunks.push_back(0xc0dedbad);
+
+overlay_error:
+    delete[] amiga_exe;
+    return n;
+}
+
+int target_amiga::preprocess(char* buf, int len)
+{
+    if (m_nohunks) {
+        return len;
+    }
+    if (m_trg->overlay) {
+        return preprocess_overlay(buf,len);
+    }
+    
+    return preprocess_exe(buf,len);
 }
 
 int target_amiga::save_header(const char* buf, int len)
@@ -121,7 +224,7 @@ int target_amiga::save_header(const char* buf, int len)
     num_seg = m_new_hunks.size() / 3;     // See src/hunk.cpp for content of the aux data 
     assert(m_new_hunks.size() % 3 == 0);
     hdr = new (std::nothrow) char[sizeof(uint32_t) * (5 + num_seg + 10
-        + (3 * num_seg)) + decompressors[m_cfg->algorithm].length + 4]; 
+        + (3 * num_seg)) + exe_decompressors[m_cfg->algorithm].length + 4]; 
     
     if (hdr == NULL) {
         std::cerr << ERR_PREAMBLE << "memory allocation failed" << std::endl;
@@ -179,8 +282,8 @@ int target_amiga::save_header(const char* buf, int len)
     ptr = write32be(ptr,0);
 
     // Write the decompressor..
-    for (n = 0; n < decompressors[m_cfg->algorithm].length; n++) {
-        *ptr++ = decompressors[m_cfg->algorithm].code[n];
+    for (n = 0; n < exe_decompressors[m_cfg->algorithm].length; n++) {
+        *ptr++ = exe_decompressors[m_cfg->algorithm].code[n];
     }
 
     // write it to the file
@@ -213,7 +316,7 @@ int target_amiga::post_save(int len)
     int original_len = len;
     int n;
 
-    len += decompressors[m_cfg->algorithm].length;
+    len += exe_decompressors[m_cfg->algorithm].length;
 
     if (len % 4) {
         // must align to 4..
