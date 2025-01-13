@@ -3,7 +3,6 @@ This is a DRAFT!
 
 ZXPAC4 version 0.1 (c) 2024 Jouni 'Mr.Spiv' Korhonen
 
-
 Work-in-Progress. Quite few optios/features are still not done:
  * BBC Master A/B target
  * ZX Spectrum target
@@ -11,6 +10,13 @@ Work-in-Progress. Quite few optios/features are still not done:
  * Finish Amiga target decompressors (draft exists)
  * Automated reverse file support with Amiga target with non-overlay decompressors
  * --backward support has not been implemented
+
+About compiling. You need the following to compile this project:
+ * C++11 or better C++ compiler ('advanced' feature usage is minimal, though)
+ * vasmm68k_mot cross assembler (see http://sun.hasenbraten.de/vasm/)
+ * python3
+ * Recent cmake (like 3.30.x or so)
+ * In the future Pasmo or vasm with Z80 target (not integrated yet)
 
 Some notes on the targets:
  * 'asc' is an 7bit ASCII target. The file will be tested that it is 7bit only.
@@ -263,6 +269,12 @@ Z80 Decompressors:
  * z80rdecb.asm    - zxpac4b from higher to lower memory (inplace) decompressor
 
 M680x0 Decompressors: 
+ * zxpac4_abs.asm     - Absolute address executable decompressor.
+ * zxpac4_32k_abs.asm - Absolute address executable decompressor with max 32K sliding window.
+ * zxpac4_exe.asm     - Normal execuatble decompressor.
+ * zxpac4_32k_exe.asm - Normal execuatble decompressor with max 32K sliding window.
+ * zxpac4_data.asm    - Data decompressor (reverse order from end to begining).
+ * ToDo data decompressor with forward decompression.
 
 ARMv4 (32bit opcoces) Decompressors:
 
