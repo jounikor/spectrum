@@ -55,24 +55,25 @@ static struct option longopts[] = {
     // string matcher parameterization
 	{"max-chain",   required_argument,  NULL, 'c'},
 	{"good-match",  required_argument,  NULL, 'g'},
+	{"max-match",   required_argument,  NULL, 'm'},
 	{"backward",    required_argument,  NULL, 'B'},
 	{"only-better", no_argument,        NULL, 'b'},
     {"pmr-offset",  required_argument,  NULL, 'p'},
     // generic parameters
 	{"reverse-file",no_argument,        NULL, 'R'},
-	{"reverse-encoded",no_argument,        NULL, 'r'},
+	{"reverse-encoded",no_argument,     NULL, 'r'},
 	{"verbose",     no_argument,        NULL, 'v'},
 	{"DEBUG",       no_argument,        NULL, 'D'},
 	{"debug",       no_argument,        NULL, 'd'},
 	{"overlay",     no_argument,        NULL, 'O'},
     {"algo",        required_argument,  NULL, 'a'},
     {"abs",         required_argument,  NULL, 'A'},
-    {"merge-hunks", no_argument,        NULL, 'm'},
+    {"merge-hunks", no_argument,        NULL, 'M'},
     {"help",        no_argument,        NULL, 'h'},
     {0,0,0,0}
 };
 
-static void usage( char *prg ) {
+static void usage(char *prg, const targets::target* trg) {
     std::cerr << "Usage: " << prg << " target [options] infile [outfile]\n";
 	std::cerr << " Targets:\n";
     std::cerr << "  bin - Binary data file\n"
@@ -83,7 +84,8 @@ static void usage( char *prg ) {
     std::cerr << " Options:\n";
     std::cerr << "  --max-chain,-c num    Maximum number of stored matches per position "
               << "(min 1, max " << MAX_CHAIN << ").\n";
-    std::cerr << "  --good-match,-g num   match length that cuts further searches.\n";
+    std::cerr << "  --good-match,-g num   Match length that cuts further searches.\n";
+    std::cerr << "  --max-match,-m num    Maximum match length size (default now " << trg->max_match_len << ").\n";
     std::cerr << "  --backward,-B num     Number of backward steps after a found match "
               << "(min 0, max " << MAX_BACKWARD_STEPS << ").\n";
     std::cerr << "  --only-better,-b      Further matches in the history must always be better than previous\n"
@@ -97,7 +99,7 @@ static void usage( char *prg ) {
               << "                        (default depends on the target)\n";
     std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
-    std::cerr << "  --merge-hunks,-m      Merge hunks (Amiga target).\n";
+    std::cerr << "  --merge-hunks,-M      Merge hunks (Amiga target).\n";
     std::cerr << "  --overlay,-O          Self-extracting overlay decruncher (Amiga target).\n";
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
     std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
@@ -113,6 +115,7 @@ static targets::target my_targets[] = {
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
+        0,          // use default
         0x0,
         0x0,
         false,      // overlay
@@ -122,6 +125,7 @@ static targets::target my_targets[] = {
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
+        0,          // use default
         0x0,
         0x0,
         false,      // overlay
@@ -131,6 +135,7 @@ static targets::target my_targets[] = {
         (1<<16) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4_32K,
+        255,        // 
         0x0,
         0x0,
         false,      // overlay
@@ -140,6 +145,7 @@ static targets::target my_targets[] = {
         (1<<16) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4_32K,
+        255,        //
         0x0,
         0x0,
         false,      // overlay
@@ -149,6 +155,7 @@ static targets::target my_targets[] = {
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
+        65535,      //
         0x0,        // load address
         0x0,        // jump address
         false,      // overlay
@@ -312,6 +319,7 @@ int main(int argc, char** argv)
     int cfg_backward_steps = -1;
     int cfg_initial_pmr_offset = -1;
     int cfg_max_chain = -1;
+    int cfg_max_match = -1;
     bool cfg_only_better_matches = false;
     bool cfg_reverse_file = false;
     bool cfg_reverse_encoded = false;
@@ -326,7 +334,7 @@ int main(int argc, char** argv)
     // Check target..
 
     if (argc < 2) {
-        usage(argv[0]);
+        usage(argv[0],&my_targets[0]);
     }
 
     for (n = 0; n < LZ_TARGET_SIZE; n++) {
@@ -337,7 +345,7 @@ int main(int argc, char** argv)
     }
 
     if (trg == NULL) {
-        usage(argv[0]);
+        usage(argv[0],&my_targets[0]);
     }
 
     // target specific default algo
@@ -345,13 +353,13 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "g:c:e:B:i:s:p:hPvdDa:A:OmrRb:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "m:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'O':   // --overlay
                 trg_overlay = true;
                 break;
             case 'h':
-                usage(argv[0]);
+                usage(argv[0],trg);
                 break;
 			case 'P':   // --preshift
                 cfg_preshift = true;
@@ -369,12 +377,12 @@ int main(int argc, char** argv)
                 cfg_algo = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_algo < 0 || cfg_algo > LZ_ALGO_SIZE) {
                     std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
-                    usage(argv[0]);
+                    usage(argv[0],trg);
                 }
                 if (!(trg->supported_algorithms & (1 << cfg_algo))) {
                     std::cerr << ERR_PREAMBLE << "not supported algorithm "
                         << "for the target" << std::endl;
-                    usage(argv[0]);
+                    usage(argv[0],trg);
                 }
                 break;
             case 'r':   // --reverse-encoded
@@ -391,44 +399,51 @@ int main(int argc, char** argv)
                 cfg_initial_pmr_offset = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_initial_pmr_offset > 127 || cfg_initial_pmr_offset < 1) {
                     std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
-                    usage(argv[0]);
+                    usage(argv[0],trg);
                 }
                 break;
             case 'c':   // --max-chain
                 cfg_max_chain = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_max_chain > MAX_CHAIN || cfg_max_chain < 1) {
                     std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
-                    usage(argv[0]);
+                    usage(argv[0],trg);
+                }
+                break;
+            case 'm':   // --max-match
+                cfg_max_match = std::strtoul(optarg,&endptr,10);
+                if (*endptr != '\0' || cfg_max_match < 2) {
+                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
+                    usage(argv[0],trg);
                 }
                 break;
             case 'g':   // --good-match
                 cfg_good_match = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0') {
                     std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
-                    usage(argv[0]);
+                    usage(argv[0],trg);
                 }
                 break;
             case 'B':   // --backsteps
                 cfg_backward_steps = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_backward_steps > MAX_BACKWARD_STEPS || cfg_backward_steps < 0) {
                     std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
-                    usage(argv[0]);
+                    usage(argv[0],trg);
                 }
                 break;
             case 'A':
                 n = sscanf(optarg,"%x,%x",&trg_load_addr,&trg_jump_addr);
 
                 if (n != 2) {
-                    usage(argv[0]);
+                    usage(argv[0],trg);
                     exit(EXIT_FAILURE);
                 }
                 break;
-            case 'm':   // --merge-hunks
+            case 'M':   // --merge-hunks
                 trg_merge_hunks = true;
                 break;
             case '?':
 			case ':':
-				usage(argv[0]);
+				usage(argv[0],trg);
 				exit(EXIT_FAILURE);
 			default:
 				break;
@@ -436,7 +451,7 @@ int main(int argc, char** argv)
 	}
 
 	if (argc - optind < 1) {
-		usage(argv[0]);
+		usage(argv[0],trg);
 		exit(EXIT_FAILURE);
 	}
 
@@ -447,7 +462,7 @@ int main(int argc, char** argv)
         if (cfg_good_match > cfg.max_match || 
             cfg_good_match < cfg.min_match) {
             std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << cfg_good_match  << "'\n";
-            usage(argv[0]);
+            usage(argv[0],trg);
         }
         cfg.good_match = cfg_good_match;
     }
@@ -478,6 +493,15 @@ int main(int argc, char** argv)
     trg->jump_addr = trg_jump_addr;
     cfg.verbose = cfg_verbose_on;
     cfg.debug_level = cfg_debug_level;
+
+    // check maximum match length adjustments..
+    if (cfg_max_match != -1) {
+        if (trg->max_match_len > 0 && cfg_max_match > trg->max_match_len) {
+            cfg.max_match = trg->max_match_len;
+        } else if (!(trg->max_match_len == 0 && cfg_max_match > cfg.max_match)) {
+            cfg.max_match = cfg_max_match;
+        }
+    }
 
     // The following stuff is horrible.. Needs to be hidden under
     // multiple functions to avoid recurring cleanup due initialization

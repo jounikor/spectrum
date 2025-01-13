@@ -55,6 +55,9 @@ namespace targets {
                                          There's a separeate data structure, which contains 
                                          default values for each alforithm. */
     
+        int max_match_len;          /**< Match length limit for the target (e.g. to ease decompressor
+                                         implementation on certain arhitectures */
+
         uint32_t load_addr;         /**< Load address of the binary for a target. 0x0 if not used. */
         uint32_t jump_addr;         /**< Jump address to the binary for a target. 0x0 if not used. */
 
