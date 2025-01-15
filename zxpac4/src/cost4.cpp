@@ -120,7 +120,7 @@ int zxpac4_cost::impl_get_offset_tag(int offset, char& byte_tag, int& bit_tag)
 int zxpac4_cost::impl_get_length_tag(int length, int& bit_tag)
 {
     assert(length > 0);
-    assert(length < 256);
+    assert(length <= lz_get_config()->max_match);
 
     int mask_bit = 7;
     int bits = 1;

@@ -85,7 +85,9 @@ static void usage(char *prg, const targets::target* trg) {
     std::cerr << "  --max-chain,-c num    Maximum number of stored matches per position "
               << "(min 1, max " << MAX_CHAIN << ").\n";
     std::cerr << "  --good-match,-g num   Match length that cuts further searches.\n";
-    std::cerr << "  --max-match,-m num    Maximum match length size (default now " << trg->max_match_len << ").\n";
+    std::cerr << "  --max-match,-m num    Maximum match length size (default now " << trg->max_match_len << "). (Note, this is an expert\n"
+              << "                        option. You better know what you are doing. Default depends on the\n"
+              << "                        current selected target, where 0 means algorithm default maximum).\n";
     std::cerr << "  --backward,-B num     Number of backward steps after a found match "
               << "(min 0, max " << MAX_BACKWARD_STEPS << ").\n";
     std::cerr << "  --only-better,-b      Further matches in the history must always be better than previous\n"

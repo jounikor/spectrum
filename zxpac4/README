@@ -51,7 +51,10 @@ Usage: ./build/zxpac4 target [options] infile [outfile]
   ami - Amiga self-executing program
  Options:
   --max-chain,-c num    Maximum number of stored matches per position (min 1, max 9999).
-  --good-match,-g num   match length that cuts further searches.
+  --good-match,-g num   Match length that cuts further searches.
+  --max-match,-m num    Maximum match length size (default now 0). (Note, this is an expert
+                        option. You better know what you are doing. Default depends on the
+                        current selected target, where 0 means algorithm default maximum).
   --backward,-B num     Number of backward steps after a found match (min 0, max 16).
   --only-better,-b      Further matches in the history must always be better than previous
                         matches for the same position (default no).
@@ -65,7 +68,7 @@ Usage: ./build/zxpac4 target [options] infile [outfile]
   --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).
   --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.
   --exe,-X              Self-extracting decruncher (Amiga target).
-  --merge_hunks,-m      Merge hunks (Amiga target). 
+  --merge_hunks,-M      Merge hunks (Amiga target). 
   --overlay,-O          Self-extracting overlay decruncher (Amiga target).
   --debug,-d            Output a LOT OF debug prints to stderr.
   --DEBUG,-D            Output EVEN MORE debug prints to stderr.
