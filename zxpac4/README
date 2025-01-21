@@ -110,6 +110,42 @@ parameterized.
                         inputs.
 
 
+The outout compressed file format in big endian is:
+ If the compressed data has not been reversed:
+    
+    3        2                      0
+    1        4                      0
+   +--------+------------------------+
+   |ARpppppp|24-bit compressed length| HEADER
+   +--------+------------------------+
+     
+     +----//////////----+
+   + |  compressed data |
+     +----//////////----+
+
+      7       0          
+     +---------+
+   + |alignment| OPTIONAL
+     +---------+
+
+
+ If the compressed data has been reversed:
+
+    7       0          
+   +---------+
+   |alignment| OPTIONAL so that the HEADER is 16-bit aligned
+   +---------+
+      
+     +----//////////----+
+   + |  compressed data |
+     +----//////////----+
+    
+      3        2                      0
+      1        4                      0
+     +--------+------------------------+
+   + |htgnel desserpmoc tib-42|ARpppppp| HEADER
+     +--------+------------------------+
+     
 Some notes on the supported algorithms:
  * zxpac4 has a 128K sliding window and a maximum match of 255.
  * zxpac4_32k has a 32K sliding window and a maximum match of 255.
@@ -172,7 +208,19 @@ Some notes on the supported algorithms:
   11110   + [4] = 16 -> 31              // 1n1n1n1n0
   111110  + [5] = 32 -> 64              // 1n1n1n1n1n0
   1111110 + [6] = 64 -> 127             // 1n1n1n1n1n1n0
+  If maximum matclengh is 255
   1111111 + [7] = 128 -> 255            // 1n1n1n1n1n1n1n
+  If maxmimum matchlengh is 65535
+  11111110        + [7]  = 128 -> 255       // 1n1n1n1n1n1n1n0
+  111111110       + [8]  = 256 -> 511       // 1n1n1n1n1n1n1n1n0
+  1111111110      + [9] = 512 -> 1023       // 1n1n1n1n1n1n1n1n1n0
+  11111111110     + [10] = 1024 -> 2047     // 1n1n1n1n1n1n1n1n1n1n0
+  111111111110    + [11] = 2048 -> 4095     // 1n1n1n1n1n1n1n1n1n1n1n0
+  1111111111110   + [12] = 4096 -> 8191     // 1n1n1n1n1n1n1n1n1n1n1n1n0
+  11111111111110  + [13] = 8192 -> 16383    // 1n1n1n1n1n1n1n1n1n1n1n1n1n0
+  111111111111110 + [14] = 16384 -> 32767   // 1n1n1n1n1n1n1n1n1n1n1n1n1n1n0
+  111111111111111 + [15] = 32768 -> 65535   // 1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n
+
 
  The offset encoding is a variation of Elias-Gamma encoder. Note that the 7
  most significant bits are encoded in an aligned byte as such. The most

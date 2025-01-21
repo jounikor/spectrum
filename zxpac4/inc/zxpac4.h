@@ -81,14 +81,15 @@
 
 */
 
-#define ZXPAC4_INIT_PMR_OFFSET         5 
-#define ZXPAC4_MATCH_MIN               2
-#define ZXPAC4_MATCH_MAX               65535
-#define ZXPAC4_MATCH_GOOD              63
-#define ZXPAC4_OFFSET_MATCH2_THRESHOLD 1024
-#define ZXPAC4_OFFSET_MATCH3_THRESHOLD 4096
-#define ZXPAC4_WINDOW_MAX              131072
-#define ZXPAC4_HEADER_SIZE      4
+#define ZXPAC4_INIT_PMR_OFFSET          5 
+#define ZXPAC4_MAX_INIT_PMR_OFFSET      63
+#define ZXPAC4_MATCH_MIN                2
+#define ZXPAC4_MATCH_MAX                65535
+#define ZXPAC4_MATCH_GOOD               63
+#define ZXPAC4_OFFSET_MATCH2_THRESHOLD  1024
+#define ZXPAC4_OFFSET_MATCH3_THRESHOLD  4096
+#define ZXPAC4_WINDOW_MAX               131072
+#define ZXPAC4_HEADER_SIZE              4
 
 /**
  * @class matches utils.h
