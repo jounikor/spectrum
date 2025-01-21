@@ -88,6 +88,7 @@ template <typename Derived> class lz_cost {
     const lz_config* m_lz_config;
 protected:
     int m_max_len;
+    int m_max_bits;
 
     int check_match(const char* s, const char* d, int max) {
         int len = 0;
@@ -99,7 +100,16 @@ public:
     lz_cost(const lz_config* p_cfg):
         m_debug_level(DEBUG_LEVEL_NONE), 
         m_verbose(false),
-        m_lz_config(p_cfg) {}
+        m_lz_config(p_cfg) {
+            m_max_bits = 0;
+            int mask = 1;
+            assert(p_cfg->max_match < 65536);
+
+            while (mask < p_cfg->max_match) {
+                ++m_max_bits;
+                mask = mask * 2 + 1;
+            }
+        }
     virtual ~lz_cost() {}
 
     const lz_config* lz_get_config(void) {

@@ -55,12 +55,11 @@ namespace targets {
                                          There's a separeate data structure, which contains 
                                          default values for each alforithm. */
     
-        int max_match_len;          /**< Match length limit for the target (e.g. to ease decompressor
-                                         implementation on certain arhitectures */
-
+        int max_match;              /**< Maximum match length for this target. 0 mean use algorithm maximum. */
         uint32_t load_addr;         /**< Load address of the binary for a target. 0x0 if not used. */
         uint32_t jump_addr;         /**< Jump address to the binary for a target. 0x0 if not used. */
 
+        int8_t initial_pmr;         /**< Target specific initial PMR offset. 0 use algorithm default. */
         bool overlay:1;             /**< Amiga target specific: use overlay decompressor. */
         bool merge_hunks:1;         /**< Amiga target specific: merge executable file hunks when possible. */
     };

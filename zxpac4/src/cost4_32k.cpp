@@ -1,7 +1,7 @@
 /**
  * @file cost4_32k.cpp
  * @brief Calculates an approximate cost for the LZ encoding.
- * @version 0.2
+ * @version 0.3
  * @author Jouni 'Mr.Spiv' Korhonen
  * @date 7-Apr-2024
  * @date 4-Aug-2024
@@ -110,15 +110,16 @@ int zxpac4_32k_cost::impl_get_offset_tag(int offset, char& byte_tag, int& bit_ta
 int zxpac4_32k_cost::impl_get_length_tag(int length, int& bit_tag)
 {
     assert(length > 0);
-    assert(length < 256);
+    assert(length <= lz_get_config()->max_match);
 
-    int mask_bit = 7;
     int bits = 1;
-    int mask;
+    int mask = 1;
+    int mask_bit = 0;
     bit_tag = 0;
 
-    while ((1 << mask_bit) > length) {
-        mask_bit--;
+    while (mask < length) {
+        ++mask_bit;
+        mask = mask * 2 + 1;
     }
 
     if (mask_bit == 0) {
@@ -135,7 +136,8 @@ int zxpac4_32k_cost::impl_get_length_tag(int length, int& bit_tag)
         mask >>= 1;
     }
 
-    if (mask_bit == 7) {
+    if (mask_bit == m_max_bits) {
+        //std::cerr << ">>>> " << std::hex << bit_tag << ", " << std::dec << bits << std::endl;
         bit_tag >>= 1;
         bits -= 1;
     }
@@ -189,7 +191,13 @@ int zxpac4_32k_cost::impl_get_offset_bits(int offset)
 int zxpac4_32k_cost::impl_get_length_bits(int length)
 {
     assert(length > 0);
-    assert(length < 256);
+    
+    // Maximum match length can be either 255 or 65535
+    if (lz_get_config()->max_match > 255) {
+        assert(length < 65536);
+    } else {
+        assert(length < 256);
+    }
 
     // matchlen cost..
     if (length == 1) {
@@ -207,8 +215,27 @@ int zxpac4_32k_cost::impl_get_length_bits(int length)
     } else if (length < 128) {
         return (7+6);
     }
-    // < 256
-    return (7+7);
+    if (lz_get_config()->max_match < 256) {
+        // < 256
+        return (7+7);
+    } else if (length < 256) {
+        return (8+7);
+    } else if (length < 512) {
+        return (9+8);
+    } else if (length < 1024) {
+        return (10+9);
+    } else if (length < 2048) {
+        return (11+10);
+    } else if (length < 4096) {
+        return (12+11);
+    } else if (length < 8192) {
+        return (13+12);
+    } else if (length < 16384) {
+        return (14+13);
+    } else if (length < 32768) {
+        return (15+14);
+    }
+    return (15+15);
 }
 
 int zxpac4_32k_cost::impl_get_literal_bits(char literal, bool is_ascii)
@@ -336,9 +363,11 @@ int zxpac4_32k_cost::impl_match_cost(int pos, cost* c, const char* buf)
     pmr_offset = p_ctx->pmr_offset;
 
     if (pmr_found == false && pos >= pmr_offset) {
-        n = pos < m_max_len-255 ? 255 : m_max_len - pos;
+        int max_match = lz_get_config()->max_match; 
+
+        n = pos < m_max_len-max_match ? max_match : m_max_len - pos;
         length = check_match(&buf[pos],&buf[pos-pmr_offset],n);
-        assert(length < 256);
+        assert(length <= max_match);
 
         if (length >= 2) {
             new_cost = p_ctx->arrival_cost + tag_cost;

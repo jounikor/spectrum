@@ -85,14 +85,13 @@ static void usage(char *prg, const targets::target* trg) {
     std::cerr << "  --max-chain,-c num    Maximum number of stored matches per position "
               << "(min 1, max " << MAX_CHAIN << ").\n";
     std::cerr << "  --good-match,-g num   Match length that cuts further searches.\n";
-    std::cerr << "  --max-match,-m num    Maximum match length size (default now " << trg->max_match_len << "). (Note, this is an expert\n"
-              << "                        option. You better know what you are doing. Default depends on the\n"
-              << "                        current selected target, where 0 means algorithm default maximum).\n";
+    std::cerr << "  --max-match,-m len    Set maximum match length. Default is an algorithm specific.\n"
+              << "                        (Note, this is an expert option. You better know what you are doing.\n";
     std::cerr << "  --backward,-B num     Number of backward steps after a found match "
               << "(min 0, max " << MAX_BACKWARD_STEPS << ").\n";
     std::cerr << "  --only-better,-b      Further matches in the history must always be better than previous\n"
               << "                        matches for the same position (default no).\n";
-    std::cerr << "  --pmr-offset,-p       Initial PMR offset between 1 and 127 (default depends on the target).\n";
+    std::cerr << "  --pmr-offset,-p       Initial PMR offset between 1 and 63 (default depends on the target).\n";
     std::cerr << "  --reverse-encoded,-r  Reverse the encoded file to allow end-to-start decompression\n"
               << "                        (default no reverse)\n";
     std::cerr << "  --reverse-file,-R     Reverse the input file to allow end-to-start decompression. This \n"
@@ -117,9 +116,10 @@ static targets::target my_targets[] = {
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
-        0,          // use default
+        0,
         0x0,
         0x0,
+        4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
     },
@@ -127,9 +127,10 @@ static targets::target my_targets[] = {
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
-        0,          // use default
+        0,
         0x0,
         0x0,
+        4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
     },
@@ -137,9 +138,10 @@ static targets::target my_targets[] = {
         (1<<16) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4_32K,
-        255,        // 
+        255,
         0x0,
         0x0,
+        4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
     },
@@ -147,9 +149,10 @@ static targets::target my_targets[] = {
         (1<<16) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4_32K,
-        255,        //
+        255,
         0x0,
         0x0,
+        4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
     },
@@ -157,9 +160,10 @@ static targets::target my_targets[] = {
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
-        65535,      //
+        0,
         0x0,        // load address
         0x0,        // jump address
+        4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
     }   
@@ -352,6 +356,7 @@ int main(int argc, char** argv)
 
     // target specific default algo
     cfg_algo = trg->algorithm;
+    cfg_initial_pmr_offset = trg->initial_pmr;
     optind = 2;
 
     // 
@@ -399,7 +404,7 @@ int main(int argc, char** argv)
                 break;
             case 'p':   // --pmr-offset
                 cfg_initial_pmr_offset = std::strtoul(optarg,&endptr,10);
-                if (*endptr != '\0' || cfg_initial_pmr_offset > 127 || cfg_initial_pmr_offset < 1) {
+                if (*endptr != '\0' || cfg_initial_pmr_offset > 63 || cfg_initial_pmr_offset < 1) {
                     std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
                     usage(argv[0],trg);
                 }
@@ -411,7 +416,7 @@ int main(int argc, char** argv)
                     usage(argv[0],trg);
                 }
                 break;
-            case 'm':   // --max-match
+            case 'm':   // --large-max-match
                 cfg_max_match = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_max_match < 2) {
                     std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
@@ -471,7 +476,7 @@ int main(int argc, char** argv)
     if (cfg_backward_steps > -1) {
         cfg.backward_steps = cfg_backward_steps;
     }
-    if (cfg_initial_pmr_offset > -1) {
+    if (cfg_initial_pmr_offset > 0) {
         cfg.initial_pmr_offset = cfg_initial_pmr_offset;
     }
     if (cfg_max_chain > -1) {
@@ -483,7 +488,24 @@ int main(int argc, char** argv)
             std::cout << "**Warning: absolute address decompression overrides overlay\n";
         }
     }
-
+    if (trg->max_match > 0) {
+        if (cfg_max_match > trg->max_match || cfg_max_match < 0) {
+            cfg_max_match = trg->max_match;
+            if (cfg_verbose_on) {
+                std::cout << "**Warning: maximum match too big. Truncating to " << cfg_max_match << "\n";
+            }
+        }
+    }
+    if (cfg_max_match > cfg.max_match) {
+        cfg_max_match = cfg.max_match;
+        if (cfg_verbose_on) {
+            std::cout << "**Warning: maximum match too big. Truncating to " << cfg_max_match << "\n";
+        }
+    }
+    if (cfg_max_match > 0) {
+        cfg.max_match = cfg_max_match;
+    }
+    
     // We do not check for all possible dump combinations..
     cfg.preshift_last_ascii_literal = cfg_preshift;
     cfg.only_better_matches = cfg_only_better_matches;
@@ -495,15 +517,6 @@ int main(int argc, char** argv)
     trg->jump_addr = trg_jump_addr;
     cfg.verbose = cfg_verbose_on;
     cfg.debug_level = cfg_debug_level;
-
-    // check maximum match length adjustments..
-    if (cfg_max_match != -1) {
-        if (trg->max_match_len > 0 && cfg_max_match > trg->max_match_len) {
-            cfg.max_match = trg->max_match_len;
-        } else if (!(trg->max_match_len == 0 && cfg_max_match > cfg.max_match)) {
-            cfg.max_match = cfg_max_match;
-        }
-    }
 
     // The following stuff is horrible.. Needs to be hidden under
     // multiple functions to avoid recurring cleanup due initialization

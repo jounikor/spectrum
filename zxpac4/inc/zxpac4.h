@@ -83,7 +83,7 @@
 
 #define ZXPAC4_INIT_PMR_OFFSET         5 
 #define ZXPAC4_MATCH_MIN               2
-#define ZXPAC4_MATCH_MAX               255
+#define ZXPAC4_MATCH_MAX               65535
 #define ZXPAC4_MATCH_GOOD              63
 #define ZXPAC4_OFFSET_MATCH2_THRESHOLD 1024
 #define ZXPAC4_OFFSET_MATCH3_THRESHOLD 4096
