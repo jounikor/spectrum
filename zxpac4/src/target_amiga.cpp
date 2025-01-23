@@ -262,12 +262,19 @@ int target_amiga::save_header_abs(const char* buf, int len)
     (void)buf;
     (void)len;
 
+    const decompressor* dec;
     int n;
     char* hdr;
     char* ptr;
     
+    if (m_cfg->max_match < 256) {
+        dec = &abs_decompressors_255[m_cfg->algorithm];
+    } else {
+        dec = &abs_decompressors[m_cfg->algorithm];
+    }
+
     hdr = new (std::nothrow) char[sizeof(uint32_t) * (5 + 1 + 2)
-          + abs_decompressors[m_cfg->algorithm].length]; 
+          + dec->length]; 
     
     if (hdr == NULL) {
         std::cerr << ERR_PREAMBLE << "memory allocation failed" << std::endl;
@@ -288,8 +295,8 @@ int target_amiga::save_header_abs(const char* buf, int len)
     ptr = write32be(ptr,0xdeadbeef);        // Offset 28 needs patching
     
     // Write the decompressor..
-    for (n = 0; n < abs_decompressors[m_cfg->algorithm].length; n++) {
-        *ptr++ = abs_decompressors[m_cfg->algorithm].code[n];
+    for (n = 0; n < dec->length; n++) {
+        *ptr++ = dec->code[n];
     }
 
     // write it to the file
@@ -319,15 +326,22 @@ int target_amiga::save_header_exe(const char* buf, int len)
     (void)buf;
     (void)len;
 
+    const decompressor* dec;
     int n;
     int num_seg;
     char* hdr;
     char* ptr;
     
+    if (m_cfg->max_match < 256) {
+        dec = &exe_decompressors_255[m_cfg->algorithm];
+    } else {
+        dec = &exe_decompressors[m_cfg->algorithm];
+    }
+
     num_seg = m_new_hunks.size() / 3;     // See src/hunk.cpp for content of the aux data 
     assert(m_new_hunks.size() % 3 == 0);
     hdr = new (std::nothrow) char[sizeof(uint32_t) * (5 + num_seg + 10
-        + (3 * num_seg)) + exe_decompressors[m_cfg->algorithm].length + 4]; 
+        + (3 * num_seg)) + dec->length + 4]; 
     
     if (hdr == NULL) {
         std::cerr << ERR_PREAMBLE << "memory allocation failed" << std::endl;
@@ -385,8 +399,8 @@ int target_amiga::save_header_exe(const char* buf, int len)
     ptr = write32be(ptr,0);
 
     // Write the decompressor..
-    for (n = 0; n < exe_decompressors[m_cfg->algorithm].length; n++) {
-        *ptr++ = exe_decompressors[m_cfg->algorithm].code[n];
+    for (n = 0; n < dec->length; n++) {
+        *ptr++ = dec->code[n];
     }
 
     // write it to the file
@@ -489,8 +503,6 @@ int target_amiga::post_save_abs(int len)
     m_ofs.write(tmp,4);
 
     // Patch the decompressor with the original byte size..
-    std::cerr << original_len << ", " << std::hex << original_len << std::endl;
-
     write32be(tmp,original_len,false);
     m_ofs.seekp(32+12,std::ios_base::beg);
     m_ofs.write(tmp,4);

@@ -125,7 +125,7 @@ int hash3::impl_find_matches(const char *buf, int pos, int len, bool only_better
             m_mtch[found].offset = pos-next;
             ++found;
 
-            if (length >= m_good_match || length == m_max_match) {
+            if (length >= m_good_match || length >= m_max_match - 1) {
                 break;
             }
         }
@@ -137,7 +137,6 @@ next_in_chain:
         next = m_next[next % m_mask];
 #endif // WINDOW_IS_POWER_OF_TWO
     }
-
     // Update the hash chain with the current position..
 #ifdef WINDOW_IS_POWER_OF_TWO
     m_next[pos & m_mask] = m_head[head];

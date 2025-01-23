@@ -85,6 +85,10 @@ int zxpac4::lz_search_matches(char* buf, int len, int interval)
         num = m_lz.find_matches(buf,pos,len-pos,m_lz_config->only_better_matches);
         m_cost_array[pos].num_matches = num;
 
+        // *TODO* add here a check if the match is close to maximum then
+        //        just stop searching and fill match length worth of the cost array
+        //        manually..
+
         if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
             std::cerr << std::setw(10) << std::dec << std::setfill(' ') << pos << ": '"
                 << (std::isprint(buf[pos]) ? buf[pos] : ' ')
