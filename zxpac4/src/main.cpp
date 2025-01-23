@@ -30,6 +30,8 @@
 #include "hunk.h"
 #include "target.h"
 
+#include "version.h"
+
 // Constants for LZ stuff
 //
 //
@@ -74,6 +76,7 @@ static struct option longopts[] = {
 };
 
 static void usage(char *prg, const targets::target* trg) {
+    std::cerr << "ZXPAC4 v" << ZXPAC4_MAJOR << "." << ZXPAC4_MINOR << " (c) 2022-24 Jouni 'Mr.Spiv' Korhonen\n\n";
     std::cerr << "Usage: " << prg << " target [options] infile [outfile]\n";
 	std::cerr << " Targets:\n";
     std::cerr << "  bin - Binary data file\n"
@@ -85,7 +88,7 @@ static void usage(char *prg, const targets::target* trg) {
     std::cerr << "  --max-chain,-c num    Maximum number of stored matches per position "
               << "(min 1, max " << MAX_CHAIN << ").\n";
     std::cerr << "  --good-match,-g num   Match length that cuts further searches.\n";
-    std::cerr << "  --max-match,-m len    Set maximum match length. Default is an algorithm specific.\n"
+    std::cerr << "  --max-match,-m len    Set teh maximum match length. Default is an algorithm specific.\n"
               << "                        (Note, this is an expert option. You better know what you are doing.\n";
     std::cerr << "  --backward,-B num     Number of backward steps after a found match "
               << "(min 0, max " << MAX_BACKWARD_STEPS << ").\n";
@@ -97,7 +100,7 @@ static void usage(char *prg, const targets::target* trg) {
     std::cerr << "  --reverse-file,-R     Reverse the input file to allow end-to-start decompression. This \n"
               << "                        setting will enable '--reverse-encoded' as well (default no reverse)\n";
     std::cerr << "  --algo,-a             Select used algorithm (0=zxpac4, 1=xzpac4b, 2=zxpac4_32k). \n"
-              << "                        (default depends on the target)\n";
+              << "                        (default depends on the target).\n";
     std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --merge-hunks,-M      Merge hunks (Amiga target).\n";
@@ -158,7 +161,7 @@ static targets::target my_targets[] = {
     },
     {   "ami",
         (1<<24) - 1,
-        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
+        1<<ZXPAC4 | 1<<ZXPAC4_32K,
         ZXPAC4,
         0,
         0x0,        // load address

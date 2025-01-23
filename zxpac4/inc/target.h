@@ -140,6 +140,8 @@ private:
     std::vector<uint32_t> m_new_hunks; 
     static const targets::decompressor exe_decompressors[]; 
     static const targets::decompressor abs_decompressors[]; 
+    static const targets::decompressor exe_decompressors_255[]; 
+    static const targets::decompressor abs_decompressors_255[]; 
     static const targets::decompressor overlay_decompressors[]; 
 
     int preprocess_exe(char* buf, int len);

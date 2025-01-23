@@ -1,3 +1,4 @@
+;APS00000018000000180000001800000018000000180000001800000018000000180000001800000018
 ;
 ; @file zxpac4_abs.asm
 ; @brief Absolute address exe file decompressor for ZXPAC4
@@ -6,6 +7,7 @@
 ; @copyright The Unlicense
 ; 
 ; 20250111 0.1 - Initial version
+; 20250122 0.2 - Added 65535 bytes max match
 ;
 ; Note:
 ;  - Reversed file
@@ -42,16 +44,19 @@ __MIN_KICK_VERSION  equ     37
 ; @note Trashes d0-d3/d6-d7/a0/a2-a4
 ;
 
-start:	lea	    $deadbeef,a0	; destination
-        lea     compressed_data(pc),a2
-        add.l   #$a5adc0de,a2	; Compressed size
-	;
+
+start:	lea	$00000000.l,a0	; destination
+        lea	compressed_data(pc),a2
+        add.l	#$00000000,a2	; Compressed size
+	    ;
         moveq   #$7f,d7
-        move.l	-(a2),d6
-        and.b   d6,d7
-        lsr.w   #8,d6
-        swap    d6
-        ror.w   #8,d6
+        and.b	-(a2),d7
+        moveq	#0,d6
+        move.b	-(a2),d6
+        lsl.w	#8,d6
+        move.b	-(a2),d6
+        lsl.l	#8,d6
+        move.b	-(a2),d6
         lea     0(a0,d6.l),a3
         moveq   #-128,d6
         bra.b   tag_literal
@@ -85,12 +90,12 @@ get_offset_tag_loop:
         addq.w  #1,d1
         GETBIT
         dbcc    d2,get_offset_tag_loop
-	bcc.b	get_offset_tag_term
-	addq.w	#1,d1
+        bcc.b	get_offset_tag_term
+        addq.w	#1,d1
 get_offset_tag_term:
         GETBIT
-	roxl.w	#1,d1
-	beq.b   get_offset_done
+        roxl.w	#1,d1
+        beq.b   get_offset_done
 get_offset_bits_loop:
         GETBIT
         addx.l  d0,d0
@@ -106,7 +111,11 @@ tag_pmr_matchlen:
         ; D1 = -1 if a PMR
         ;
         moveq   #1,d2
+    IFD LARGE_MAX_MATCH
+        moveq   #15-1,d3
+    ELSE
         moveq   #7-1,d3
+    ENDIF
 get_matchlen_loop:
         GETBIT
         bcc.b   get_matchlen_exit
@@ -135,9 +144,9 @@ tag_literal:
         move.l	$4.w,a6
         cmp.w   #__MIN_KICK_VERSION,__LIB_VERSION(a6)
         blo.b   too_old_kick
-        jsr     __LVOCacheClearU(a6)
+        jsr	__LVOCacheClearU(a6)
 too_old_kick:
-        jmp     $c0dedbad	; jump address
+        jmp     $00000000.l	; jump address
 
 compressed_data:
 compressed_data_end:

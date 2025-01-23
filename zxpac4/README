@@ -201,15 +201,15 @@ Some notes on the supported algorithms:
  Elias-Gamma codes and length bits are interleaved in pairs. See below how
  match lengths are encoded.
  Matchlen:
-  0       + [0] = 1                     // 0
-  10      + [1] = 2 -> 3                // 1n0
-  110     + [2] = 4 -> 7                // 1n1n0
-  1110    + [3] = 8 -> 15               // 1n1n1n0
-  11110   + [4] = 16 -> 31              // 1n1n1n1n0
-  111110  + [5] = 32 -> 64              // 1n1n1n1n1n0
-  1111110 + [6] = 64 -> 127             // 1n1n1n1n1n1n0
+  0               + [0] = 1                 // 0
+  10              + [1] = 2 -> 3            // 1n0
+  110             + [2] = 4 -> 7            // 1n1n0
+  1110            + [3] = 8 -> 15           // 1n1n1n0
+  11110           + [4] = 16 -> 31          // 1n1n1n1n0
+  111110          + [5] = 32 -> 64          // 1n1n1n1n1n0
+  1111110         + [6] = 64 -> 127         // 1n1n1n1n1n1n0
   If maximum matclengh is 255
-  1111111 + [7] = 128 -> 255            // 1n1n1n1n1n1n1n
+  1111111         + [7] = 128 -> 255        // 1n1n1n1n1n1n1n
   If maxmimum matchlengh is 65535
   11111110        + [7]  = 128 -> 255       // 1n1n1n1n1n1n1n0
   111111110       + [8]  = 256 -> 511       // 1n1n1n1n1n1n1n1n0

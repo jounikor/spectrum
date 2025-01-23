@@ -9,6 +9,7 @@
 ; 20250109 0.1 - Initial version.
 ; 20250109 0.2 - Fixed offset decoding bug.
 ; 20250111 0.3 - Added security length.
+; 20250122 0.4 - Added 65535 bytes max match
 ;
 ; Note:
 ;  - Reversed file
@@ -33,8 +34,7 @@ __LVOCacheClearU    equ     -636
 __LIB_VERSION       equ     20
 
 
-SECURITY_LENGTH	equ	8
-
+SECURITY_LENGTH	    equ	    8
 
 ; The compressed size of the file is in the 4 first bytes
 file_size:
@@ -62,14 +62,16 @@ exe:
 	;
 	;
 start:  moveq   #$7f,d7
-        move.l	-(a2),d6
-        and.b   d6,d7
-        lsr.w   #8,d6
-        swap    d6
-        ror.w   #8,d6
+        and.b	-(a2),d7
+        moveq	#0,d6
+        move.b	-(a2),d6
+        lsl.w	#8,d6
+        move.b	-(a2),d6
+        lsl.l	#8,d6
+        move.b	-(a2),d6
         addq.l	#SECURITY_LENGTH,a0
-	move.l	a0,a3
-	add.l	d6,a3
+        move.l	a0,a3
+        add.l	d6,a3
         moveq   #-128,d6
         bra.b   tag_literal
         ;
@@ -102,12 +104,12 @@ get_offset_tag_loop:
         addq.w  #1,d1
         GETBIT
         dbcc    d2,get_offset_tag_loop
-	bcc.b	get_offset_tag_term
-	addq.w	#1,d1
+        bcc.b	get_offset_tag_term
+        addq.w	#1,d1
 get_offset_tag_term:
         GETBIT
-	roxl.w	#1,d1
-	beq.b   get_offset_done
+        roxl.w	#1,d1
+        beq.b   get_offset_done
 get_offset_bits_loop:
         GETBIT
         addx.l  d0,d0
@@ -123,7 +125,11 @@ tag_pmr_matchlen:
         ; D1 = -1 if a PMR
         ;
         moveq   #1,d2
+    IFD LARGE_MAX_MATCH
+    	moveq	#15-1,d3
+    ELSE
         moveq   #7-1,d3
+    ENDIF
 get_matchlen_loop:
         GETBIT
         bcc.b   get_matchlen_exit
@@ -162,7 +168,7 @@ reloc_main_or_bss_hunk:
 code_or_data_hunk:
         swap    d0
         move.w  (a3)+,d0
-	lsl.l	#2,d0
+        lsl.l	#2,d0
         lea     4(a1),a4
 copy_code_or_data:
         move.l  (a3)+,(a4)+
@@ -187,7 +193,7 @@ reloc_first_start:
         move.l  a0,d1
         move.w  (a3)+,d0
         bsr.b   get_segment_address
-	moveq	#0,d3
+        moveq	#0,d3
         ;
         ; D1 = destination hunk address
         ; D3 = base for delta relocs
@@ -197,10 +203,10 @@ reloc_first_start:
 reloc_loop:
         moveq   #0,d0
 reloc_delta:
-	lsl.l	#7,d0
+        lsl.l	#7,d0
         move.b  (a3)+,d2
         beq.b   reloc_check_alignment
-	bclr	#7,d2
+        bclr	#7,d2
         beq.b   delta_done
        	or.b  	d2,d0
         bra.b   reloc_delta
@@ -231,8 +237,8 @@ get_segment_address:
         subq.l  #4,a0
 
 get_segment_loop:
-	subq.w	#1,d0
-	beq.b	segment_found
+        subq.w	#1,d0
+        beq.b	segment_found
         move.l  (a0),a0
         add.l   a0,a0
         add.l   a0,a0

@@ -1,0 +1,7 @@
+#ifndef _VERSION_H_INCLUDED
+#define _VERSION_H_INCLUDED
+
+#define ZXPAC4_MAJOR 0
+#define ZXPAC4_MINOR 1
+
+#endif  // _VERSION_H_INCLUDED

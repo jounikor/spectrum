@@ -21,9 +21,13 @@ using namespace targets;
 
 // First 4 bytes is always reserved for the final compressed size of the file
 #include "../m68k/zxpac4_exe.h"
-#include "../m68k/zxpac4_32k_exe.h"
+#include "../m68k/zxpac4_exe_255.h"
+#include "../m68k/zxpac4_exe_32k.h"
+#include "../m68k/zxpac4_exe_255_32k.h"
 #include "../m68k/zxpac4_abs.h"
-#include "../m68k/zxpac4_32k_abs.h"
+#include "../m68k/zxpac4_abs_255.h"
+#include "../m68k/zxpac4_abs_32k.h"
+#include "../m68k/zxpac4_abs_255_32k.h"
 
 // Length must be even
 decompressor const target_amiga::exe_decompressors[] = { 
@@ -32,27 +36,55 @@ decompressor const target_amiga::exe_decompressors[] = {
         zxpac4_exe_bin,
     },
     {
-        sizeof(zxpac4_32k_exe_bin),
-        zxpac4_32k_exe_bin,
+        32,
+        NULL,   // This is still missing..
+    },
+    {
+        sizeof(zxpac4_exe_32k_bin),
+        zxpac4_exe_32k_bin,
+    },
+};
+decompressor const target_amiga::exe_decompressors_255[] = { 
+    {
+        sizeof(zxpac4_exe_255_bin),
+        zxpac4_exe_255_bin,
     },
     {
         32,
         NULL,   // This is still missing..
-    }
+    },
+    {
+        sizeof(zxpac4_exe_255_32k_bin),
+        zxpac4_exe_255_32k_bin,
+    },
 };
-
 const decompressor target_amiga::abs_decompressors[] = { 
     {
         sizeof(zxpac4_abs_bin),
         zxpac4_abs_bin,
     },
     {
-        sizeof(zxpac4_32k_abs_bin),
-        zxpac4_32k_abs_bin,
+        sizeof(zxpac4_abs_32k_bin),
+        zxpac4_abs_32k_bin,
     },
     {
         32,
-        NULL,   // This is still missing..
+        NULL,   // this is still missing..
+    }
+};
+
+const decompressor target_amiga::abs_decompressors_255[] = { 
+    {
+        sizeof(zxpac4_abs_255_bin),
+        zxpac4_abs_255_bin,
+    },
+    {
+        sizeof(zxpac4_abs_255_32k_bin),
+        zxpac4_abs_255_32k_bin,
+    },
+    {
+        32,
+        NULL,   // this is still missing..
     }
 };
 
@@ -62,8 +94,8 @@ const decompressor target_amiga::overlay_decompressors[] = {
         zxpac4_exe_bin,
     },
     {
-        sizeof(zxpac4_32k_exe_bin),
-        zxpac4_32k_exe_bin,
+        sizeof(zxpac4_exe_32k_bin),
+        zxpac4_exe_32k_bin,
     },
     {
         32,
@@ -470,7 +502,7 @@ int target_amiga::post_save_abs(int len)
 
     // Patch jump address
     write32be(tmp,m_trg->jump_addr,false);
-    m_ofs.seekp(32+180,std::ios_base::beg);
+    m_ofs.seekp(32+184,std::ios_base::beg);
     m_ofs.write(tmp,4);
 
     // Seek to the end end and return the final byte size

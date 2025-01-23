@@ -2,7 +2,7 @@
  * @file zxpac4_32k.h
  * @brief ZX Pac v4 with 32K window class definitions
  * @author Jouni 'Mr.SpivKorhonen
- * @version 0.1
+ * @version 0.2
  * @date fall 2024
  * @copyright The Unlicense
  *
@@ -41,25 +41,36 @@
           Where matchlen + 1 is the final length
 
  matchlen:
-  0       + [0] = 1                     // 0
-  10      + [1] = 2 -> 3                // 1n0
-  110     + [2] = 4 -> 7                // 1n1n0
-  1110    + [3] = 8 -> 15               // 1n1n1n0
-  11110   + [4] = 16 -> 31              // 1n1n1n1n0
-  111110  + [5] = 32 -> 64              // 1n1n1n1n1n0
-  1111110 + [6] = 64 -> 127             // 1n1n1n1n1n1n0
-  1111111 + [7] = 128 -> 255            // 1n1n1n1n1n1n1n
+  0               + [0] = 1                 // 0
+  10              + [1] = 2 -> 3            // 1n0
+  110             + [2] = 4 -> 7            // 1n1n0
+  1110            + [3] = 8 -> 15           // 1n1n1n0
+  11110           + [4] = 16 -> 31          // 1n1n1n1n0
+  111110          + [5] = 32 -> 64          // 1n1n1n1n1n0
+  1111110         + [6] = 64 -> 127         // 1n1n1n1n1n1n0
+  If maximum matclengh is 255
+  1111111         + [7] = 128 -> 255        // 1n1n1n1n1n1n1n
+  If maxmimum matchlengh is 65535
+  11111110        + [7]  = 128 -> 255       // 1n1n1n1n1n1n1n0
+  111111110       + [8]  = 256 -> 511       // 1n1n1n1n1n1n1n1n0
+  1111111110      + [9] = 512 -> 1023       // 1n1n1n1n1n1n1n1n1n0
+  11111111110     + [10] = 1024 -> 2047     // 1n1n1n1n1n1n1n1n1n1n0
+  111111111110    + [11] = 2048 -> 4095     // 1n1n1n1n1n1n1n1n1n1n1n0
+  1111111111110   + [12] = 4096 -> 8191     // 1n1n1n1n1n1n1n1n1n1n1n1n0
+  11111111111110  + [13] = 8192 -> 16383    // 1n1n1n1n1n1n1n1n1n1n1n1n1n0
+  111111111111110 + [14] = 16384 -> 32767   // 1n1n1n1n1n1n1n1n1n1n1n1n1n1n0
+  111111111111111 + [15] = 32768 -> 65535   // 1n1n1n1n1n1n1n1n1n1n1n1n1n1n1n
 
  offset
-  0       + [0]  = 1 -> 127             // 0+nnnnnnn                    8
-  100     + [0]  = 128 -> 255           // 1+nnnnnnn+00                 10
-  101     + [1]  = 256 -> 511           // 1+nnnnnnn+01+n               11
-  1100    + [2]  = 512 -> 1023          // 1+nnnnnnn+100+nn             13
-  1101    + [3]  = 1024 -> 2047         // 1+nnnnnnn+101+nnn            14
-  11100   + [4]  = 2048 -> 4095         // 1+nnnnnnn+1100+nnnn          16
-  11101   + [5]  = 4096 -> 8191         // 1+nnnnnnn+1101+nnnnn         17
-  11110   + [6]  = 8192 -> 16383        // 1+nnnnnnn+11100+nnnnnn       19
-  11111   + [7]  = 16384 -> 32767       // 1+nnnnnnn+11101+nnnnnnn      20
+  0       + [0]  = 1 -> 127                 // 0+nnnnnnn                    8
+  100     + [0]  = 128 -> 255               // 1+nnnnnnn+00                 10
+  101     + [1]  = 256 -> 511               // 1+nnnnnnn+01+n               11
+  1100    + [2]  = 512 -> 1023              // 1+nnnnnnn+100+nn             13
+  1101    + [3]  = 1024 -> 2047             // 1+nnnnnnn+101+nnn            14
+  11100   + [4]  = 2048 -> 4095             // 1+nnnnnnn+1100+nnnn          16
+  11101   + [5]  = 4096 -> 8191             // 1+nnnnnnn+1101+nnnnn         17
+  11110   + [6]  = 8192 -> 16383            // 1+nnnnnnn+11100+nnnnnn       19
+  11111   + [7]  = 16384 -> 32767           // 1+nnnnnnn+11101+nnnnnnn      20
 
   0+nnnnnnnn                        8
   1+nnnnnnnn + 0                    9
@@ -73,20 +84,18 @@
   1+nnnnnnnn + 1n1n1n1n1n1n1n1n0    25
   1+nnnnnnnn + 1n1n1n1n1n1n1n1n1n0  27
 
-
-
 @endverbatim
 
 */
 
-#define ZXPAC4_32K_INIT_PMR_OFFSET         5 
-#define ZXPAC4_32K_MATCH_MIN               2
-#define ZXPAC4_32K_MATCH_MAX               255
-#define ZXPAC4_32K_MATCH_GOOD              63
-#define ZXPAC4_32K_OFFSET_MATCH2_THRESHOLD 1024
-#define ZXPAC4_32K_OFFSET_MATCH3_THRESHOLD 4096
-#define ZXPAC4_32K_WINDOW_MAX              32768
-#define ZXPAC4_32K_HEADER_SIZE      4
+#define ZXPAC4_32K_INIT_PMR_OFFSET          5 
+#define ZXPAC4_32K_MATCH_MIN                2
+#define ZXPAC4_32K_MATCH_MAX                65535
+#define ZXPAC4_32K_MATCH_GOOD               63
+#define ZXPAC4_32K_OFFSET_MATCH2_THRESHOLD  1024
+#define ZXPAC4_32K_OFFSET_MATCH3_THRESHOLD  4096
+#define ZXPAC4_32K_WINDOW_MAX               32768
+#define ZXPAC4_32K_HEADER_SIZE              4
 
 /**
  * @class matches utils.h
