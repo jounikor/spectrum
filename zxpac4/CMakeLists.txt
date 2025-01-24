@@ -69,6 +69,7 @@ set(COMMON_SRC  src/cost4.cpp
                 inc/hash.h
                 inc/hunk.h
                 inc/target.h
+                inc/version.h
 )
 
 add_executable(${TARGET} ${COMMON_SRC})

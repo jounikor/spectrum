@@ -19,7 +19,7 @@
 using namespace amiga_hunks;
 using namespace targets;
 
-// First 4 bytes is always reserved for the final compressed size of the file
+// These include files are generated
 #include "../m68k/zxpac4_exe.h"
 #include "../m68k/zxpac4_exe_255.h"
 #include "../m68k/zxpac4_exe_32k.h"
@@ -44,6 +44,7 @@ decompressor const target_amiga::exe_decompressors[] = {
         zxpac4_exe_32k_bin,
     },
 };
+
 decompressor const target_amiga::exe_decompressors_255[] = { 
     {
         sizeof(zxpac4_exe_255_bin),
@@ -58,6 +59,7 @@ decompressor const target_amiga::exe_decompressors_255[] = {
         zxpac4_exe_255_32k_bin,
     },
 };
+
 const decompressor target_amiga::abs_decompressors[] = { 
     {
         sizeof(zxpac4_abs_bin),
@@ -181,9 +183,12 @@ int target_amiga::preprocess_exe(char* buf, int len)
             memory_len = n + exe_decompressors[m_cfg->algorithm].length + AMIGA_EXE_SECURITY_DISTANCE;
 
             // Fabricate a new hunk and insert the size of the compressed data
-            m_new_hunks.push_back((memory_len+3) >> 2);
-            m_new_hunks.push_back(0xdeadbeef);
-            m_new_hunks.push_back(0xc0dedbad);
+            new_hunk_info_t new_seg = {
+                .mem_size_typed_longs = static_cast<uint32_t>((memory_len+3) >> 2),
+                0xdeadbeef,
+                0xc0dedbad
+            };
+            m_new_hunks.push_back(new_seg);
         }
         
         delete[] amiga_exe;
@@ -199,6 +204,7 @@ int target_amiga::preprocess_overlay(char* buf, int len)
     char* amiga_exe = NULL;
     int m, n, memory_len;
     int num_code_hunks = 0;
+    new_hunk_info_t new_seg;
 
     n = amiga_hunks::parse_hunks(buf,len,hunk_list,debug_on);
     
@@ -217,8 +223,9 @@ int target_amiga::preprocess_overlay(char* buf, int len)
        goto overlay_error;
     }
     
-    for (m = 0; m < static_cast<int>(m_new_hunks.size()); m += 3) {
-        if (m_new_hunks[m + 1] != HUNK_BSS) {
+    for (m = 0; m < static_cast<int>(m_new_hunks.size()); m++) {
+        //if (m_new_hunks[m + 1] != HUNK_BSS) {
+        if (m_new_hunks[m].hunk_type != HUNK_BSS) {
             if (++num_code_hunks > 1) {
                 std::cerr << ERR_PREAMBLE << "only single code/data hunk allowed";
                 goto overlay_error;
@@ -231,9 +238,12 @@ int target_amiga::preprocess_overlay(char* buf, int len)
     memory_len = overlay_decompressors[m_cfg->algorithm].length + AMIGA_OVERLAY_BUFFER_SIZE;
 
     // Fabricate a new hunk and insert the size of the compressed data
-    m_new_hunks.push_back((memory_len+3) >> 2);
-    m_new_hunks.push_back(0xdeadbeef);
-    m_new_hunks.push_back(0xc0dedbad);
+    new_seg = {
+        .mem_size_typed_longs = static_cast<uint32_t>((memory_len+3) >> 2),
+        0xdeadbeef,
+        0xc0dedbad
+    };
+    m_new_hunks.push_back(new_seg);
 
 overlay_error:
     delete[] amiga_exe;
@@ -338,8 +348,7 @@ int target_amiga::save_header_exe(const char* buf, int len)
         dec = &exe_decompressors[m_cfg->algorithm];
     }
 
-    num_seg = m_new_hunks.size() / 3;     // See src/hunk.cpp for content of the aux data 
-    assert(m_new_hunks.size() % 3 == 0);
+    num_seg = m_new_hunks.size();           // See src/hunk.cpp for content of the aux data 
     hdr = new (std::nothrow) char[sizeof(uint32_t) * (5 + num_seg + 10
         + (3 * num_seg)) + dec->length + 4]; 
     
@@ -355,11 +364,11 @@ int target_amiga::save_header_exe(const char* buf, int len)
     ptr = write32be(ptr,num_seg-1);
 
     for (n = 0; n < num_seg; n++) {
-        ptr = write32be(ptr,m_new_hunks[3*n]);    
+        ptr = write32be(ptr,m_new_hunks[n].mem_size_typed_longs);
     }
     
     // First hunk is always HUNK_CODE with 6 bytes of payload for a JSR
-    ptr = write32be(ptr,m_new_hunks[3*0 + 1]);
+    ptr = write32be(ptr,m_new_hunks[0].hunk_type);
     ptr = write32be(ptr,2);    
     
     // JSR 0x00000000   b0100111010111001
@@ -378,12 +387,12 @@ int target_amiga::save_header_exe(const char* buf, int len)
     
     // Write rest of the hunks minus the last (with compressed data) with data size of 0..
     for (n = 1; n < num_seg-1; n++) {
-        uint32_t hunk = m_new_hunks[3*n + 1];
+        uint32_t hunk = m_new_hunks[n].hunk_type;
 
         ptr = write32be(ptr,hunk);
         
         if (hunk == HUNK_BSS) {
-            ptr = write32be(ptr,m_new_hunks[3*n] & 0x3fffffff);
+            ptr = write32be(ptr,m_new_hunks[n].mem_size_typed_longs & 0x3fffffff);
         } else {
             ptr = write32be(ptr,0x00000000);
         }
@@ -395,7 +404,7 @@ int target_amiga::save_header_exe(const char* buf, int len)
     
     // record the location for patching the data size.. for now put 0 there.
     n = ptr - hdr;
-    m_new_hunks[num_seg*3 - 1] = n;
+    m_new_hunks[(num_seg - 1)].data_size_longs = n;
     ptr = write32be(ptr,0);
 
     // Write the decompressor..
@@ -454,7 +463,7 @@ int target_amiga::post_save_exe(int len)
 
     // Patch the HUNK_CODE size with the compressed data size in words..
     n = m_new_hunks.size();
-    m_ofs.seekp(m_new_hunks[n-1],std::ios_base::beg);
+    m_ofs.seekp(m_new_hunks[n-1].data_size_longs,std::ios_base::beg);
     write32be(tmp,len>>2,false);
     m_ofs.write(tmp,4);
 

@@ -20,7 +20,7 @@
 #include <cassert>
 #include <stdint.h>
 
-
+//////////////////////////////////////////////////////////////////////////////
 
 #define HUNK_UNIT	        0x3E7       // error
 #define FIRST_SUPPORTED_HUNK    HUNK_UNIT
@@ -65,19 +65,13 @@
 
 
 /*
- 
  Hunk merger/optimizer 
   - merge hunks whenever possible into larger one
   - sort relocs
   - apply reloc32short when possible
   - remove NAME/DEBUG/SYMBOL hunks
   - do not support Advisory hunk flag -> error
-
-
-
-
  */
-
 
 
 namespace amiga_hunks {
@@ -112,9 +106,9 @@ uint32_t read32be(char*& ptr, bool inc=true);
     char* write16be(char* ptr, uint16_t v, bool inc=true);
     int parse_hunks(char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool debug=false);
     int merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list, char*& new_exe,
-        std::vector<uint32_t>* new_segments, bool debug=false);
+        std::vector<new_hunk_info_t>* new_segments, bool debug=false);
     int optimize_hunks(char* exe, int len, const std::vector<hunk_info_t>& hunk_list, char*& new_exe,
-        std::vector<uint32_t>* new_segments, bool debug=false);
+        std::vector<new_hunk_info_t>* new_segments, bool debug=false);
 };
 
 #define TDEBUG(x) {if (debug) {x}}

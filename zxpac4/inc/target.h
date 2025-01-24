@@ -19,6 +19,7 @@
 
 #include "lz_util.h"
 #include "lz_base.h"
+#include "hunk.h"
 
 #define AMIGA_EXE_SECURITY_DISTANCE     8
 #define AMIGA_OVERLAY_BUFFER_SIZE       2048
@@ -137,7 +138,7 @@ public:
 
 class target_amiga : public target_base {
 private:
-    std::vector<uint32_t> m_new_hunks; 
+    std::vector<amiga_hunks::new_hunk_info_t> m_new_hunks; 
     static const targets::decompressor exe_decompressors[]; 
     static const targets::decompressor abs_decompressors[]; 
     static const targets::decompressor exe_decompressors_255[]; 

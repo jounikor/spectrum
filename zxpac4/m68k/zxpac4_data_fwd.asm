@@ -1,16 +1,14 @@
-;APS00000019000000190000001900000019000000190000001900000019000000190000001900000019
+;APS0000001D0000001D0000001D0000001D0000001D0000001D0000001D0000001D0000001D0000001D
 ;
-; @file zxpac4_data.asm
-; @brief Data file decompressor for ZXPAC4
-;        Decompression from the higher to the lower memory.
+; @file zxpac4_data_fwd.asm
+; @brief Forward data file decompressor for ZXPAC4.
+;        Decompression from the lower to the higher memory.
 ; @author Jouni 'Mr.Spiv' Korhonen
-; @version 0.4
+; @version 0.2
 ; @copyright The Unlicense
 ; 
-; 20250109 0.1 - Initial version
-; 20250109 0.2 - Fixed offset decoding bug
-; 20250122 0.3 - Added 65535 bytes max match
-; 20250124 0.4 - Small code changes and added comments
+; 20250124 0.1 - Initial version
+; 20250124 0.2 - Small code changes and added comments
 ;
 ; Note:
 ;  - Reversed file
@@ -27,34 +25,29 @@
 ;                   If not set the maximum match length is 255 bytes.
 ;
 
-
 GETBIT  MACRO
         add.b   d6,d6
         bne.b   \@notempty
-        move.b  -(a1),d6
+        move.b  (a1)+,d6
         addx.b  d6,d6
 \@notempty:
         ENDM
 
-
 ;-----------------------------------------------------------------------------
 ;
 ; @param[in] A0 A ptr to destination memory.
-; @param[in] A1 A ptr to the first memory address after the
-;               compressed file.
+; @param[in] a1 A ptr to the compressed file start.
 ; 
 ; @return none
 ;
 ; @note Trashes d0-d3/d6-d7/a0-a3
 ;
 start:  moveq   #$3f,d7
-	and.b	-(a1),d7
+	and.b	(a1)+,d7
 	moveq	#0,d6
-	move.b	-(a1),d6
-	lsl.w	#8,d6
-	move.b	-(a1),d6
-	lsl.l	#8,d6
-	move.b	-(a1),d6
+	move.b	(a1)+,d6
+	swap	d6
+	move.w	(a1)+,d6
         lea     0(a0,d6.l),a3
         moveq   #-128,d6
         bra.b   tag_literal
@@ -64,10 +57,11 @@ main_loop:
         ; D6 = bit buffer
         ; D7 = pmr offset
         ; A5 = ptr to the first segment
-        ; A0 = decompressed
-        ; A1 = compressed data end
-        ; A3 = destination
-        ; A2 = tmp regisrer
+        ; A0 = destination
+        ; A1 = decompressed data start
+	; A2 = tmp
+        ; A3 = compressed data end
+        ;
         GETBIT
         bcc.b   tag_literal
         ;
@@ -82,7 +76,7 @@ tag_match_or_literal:
         GETBIT
         bcs.b   tag_pmr_matchlen 
         moveq   #0,d0
-        move.b  -(a1),d0
+        move.b  (a1)+,d0
         bpl.b   get_offset_done
 get_offset_tag_loop:
         addq.w  #1,d1
@@ -123,19 +117,20 @@ get_matchlen_loop:
 get_matchlen_exit:
         add.w   d2,d1
         ;
-        ; A0 = decompressed data start
-        ; a1 = compressed data end
-        ; A3 = destination
+        ; A0 = destination
+        ; A1 = decompressed data
+        ; A3 = compressed data end
         ; D7 = offset
         ; D1 = adjusted match lenght
         ;
-        lea     0(a3,d7.l),a2
+	move.l	a0,a2
+	sub.l	d7,a2
 copy_loop:
-        move.b  -(a2),-(a3)
+        move.b  (a2)+,(a0)+
         dbra    d1,copy_loop
         dc.w    $b07c           ; CMP.W #$xxxx,D0
 tag_literal:
-        move.b  -(a1),-(a3) 
+        move.b  (a1)+,(a0)+
         cmp.l   a0,a3
         bhi.b   main_loop
 	rts
