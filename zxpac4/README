@@ -127,11 +127,11 @@ parameterized.
 The outout compressed file format in big endian is:
  If the compressed data has not been reversed:
     
-    3        2                      0
-    1        4                      0
-   +--------+------------------------+
-   | flags  |24-bit compressed length| HEADER
-   +--------+------------------------+
+    3        2                        0
+    1        4                        0
+   +--------+--------+--------+--------+
+   | flags  |  24-bit original length  | HEADER
+   +--------+--------+--------+--------+
      
      +----//////////----+
    + |  compressed data |
@@ -153,17 +153,19 @@ The outout compressed file format in big endian is:
    + |  compressed data |
      +----//////////----+
     
-      3        2                      0
-      1        4                      0
-     +--------+------------------------+
-   + |htgnel desserpmoc tib-42| flags  | HEADER
-     +--------+------------------------+
+      3                        0        0
+      1                        8        0
+     +--------+--------+--------+--------+
+   + |  htgnel lanigiro tib-42  | flags  | HEADER
+     +--------+--------+--------+--------+
      
  flags = ARpppppp
   A      - If 1 literals are 7-bit ASCII
   R      - Reserved
   pppppp - Initial PMR offset
 
+ The notable restriction is the maximum 16MB uncompressed file size!
+ (..kiviäkin kiinnostaa..)
 
 Some notes on the supported algorithms:
  * zxpac4 has a 128K sliding window and a maximum match of 255 or 65535.
@@ -228,9 +230,9 @@ Some notes on the supported algorithms:
   11110           + [4] = 16 -> 31          // 1n1n1n1n0
   111110          + [5] = 32 -> 64          // 1n1n1n1n1n0
   1111110         + [6] = 64 -> 127         // 1n1n1n1n1n1n0
-  If maximum matclengh is 255
+  If maximum match length is 255
   1111111         + [7] = 128 -> 255        // 1n1n1n1n1n1n1n
-  If maxmimum matchlengh is 65535
+  If maximum match length is 65535
   11111110        + [7]  = 128 -> 255       // 1n1n1n1n1n1n1n0
   111111110       + [8]  = 256 -> 511       // 1n1n1n1n1n1n1n1n0
   1111111110      + [9] = 512 -> 1023       // 1n1n1n1n1n1n1n1n1n0
