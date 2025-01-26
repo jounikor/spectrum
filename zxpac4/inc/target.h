@@ -63,6 +63,7 @@ namespace targets {
         int8_t initial_pmr;         /**< Target specific initial PMR offset. 0 use algorithm default. */
         bool overlay:1;             /**< Amiga target specific: use overlay decompressor. */
         bool merge_hunks:1;         /**< Amiga target specific: merge executable file hunks when possible. */
+        bool equalize_hunks:1;      /**< Amiga target specific: treat HUNK_CODE/DATA/BSS the same. */
     };
 
     struct decompressor {

@@ -71,6 +71,7 @@ static struct option longopts[] = {
     {"algo",        required_argument,  NULL, 'a'},
     {"abs",         required_argument,  NULL, 'A'},
     {"merge-hunks", no_argument,        NULL, 'M'},
+    {"equalize-hunks", no_argument,     NULL, 'E'},
     {"help",        no_argument,        NULL, 'h'},
     {0,0,0,0}
 };
@@ -104,6 +105,7 @@ static void usage(char *prg, const targets::target* trg) {
     std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --merge-hunks,-M      Merge hunks (Amiga target).\n";
+    std::cerr << "  --equalize-hunks,-E   Treat HUNK_CODE/DATA/BSS all the same (Amiga target).\n";
     std::cerr << "  --overlay,-O          Self-extracting overlay decruncher (Amiga target).\n";
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
     std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
@@ -125,6 +127,7 @@ static targets::target my_targets[] = {
         4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
+        false,      // equalize_hunks
     },
     {   "bin",
         (1<<24) - 1,
@@ -136,6 +139,7 @@ static targets::target my_targets[] = {
         4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
+        false,      // equalize_hunks
     },
     {   "zx",
         (1<<16) - 1,
@@ -147,6 +151,7 @@ static targets::target my_targets[] = {
         4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
+        false,      // equalize_hunks
     },
     {   "bbc",
         (1<<16) - 1,
@@ -158,6 +163,7 @@ static targets::target my_targets[] = {
         4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
+        false,      // equalize_hunks
     },
     {   "ami",
         (1<<24) - 1,
@@ -169,6 +175,7 @@ static targets::target my_targets[] = {
         4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
+        false,      // equalize_hunks
     }   
 };
 
@@ -333,6 +340,7 @@ int main(int argc, char** argv)
     bool cfg_reverse_file = false;
     bool cfg_reverse_encoded = false;
     bool trg_merge_hunks = false;
+    bool trg_equalize_hunks = false;
     bool trg_overlay = false;
     uint32_t trg_load_addr = 0;
     uint32_t trg_jump_addr = 0;
@@ -451,6 +459,9 @@ int main(int argc, char** argv)
             case 'M':   // --merge-hunks
                 trg_merge_hunks = true;
                 break;
+            case 'E':   // --equalize-hunks
+                trg_equalize_hunks = true;
+                break;
             case '?':
 			case ':':
 				usage(argv[0],trg);
@@ -515,6 +526,7 @@ int main(int argc, char** argv)
     cfg.reverse_file = cfg_reverse_file;
     cfg.reverse_encoded = cfg_reverse_encoded;
     trg->merge_hunks = trg_merge_hunks;
+    trg->merge_hunks = trg_equalize_hunks;
     trg->overlay = trg_overlay;
     trg->load_addr = trg_load_addr;
     trg->jump_addr = trg_jump_addr;

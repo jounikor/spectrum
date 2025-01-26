@@ -166,6 +166,7 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
     int padding;
     bool overlay = false;
     bool hunk_end = true;
+    uint32_t combined_hunk_type;
 
     hunk_type = read32be(ptr);
     
@@ -294,9 +295,13 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
         case HUNK_DATA:
         case HUNK_CODE:
             hunk_size = read32be(ptr);
+            //combined_hunk_type = HUNK_CODE;
+            combined_hunk_type = hunk_type;
             goto process_code_data_bss;
         case HUNK_BSS:
             ptr += 4;       // skip size..
+            combined_hunk_type = hunk_type;
+            //combined_hunk_type = HUNK_BSS;
             hunk_size = 0;
 process_code_data_bss:
             if (hunk_end == false) {
@@ -310,7 +315,7 @@ process_code_data_bss:
             hunk_list[n].seg_start = ptr;
             hunk_list[n].data_size = hunk_size << 2;
             hunk_list[n].hunk_type = hunk_type;
-            hunk_list[n].combined_type |= hunk_type;
+            hunk_list[n].combined_type |= combined_hunk_type;
             TDEBUG(std::cerr << std::dec << "  segment: " << hunk_list[n].old_seg_num   \
                     << std::hex << ", data size: 0x" << hunk_list[n].data_size          \
                     << ", memory size: 0x" << hunk_list[n].memory_size                  \
