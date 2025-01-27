@@ -105,7 +105,8 @@ static void usage(char *prg, const targets::target* trg) {
     std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --merge-hunks,-M      Merge hunks (Amiga target).\n";
-    std::cerr << "  --equalize-hunks,-E   Treat HUNK_CODE/DATA/BSS all the same (Amiga target).\n";
+    std::cerr << "  --equalize-hunks,-E   Treat HUNK_CODE/DATA/BSS all the same. This setting will enable\n"
+              << "                        '--merge-hunks' as well (Amiga target).\n";
     std::cerr << "  --overlay,-O          Self-extracting overlay decruncher (Amiga target).\n";
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
     std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
@@ -371,7 +372,7 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "m:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "Em:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'O':   // --overlay
                 trg_overlay = true;
@@ -461,6 +462,7 @@ int main(int argc, char** argv)
                 break;
             case 'E':   // --equalize-hunks
                 trg_equalize_hunks = true;
+                trg_merge_hunks = true;
                 break;
             case '?':
 			case ':':
@@ -526,7 +528,7 @@ int main(int argc, char** argv)
     cfg.reverse_file = cfg_reverse_file;
     cfg.reverse_encoded = cfg_reverse_encoded;
     trg->merge_hunks = trg_merge_hunks;
-    trg->merge_hunks = trg_equalize_hunks;
+    trg->equalize_hunks = trg_equalize_hunks;
     trg->overlay = trg_overlay;
     trg->load_addr = trg_load_addr;
     trg->jump_addr = trg_jump_addr;

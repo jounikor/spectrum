@@ -104,7 +104,7 @@ uint32_t read32be(char*& ptr, bool inc=true);
     char* write32be(char* ptr, uint32_t v, bool inc=true);
     char* write24be(char* ptr, uint32_t r, bool inc=true);
     char* write16be(char* ptr, uint16_t v, bool inc=true);
-    int parse_hunks(char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool debug=false);
+    int parse_hunks(char* buf, int size, std::vector<hunk_info_t>& hunk_list, bool equalize=false, bool debug=false);
     int merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_list, char*& new_exe,
         std::vector<new_hunk_info_t>* new_segments, bool debug=false);
     int optimize_hunks(char* exe, int len, const std::vector<hunk_info_t>& hunk_list, char*& new_exe,

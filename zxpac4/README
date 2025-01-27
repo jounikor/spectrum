@@ -8,8 +8,6 @@ TODO. Quite few optios/features are still not done:
  * ZX Spectrum target
  * Amiga target overlay decompressor
  * --backward support has not been implemented
- * Hunk merger enhancements
-   - Merging a BSS hunk CODE/DATA_HUNK
  * ZXPAC4(b)(_32k) match searcher and cost calculation
    - With long matched generate costs instead of searching again.
    - Memory usage reduction i.e. reduce the "found matches" to the 

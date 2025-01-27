@@ -154,7 +154,7 @@ char* amiga_hunks::write16be(char* ptr, uint16_t r, bool inc)
  * @return The number of found hunks or <= 0 if an error.
  */
 
-int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk_list, bool debug)
+int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk_list, bool equalize, bool debug)
 {
     char* end = ptr+size;
     uint32_t n, m, j;
@@ -276,6 +276,8 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
             ptr += hunk_size;
         }
 
+        combined_hunk_type = hunk_type;
+
         switch (hunk_type) {
         case HUNK_SYMBOL:
             TDEBUG(std::cerr << "  Removing.." << std::endl;)
@@ -295,19 +297,18 @@ int amiga_hunks::parse_hunks(char* ptr, int size, std::vector<hunk_info_t>& hunk
         case HUNK_DATA:
         case HUNK_CODE:
             hunk_size = read32be(ptr);
-            //combined_hunk_type = HUNK_CODE;
-            combined_hunk_type = hunk_type;
             goto process_code_data_bss;
         case HUNK_BSS:
             ptr += 4;       // skip size..
-            combined_hunk_type = hunk_type;
-            //combined_hunk_type = HUNK_BSS;
             hunk_size = 0;
 process_code_data_bss:
             if (hunk_end == false) {
                 std::cout << "**Warning: HUNK_CODE/DATA/BSS without closing HUNK_END\n";
             }
-            
+            if (equalize) {
+                combined_hunk_type = HUNK_CODE;
+            }
+
             hunk_end = false;
             // we increment to next segment due exe files that may not
             // contain HUNK_ENDs

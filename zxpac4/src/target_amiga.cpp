@@ -158,16 +158,17 @@ int target_amiga::preprocess_exe(char* buf, int len)
 {
     std::vector<amiga_hunks::hunk_info_t> hunk_list(0);
     bool debug_on = m_cfg->debug_level > DEBUG_LEVEL_NONE ? true : false;
+    bool equalize = m_trg->equalize_hunks;
     char* amiga_exe = NULL;
     int m, n, memory_len;
 
-    n = amiga_hunks::parse_hunks(buf,len,hunk_list,debug_on);
+    n = amiga_hunks::parse_hunks(buf,len,hunk_list,equalize,debug_on);
     
     if (n < 0) {
         std::cerr << ERR_PREAMBLE << "Amiga target hunk parsing failed (" << n << ")" << std::endl;
     } else {
         if (m_trg->merge_hunks) {
-            n = amiga_hunks::merge_hunks(buf,len,hunk_list,amiga_exe,&m_new_hunks,debug_on);
+            n = amiga_hunks::merge_hunks(buf,len,hunk_list,amiga_exe,&m_new_hunks,debug_on);  
         } else {
             n = amiga_hunks::optimize_hunks(buf,len,hunk_list,amiga_exe,&m_new_hunks,debug_on);
         }
