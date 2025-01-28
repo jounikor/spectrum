@@ -186,8 +186,8 @@ int target_amiga::preprocess_exe(char* buf, int len)
             // Fabricate a new hunk and insert the size of the compressed data
             new_hunk_info_t new_seg = {
                 .mem_size_typed_longs = static_cast<uint32_t>((memory_len+3) >> 2),
-                0xdeadbeef,
-                0xc0dedbad
+                .hunk_type = 0xdeadbeef,
+                .data_size_longs = 0xc0dedbad
             };
             m_new_hunks.push_back(new_seg);
         }
@@ -241,8 +241,8 @@ int target_amiga::preprocess_overlay(char* buf, int len)
     // Fabricate a new hunk and insert the size of the compressed data
     new_seg = {
         .mem_size_typed_longs = static_cast<uint32_t>((memory_len+3) >> 2),
-        0xdeadbeef,
-        0xc0dedbad
+        .hunk_type = 0xdeadbeef,
+        .data_size_longs = 0xc0dedbad
     };
     m_new_hunks.push_back(new_seg);
 
@@ -253,8 +253,13 @@ overlay_error:
 
 // Amiga target header saving functions:
 //
-//
-//
+// TODO:
+// - Especially the post saving of headers patch the output file
+//   in a very crude manner. The seek offsets are just put into the
+//   code. To fix this the offset should be:
+//   a) defined properly
+//   b) those referring to the decompressor imported from the
+//      generated h-file..somehow.
 
 int target_amiga::save_header(const char* buf, int len)
 {
@@ -374,7 +379,7 @@ int target_amiga::save_header_exe(const char* buf, int len)
     
     // JSR 0x00000000   b0100111010111001
     ptr = write16be(ptr,0x4eb9);        // JSR
-    ptr = write32be(ptr,0x00000004);    // to 4th byte of the last segment
+    ptr = write32be(ptr,0x00000000);    // to 1sr byte of the last segment
     ptr = write16be(ptr,0x4e70);        // RESET ;)
 
     // Followed by a single relocation to the last hunk, which will contain
@@ -397,6 +402,7 @@ int target_amiga::save_header_exe(const char* buf, int len)
         } else {
             ptr = write32be(ptr,0x00000000);
         }
+        // Nasty but works..
         //ptr = write32be(ptr,HUNK_END);
     }
 
@@ -405,7 +411,7 @@ int target_amiga::save_header_exe(const char* buf, int len)
     
     // record the location for patching the data size.. for now put 0 there.
     n = ptr - hdr;
-    m_new_hunks[(num_seg - 1)].data_size_longs = n;
+    m_new_hunks[(num_seg - 1)].data_size_bytes = n;
     ptr = write32be(ptr,0);
 
     // Write the decompressor..
@@ -464,11 +470,12 @@ int target_amiga::post_save_exe(int len)
 
     // Patch the HUNK_CODE size with the compressed data size in words..
     n = m_new_hunks.size();
-    m_ofs.seekp(m_new_hunks[n-1].data_size_longs,std::ios_base::beg);
+    m_ofs.seekp(m_new_hunks[n-1].data_size_bytes,std::ios_base::beg);
     write32be(tmp,len>>2,false);
     m_ofs.write(tmp,4);
 
     // Patch the decompressor with the original byte size..
+    m_ofs.seekp(m_new_hunks[n-1].data_size_bytes+24,std::ios_base::beg);
     write32be(tmp,original_len,false);
     m_ofs.write(tmp,4);
 

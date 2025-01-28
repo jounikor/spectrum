@@ -566,10 +566,10 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     int* merged_old_seg_offs = new (std::nothrow) int[num_old_seg];
 
     // This list is used with merged_old_seg_offs and indexes similarly using the 
-    // original executable file hunk/segment numbers. If a code/data hunk had an
+    // original executable file hunk/segment numbers. If a CODE/DATA HUNK had an
     // assiciated BSS area, then this list contains the adjustment offset for each
     // old hunk/segment in the new merged hunk how much the relocation entry in 
-    // the file has to be offsetted to be inthe BSS area. The below drawing attemps
+    // the file has to be offsetted to be in the BSS area. The below drawing attemps
     // to illustrate what this means:
     //
     // Original HUNK_DATA #1 with an associated BSS
@@ -602,9 +602,6 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     // merged_old_seg_bss_offs[1] = n+m;
     // merged_old_seg_bss_offs[3] = n+m+N;
     //
-    // TODO: A bit sad operation here is that the current hunk merger cannot merge
-    //       a BSS hunk into a DATA or a CODE hunk. Need to be fixed at some point.
-    //
 
     int* merged_old_seg_bss_offs = new (std::nothrow) int[num_old_seg];
 
@@ -612,16 +609,18 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     //  1) Combine hunks with the same type and the memory requirement into a single merged hunk.
     //  2) If merged hunks (HUNK_DATA and HUNK_CODE) have attaced BSS section those are also
     //     included into the merged hunk. There can be total 9 merged hunks.
-    //  3) CODE/DATA/BSS hunks are separated from relocation information. The relocation information
+    //  3) If merged hunks are also equalized i.e. HUNK_DATA and HUNK_BSS are treated as HUNK_CODE,
+    //     then HUNK/DATAs/HUNK_BSSesare merged to HUNK_CODE with a matching memory type. This is
+    //     a bit crude merging but since AmigaDOS does not care we can do this..
+    //  4) CODE/DATA/BSS hunks are separated from relocation information. The relocation information
     //     is stored as a one binary blob at the end of all merged hunks.
-    //  4) Relocation datas are also merged accordingly to merged hunks. Duplicates are removed and
+    //  5) Relocation datas are also merged accordingly to merged hunks. Duplicates are removed and
     //     possible multiple relocations to the same hunk are combined.
-    //  5) Relocation entries are delta encoded.
+    //  6) Relocation entries are delta encoded.
     //
     //  Note that there are some restrictions.
-    //  - Maximum number of merged hunks is 9 but if the encoder does not not merge hunks then
-    //    the limit is 65534. The value 65535 is reserved for an EOF marker.
-    //  - Maximum length of a reloc entry is 2^24-1.
+    //  - Maximum number of hunks is 65534. The value 0 is reserved for an EOF marker, so the
+    //    hunk 0 is marked as 1.
     
     for (std::vector<hunk_info_t>::iterator it = hunk_list.begin(), et = hunk_list.end(); it != et; it++) {
         if (new_hunks.find(it->combined_type) == new_hunks.end()) {

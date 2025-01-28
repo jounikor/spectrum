@@ -93,7 +93,10 @@ namespace amiga_hunks {
     typedef struct {
         uint32_t mem_size_typed_longs;
         uint32_t hunk_type;
-        uint32_t data_size_longs;
+        union {
+            uint32_t data_size_longs;
+            uint32_t data_size_bytes;
+        };
     } new_hunk_info_t;
 
 

@@ -3,13 +3,15 @@
 ; @file zxpac4_exe.asm
 ; @brief Executable file decompressor for ZXPAC4
 ; @author Jouni 'Mr.Spiv' Korhonen
-; @version 0.1
+; @version 0.5
 ; @copyright The Unlicense
 ; 
 ; 20250109 0.1 - Initial version.
 ; 20250109 0.2 - Fixed offset decoding bug.
 ; 20250111 0.3 - Added security length.
 ; 20250122 0.4 - Added 65535 bytes max match
+; 20250128 0.5 - Moved the compressed file size into ADD instead
+;                of having first 4 bytes the file for it.
 ;
 ; Note:
 ;  - Reversed file
@@ -26,19 +28,13 @@ GETBIT  MACRO
 \@notempty:
         ENDM
         
-
 __LVOForbid		    equ	    -132
 __LVOPermit         equ     -138
 __LVOFreeMem        equ     -210
 __LVOCacheClearU    equ     -636
 __LIB_VERSION       equ     20
 
-
 SECURITY_LENGTH	    equ	    8
-
-; The compressed size of the file is in the 4 first bytes
-file_size:
-        dc.l    0
 
 ;  Each segment in memory is as follows:
 ;
@@ -51,14 +47,15 @@ file_size:
 ;
 
 exe:
-        subq.l  #6,(sp)
-        movem.l d0-a5,-(sp)
-        move.l  14*4(sp),a1
-        subq.l  #4,a1
+        subq.l  #6,(sp)                     ; 2
+        movem.l d0-a5,-(sp)                 ; 4
+        move.l  14*4(sp),a1                 ; 4
+        subq.l  #4,a1                       ; 2
         ; A1 = A ptr to the first segment
-        lea     compressed_data(pc),a0
-        move.l  a0,a2
-        add.l   file_size(pc),a2
+        lea     compressed_data(pc),a0      ; 4
+        move.l  a0,a2                       ; 2
+        ; Offset 
+        add.l   #$00000000,a2               ; 2(+4) -> offset 20
 	;
 	;
 start:  moveq   #$7f,d7
