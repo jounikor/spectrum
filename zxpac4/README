@@ -228,9 +228,9 @@ Some notes on the supported algorithms:
   11110           + [4] = 16 -> 31          // 1n1n1n1n0
   111110          + [5] = 32 -> 64          // 1n1n1n1n1n0
   1111110         + [6] = 64 -> 127         // 1n1n1n1n1n1n0
-  If maximum match length is 255
+  If maximum match length is 255 (zxpac_32k, zxpac4b)
   1111111         + [7] = 128 -> 255        // 1n1n1n1n1n1n1n
-  If maximum match length is 65535
+  If maximum match length is 65535 (zxpac4)
   11111110        + [7]  = 128 -> 255       // 1n1n1n1n1n1n1n0
   111111110       + [8]  = 256 -> 511       // 1n1n1n1n1n1n1n1n0
   1111111110      + [9] = 512 -> 1023       // 1n1n1n1n1n1n1n1n1n0
