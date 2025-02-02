@@ -1,10 +1,11 @@
 /**
  * @file cost4_32k.cpp
  * @brief Calculates an approximate cost for the LZ encoding.
- * @version 0.3
+ * @version 0.4
  * @author Jouni 'Mr.Spiv' Korhonen
  * @date 7-Apr-2024
  * @date 4-Aug-2024
+ * @date 1-Feb-2025
  * @copyright The Unlicense
  *
  * @note TODOs - the current design still has few (pun intended) flaws I want to change:
@@ -215,27 +216,8 @@ int zxpac4_32k_cost::impl_get_length_bits(int length)
     } else if (length < 128) {
         return (7+6);
     }
-    if (lz_get_config()->max_match < 256) {
-        // < 256
-        return (7+7);
-    } else if (length < 256) {
-        return (8+7);
-    } else if (length < 512) {
-        return (9+8);
-    } else if (length < 1024) {
-        return (10+9);
-    } else if (length < 2048) {
-        return (11+10);
-    } else if (length < 4096) {
-        return (12+11);
-    } else if (length < 8192) {
-        return (13+12);
-    } else if (length < 16384) {
-        return (14+13);
-    } else if (length < 32768) {
-        return (15+14);
-    }
-    return (15+15);
+    // < 256
+    return (7+7);
 }
 
 int zxpac4_32k_cost::impl_get_literal_bits(char literal, bool is_ascii)
@@ -313,12 +295,10 @@ int zxpac4_32k_cost::impl_literal_cost(int pos, cost* c, const char* buf)
  */
 
 
-int zxpac4_32k_cost::impl_match_cost(int pos, cost* c, const char* buf)
+int zxpac4_32k_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset, int length)
 {
     cost* p_ctx = &c[pos];
     bool pmr_found = false;
-    int offset;
-    int length;
     uint32_t new_cost;
     int pmr_offset; 
     int encode_length;
@@ -331,33 +311,29 @@ int zxpac4_32k_cost::impl_match_cost(int pos, cost* c, const char* buf)
         tag_cost = 0+1;
     }
 
-    for (n = 0; n < p_ctx->num_matches; n++) {
-        offset = p_ctx->matches[n].offset;
-        length = p_ctx->matches[n].length;
-        new_cost = p_ctx->arrival_cost + tag_cost;
-        pmr_offset = p_ctx->pmr_offset; 
-        
-        if (offset == pmr_offset) {
-            pmr_found = true;
-            offset = 0;
-            encode_length = length;
-        } else {
-            pmr_offset = offset;
-            encode_length = length - 1;
-        }
+    new_cost = p_ctx->arrival_cost + tag_cost;
+    pmr_offset = p_ctx->pmr_offset; 
 
-        assert(encode_length > 0);
-        assert(offset < 32768);
-        new_cost += get_offset_bits(offset);
-        new_cost += get_length_bits(encode_length);
+    if (offset == pmr_offset) {
+        pmr_found = true;
+        offset = 0;
+        encode_length = length;
+    } else {
+        pmr_offset = offset;
+        encode_length = length - 1;
+    }
+
+    assert(encode_length > 0);
+    assert(offset < 32768);
+    new_cost += get_offset_bits(offset);
+    new_cost += get_length_bits(encode_length);
             
-        if (p_ctx[length].arrival_cost > new_cost) {
-            p_ctx[length].offset       = offset;
-            p_ctx[length].pmr_offset   = pmr_offset;
-            p_ctx[length].arrival_cost = new_cost;
-            p_ctx[length].length       = length;
-            p_ctx[length].last_was_literal = false;
-        }
+    if (p_ctx[length].arrival_cost > new_cost) {
+        p_ctx[length].offset       = offset;
+        p_ctx[length].pmr_offset   = pmr_offset;
+        p_ctx[length].arrival_cost = new_cost;
+        p_ctx[length].length       = length;
+        p_ctx[length].last_was_literal = false;
     }
 
     pmr_offset = p_ctx->pmr_offset;
@@ -406,8 +382,7 @@ int zxpac4_32k_cost::impl_init_cost(cost* p_ctx, int sta, int len, int pmr)
 cost* zxpac4_32k_cost::impl_alloc_cost(int len, int max_chain)
 {
     cost* cc;
-    match* mm;
-    int n;
+    (void)max_chain;
 
     m_max_len = len;
 
@@ -415,16 +390,6 @@ cost* zxpac4_32k_cost::impl_alloc_cost(int len, int max_chain)
         cc = new cost[len+1];
     } catch (...) {
         throw;
-    }
-    try {
-        mm = new match[(len+1)*max_chain];
-    } catch (...) {
-        delete[] cc;
-        throw;
-    }
-
-    for (n = 0; n < len+1; n++) {
-        cc[n].matches = &mm[n*max_chain];
     }
 
     return cc;
@@ -434,7 +399,6 @@ cost* zxpac4_32k_cost::impl_alloc_cost(int len, int max_chain)
 int zxpac4_32k_cost::impl_free_cost(cost* cost)
 {
     if (cost) {
-        delete[] cost->matches;
         delete[] cost;
     }
     return 0;

@@ -1,10 +1,11 @@
 /**
  * @file cost.cpp
  * @brief Calculates an approximate cost for the LZ encoding.
- * @version 0.2
+ * @version 0.3
  * @author Jouni 'Mr.Spiv' Korhonen
  * @date 7-Apr-2024
  * @date 4-Aug-2024
+ * @date 28-Jan-2025
  * @copyright The Unlicense
  *
  * @note TODOs - the current design still has few (pun intended) flaws I want to change:
@@ -327,12 +328,10 @@ int zxpac4_cost::impl_literal_cost(int pos, cost* c, const char* buf)
  */
 
 
-int zxpac4_cost::impl_match_cost(int pos, cost* c, const char* buf)
+int zxpac4_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset, int length)
 {
     cost* p_ctx = &c[pos];
     bool pmr_found = false;
-    int offset;
-    int length;
     uint32_t new_cost;
     int pmr_offset; 
     int encode_length;
@@ -345,33 +344,30 @@ int zxpac4_cost::impl_match_cost(int pos, cost* c, const char* buf)
         tag_cost = 0+1;
     }
 
-    for (n = 0; n < p_ctx->num_matches; n++) {
-        offset = p_ctx->matches[n].offset;
-        length = p_ctx->matches[n].length;
-        new_cost = p_ctx->arrival_cost + tag_cost;
-        pmr_offset = p_ctx->pmr_offset; 
+    new_cost = p_ctx->arrival_cost + tag_cost;
+    pmr_offset = p_ctx->pmr_offset; 
         
-        if (offset == pmr_offset) {
-            pmr_found = true;
-            offset = 0;
-            encode_length = length;
-        } else {
-            pmr_offset = offset;
-            encode_length = length - 1;
-        }
+    if (offset == pmr_offset) {
+        pmr_found = true;
+        offset = 0;
+        encode_length = length;
+    } else {
+        pmr_offset = offset;
+        encode_length = length - 1;
+    }
 
-        assert(encode_length > 0);
-        assert(offset < 131072);
-        new_cost += get_offset_bits(offset);
-        new_cost += get_length_bits(encode_length);
+    assert(length < 65536);
+    assert(encode_length > 0);
+    assert(offset < 131072);
+    new_cost += get_offset_bits(offset);
+    new_cost += get_length_bits(encode_length);
             
-        if (p_ctx[length].arrival_cost > new_cost) {
-            p_ctx[length].offset       = offset;
-            p_ctx[length].pmr_offset   = pmr_offset;
-            p_ctx[length].arrival_cost = new_cost;
-            p_ctx[length].length       = length;
-            p_ctx[length].last_was_literal = false;
-        }
+    if (p_ctx[length].arrival_cost > new_cost) {
+        p_ctx[length].offset       = offset;
+        p_ctx[length].pmr_offset   = pmr_offset;
+        p_ctx[length].arrival_cost = new_cost;
+        p_ctx[length].length       = length;
+        p_ctx[length].last_was_literal = false;
     }
 
     pmr_offset = p_ctx->pmr_offset;
@@ -383,7 +379,7 @@ int zxpac4_cost::impl_match_cost(int pos, cost* c, const char* buf)
         length = check_match(&buf[pos],&buf[pos-pmr_offset],n);
         assert(length <= max_match);
 
-        if (length >= 2) {
+        if (length >= lz_get_config()->min_match) {
             new_cost = p_ctx->arrival_cost + tag_cost;
             new_cost += get_length_bits(length);
             
@@ -398,7 +394,7 @@ int zxpac4_cost::impl_match_cost(int pos, cost* c, const char* buf)
         }
     }
 
-    return 0;
+    return length >= lz_get_config()->good_match ? length : 1;
 }
 
 int zxpac4_cost::impl_init_cost(cost* p_ctx, int sta, int len, int pmr)
@@ -417,11 +413,11 @@ int zxpac4_cost::impl_init_cost(cost* p_ctx, int sta, int len, int pmr)
     return 0;
 }
 
+// *FIX* No need for max_chain
 cost* zxpac4_cost::impl_alloc_cost(int len, int max_chain)
 {
     cost* cc;
-    match* mm;
-    int n;
+    (void)max_chain;
 
     m_max_len = len;
 
@@ -429,16 +425,6 @@ cost* zxpac4_cost::impl_alloc_cost(int len, int max_chain)
         cc = new cost[len+1];
     } catch (...) {
         throw;
-    }
-    try {
-        mm = new match[(len+1)*max_chain];
-    } catch (...) {
-        delete[] cc;
-        throw;
-    }
-
-    for (n = 0; n < len+1; n++) {
-        cc[n].matches = &mm[n*max_chain];
     }
 
     return cc;
@@ -448,7 +434,6 @@ cost* zxpac4_cost::impl_alloc_cost(int len, int max_chain)
 int zxpac4_cost::impl_free_cost(cost* cost)
 {
     if (cost) {
-        delete[] cost->matches;
         delete[] cost;
     }
     return 0;

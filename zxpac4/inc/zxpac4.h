@@ -112,6 +112,7 @@
 class zxpac4 : public lz_base {
     hash3 m_lz;
     cost* m_cost_array;
+    match* m_match_array;
     int m_alloc_len;
     zxpac4_cost m_cost;
     int encode_history(const char* buf, char* out, int len, int pos);

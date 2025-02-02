@@ -302,12 +302,10 @@ int zxpac4b_cost::impl_literal_cost(int pos, cost* c, const char* buf)
  */
 
 
-int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf)
+int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset, int length)
 {
     cost* p_ctx = &c[pos];
     bool pmr_found = false;
-    int offset;
-    int length;
     int pmr_offset; 
     uint32_t new_cost;
     int encode_length;
@@ -320,34 +318,30 @@ int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf)
         tag_cost = 0;
     }
 
-    for (n = 0; n < p_ctx->num_matches; n++) {
-        offset = p_ctx->matches[n].offset;
-        length = p_ctx->matches[n].length;
-        pmr_offset = p_ctx->pmr_offset; 
-        new_cost = p_ctx->arrival_cost + tag_cost;
+    pmr_offset = p_ctx->pmr_offset; 
+    new_cost = p_ctx->arrival_cost + tag_cost;
         
-        if (offset == pmr_offset) {
-            offset = 0;
-            encode_length = length;
-            pmr_found = true;
-        } else {
-            pmr_offset = offset;
-            encode_length = length - 1;
-        }
-        
-        assert(encode_length > 0);
-        assert(offset < 131072);
-        new_cost += get_offset_bits(offset);
-        new_cost += get_length_bits(encode_length);
-            
-        if (p_ctx[length].arrival_cost >= new_cost) {
-            p_ctx[length].offset       = offset;
-            p_ctx[length].pmr_offset   = pmr_offset;
-            p_ctx[length].arrival_cost = new_cost;
-            p_ctx[length].length       = length;
-            p_ctx[length].last_was_literal = false;
-            p_ctx[length].num_literals = 0;
-        }
+    if (offset == pmr_offset) {
+        offset = 0;
+        encode_length = length;
+        pmr_found = true;
+    } else {
+        pmr_offset = offset;
+        encode_length = length - 1;
+    }
+       
+    assert(encode_length > 0);
+    assert(offset < 131072);
+    new_cost += get_offset_bits(offset);
+    new_cost += get_length_bits(encode_length);
+           
+    if (p_ctx[length].arrival_cost >= new_cost) {
+        p_ctx[length].offset       = offset;
+        p_ctx[length].pmr_offset   = pmr_offset;
+        p_ctx[length].arrival_cost = new_cost;
+        p_ctx[length].length       = length;
+        p_ctx[length].last_was_literal = false;
+        p_ctx[length].num_literals = 0;
     }
     
     pmr_offset = p_ctx->pmr_offset;
@@ -394,8 +388,7 @@ int zxpac4b_cost::impl_init_cost(cost* p_ctx, int sta, int len, int pmr)
 cost* zxpac4b_cost::impl_alloc_cost(int len, int max_chain)
 {
     cost* cc;
-    match* mm;
-    int n;
+    (void)max_chain;
 
     m_max_len = len;
     
@@ -403,16 +396,6 @@ cost* zxpac4b_cost::impl_alloc_cost(int len, int max_chain)
         cc = new cost[len+1];
     } catch (...) {
         throw;
-    }
-    try {
-        mm = new match[(len+1)*max_chain];
-    } catch (...) {
-        delete[] cc;
-        throw;
-    }
-
-    for (n = 0; n < len+1; n++) {
-        cc[n].matches = &mm[n*max_chain];
     }
 
     return cc;
@@ -422,7 +405,6 @@ cost* zxpac4b_cost::impl_alloc_cost(int len, int max_chain)
 int zxpac4b_cost::impl_free_cost(cost* cost)
 {
     if (cost) {
-        delete[] cost->matches;
         delete[] cost;
     }
     return 0;

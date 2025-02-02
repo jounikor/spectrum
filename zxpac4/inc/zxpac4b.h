@@ -102,6 +102,7 @@
 class zxpac4b : public lz_base {
     hash3 m_lz;
     cost* m_cost_array;
+    match* m_match_array;
     int m_alloc_len;
     zxpac4b_cost m_cost;
 private:

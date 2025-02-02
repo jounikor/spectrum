@@ -1,9 +1,10 @@
 /**
  * @file cost4_32k.h
- * @version 0.2
+ * @version 0.3
  * @brief lzpac4 specific Literal & Match encoding cost calculator.
  * @author Jouni 'Mr.Spiv' Korhonen
  * @date 7-Apr-2024
+ * @date 1-Feb-2025
  * @copyright The Unlicense 
  *
  */
@@ -31,7 +32,7 @@ public:
 
     // Base class interface method implementations
     int impl_literal_cost(int pos, cost* c, const char* buf);
-    int impl_match_cost(int pos, cost* c, const char* buf);
+    int impl_match_cost(int pos, cost* c, const char* buf, int offset, int length);
     int impl_init_cost(cost* c, int sta, int len, int pmr);
     cost* impl_alloc_cost(int len, int max_chain);
     int impl_free_cost(cost* cost);

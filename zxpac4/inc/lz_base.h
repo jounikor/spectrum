@@ -39,12 +39,10 @@ struct cost {
     int32_t next;
     int32_t offset;
     int32_t length;
-    uint32_t arrival_cost;
     int32_t pmr_offset;         ///< tbd
-    int16_t num_matches;        ///< Number of matches in @p matches array
+    uint32_t arrival_cost;
     int16_t num_literals;       ///< Number of consequtive literal up to this match node.
-    match *matches;         ///< An array of matches
-    bool last_was_literal;
+    bool last_was_literal:1;
 };
 
 /**
@@ -118,8 +116,8 @@ public:
     int literal_cost(int pos, cost* c, const char* buf) {
         return impl().impl_literal_cost(pos,c,buf);
     }
-    int match_cost(int pos, cost* c, const char* buf) {
-        return impl().impl_match_cost(pos,c,buf);
+    int match_cost(int pos, cost* c, const char* buf, int offset, int length) {
+        return impl().impl_match_cost(pos,c,buf,offset,length);
     }
     int init_cost(cost* c, int sta, int len, int pmr) {
         return impl().impl_init_cost(c,sta,len,pmr);

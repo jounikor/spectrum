@@ -1,9 +1,9 @@
 /**
  * @file zxpac4.cpp
  * @brief zxpac4 for ASCII only data and binary data
- * @version 0.1
+ * @version 0.2
  * @author Jouni Korhonen
- * @date somewhere in 2024
+ * @date somewhere in 2024-25
  *
  * @copyright The Unlicense
  *
@@ -34,6 +34,7 @@ zxpac4::zxpac4(const lz_config* p_cfg, int ins, int max) :
 {
     (void)ins;
     (void)max;
+    m_match_array = new match[p_cfg->max_chain];
     m_alloc_len  = 0;
 }
 
@@ -42,6 +43,8 @@ zxpac4::~zxpac4(void)
     if (m_cost_array) {
         lz_cost_array_done();
     }
+
+    delete[] m_match_array;
 }
 
 
@@ -50,6 +53,7 @@ int zxpac4::lz_search_matches(char* buf, int len, int interval)
 {
     int pos = 0;
     int num;
+    int offset, length;
 
     // Unused at the moment..
     (void)interval;
@@ -60,6 +64,8 @@ int zxpac4::lz_search_matches(char* buf, int len, int interval)
     m_num_matches = 0;
     m_num_matched_bytes = 0;
     m_num_pmr_matches = 0;
+    
+    m_cost.init_cost(m_cost_array,0,len,m_lz_config->initial_pmr_offset);
 
     if (m_lz_config->reverse_file) {
         if (verbose()) {
@@ -78,12 +84,12 @@ int zxpac4::lz_search_matches(char* buf, int len, int interval)
     }
 
     while (pos < len) {
-        m_lz.init_get_matches(m_lz_config->max_chain,m_cost_array[pos].matches);
+        // *FIX* This could all be hidden inside the class..
+        m_lz.init_get_matches(m_lz_config->max_chain,m_match_array);
             
         // Find all matches at this position. Returned 'num' is the
         // the number of found matches.
         num = m_lz.find_matches(buf,pos,len-pos,m_lz_config->only_better_matches);
-        m_cost_array[pos].num_matches = num;
 
         // *TODO* add here a check if the match is close to maximum then
         //        just stop searching and fill match length worth of the cost array
@@ -96,14 +102,26 @@ int zxpac4::lz_search_matches(char* buf, int len, int interval)
                 << std::dec << std::setw(0) <<  ") -> " << num << ": ";
             if (num > 0) {
                 for (int n = 0; n < num; n++) {
-                    assert(m_cost_array[pos].matches[n].offset < 131072);
-                    std::cerr << m_cost_array[pos].matches[n].offset << ":"
-                              << m_cost_array[pos].matches[n].length << " ";
+                    std::cerr << m_match_array[n].offset << ":"
+                              << m_match_array[n].length << " ";
                 }
             } else {
                 std::cerr << "no match";
             }
             std::cerr << "\n";
+        }
+
+        m_cost.literal_cost(pos,m_cost_array,buf);
+        
+        // match cost calculation if not at the end of file and there was a match
+        // *FIX* How to speed up when good enough match has been found..? Now we do
+        //       unnecessary searches for matches..
+        if (pos < (len - ZXPAC4_MATCH_MIN)) {
+            for (int index = 0; index < num; index++) {
+                offset = m_match_array[index].offset;
+                length = m_match_array[index].length;
+                length = m_cost.match_cost(pos,m_cost_array,buf,offset,length);
+            }
         }
         ++pos;
     }
@@ -118,7 +136,6 @@ int zxpac4::lz_parse(const char* buf, int len, int interval)
     int offset;
     int pos;
     int num_literals;
-    int pmr_offset = m_lz_config->initial_pmr_offset;
 
     // Unused at the moment..
     (void)interval;
@@ -133,20 +150,6 @@ int zxpac4::lz_parse(const char* buf, int len, int interval)
     if (verbose()) {
         std::cout << "Calculating arrival costs" << std::endl;
     }
-    
-    m_cost.init_cost(m_cost_array,0,len,pmr_offset);
-
-    for (pos = 0; pos < len; pos++) {
-        // always do literal cost calculation
-        m_cost.literal_cost(pos,m_cost_array,buf);
-        
-        // match cost calculation if not at the end of file and there was a match
-        if (pos < (len - ZXPAC4_MATCH_MIN)) {
-            m_cost.match_cost(pos,m_cost_array,buf);
-        }        
-    }
-
-    //
     if (verbose()) {
         std::cout << "Building list of optimally parsed matches" << std::endl;
     }

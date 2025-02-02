@@ -50,6 +50,7 @@ int zxpac4b::lz_search_matches(char* buf, int len, int interval)
 {
     int pos = 0;
     int num;
+    int offset, length;
 
     // Unused at the moment..
     (void)interval;
@@ -60,6 +61,8 @@ int zxpac4b::lz_search_matches(char* buf, int len, int interval)
     m_num_matches = 0;
     m_num_matched_bytes = 0;
     m_num_pmr_matches = 0;
+    
+    m_cost.init_cost(m_cost_array,0,len,m_lz_config->initial_pmr_offset);
 
     if (verbose()) {
         std::cout << "Finding all matches" << std::endl;
@@ -78,12 +81,11 @@ int zxpac4b::lz_search_matches(char* buf, int len, int interval)
     }
 
     while (pos < len) {
-        m_lz.init_get_matches(m_lz_config->max_chain,m_cost_array[pos].matches);
+        m_lz.init_get_matches(m_lz_config->max_chain,m_match_array);
             
         // Find all matches at this position. Returned 'num' is the
         // the number of found matches.
         num = m_lz.find_matches(buf,pos,len-pos,m_lz_config->only_better_matches);
-        m_cost_array[pos].num_matches = num;
 
         if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
             std::cerr << std::setw(10) << std::dec << std::setfill(' ') << pos << ": '"
@@ -92,15 +94,29 @@ int zxpac4b::lz_search_matches(char* buf, int len, int interval)
                 << std::dec << std::setw(0) <<  ") -> " << num << ": ";
             if (num > 0) {
                 for (int n = 0; n < num; n++) {
-                    assert(m_cost_array[pos].matches[n].offset < 131072);
-                    std::cerr << m_cost_array[pos].matches[n].offset << ":"
-                              << m_cost_array[pos].matches[n].length << " ";
+                    assert(m_match_array[n].offset < 131072);
+                    std::cerr << m_match_array[n].offset << ":"
+                              << m_match_array[n].length << " ";
                 }
             } else {
                 std::cerr << "no match";
             }
             std::cerr << "\n";
         }
+
+        // always do literal cost calculation
+        m_cost.literal_cost(pos,m_cost_array,buf);
+        
+        // match cost calculation if not at the end of file and there was a match
+        if (pos < (len - ZXPAC4B_MATCH_MIN)) {
+            for (int match_pos = 0; match_pos < num; match_pos++) {
+                offset = m_match_array[match_pos].offset;
+                length = m_match_array[match_pos].length;
+                m_cost.match_cost(pos,m_cost_array,buf,offset,length);
+            }
+        }        
+        ////////////////////////////////////////////
+
         ++pos;
     }
 
@@ -115,29 +131,21 @@ int zxpac4b::lz_parse(const char* buf, int len, int interval)
     int pos;
     int next;
     int num_literals;
-    int pmr_offset = m_lz_config->initial_pmr_offset;
     int previous_was_pmr;
 
     // Unused at the moment..
     (void)interval;
 
     if (verbose()) {
+        if (m_lz_config->reverse_file) {
+            std::cout << "Reversed file parsing engaged" << std::endl;
+        } else {
+            std::cout << "History parsing engaged" << std::endl;
+        }
+    }
+    if (verbose()) {
         std::cout << "Calculating arrival costs" << std::endl;
     }
-    
-    m_cost.init_cost(m_cost_array,0,len,pmr_offset);
-
-    for (pos = 0; pos < len; pos++) {
-        // always do literal cost calculation
-        m_cost.literal_cost(pos,m_cost_array,buf);
-        
-        // match cost calculation if not at the end of file and there was a match
-        if (pos < (len - ZXPAC4B_MATCH_MIN)) {
-            m_cost.match_cost(pos,m_cost_array,buf);
-        }        
-    }
-
-    //
     if (verbose()) {
         std::cout << "Building list of optimally parsed matches" << std::endl;
     }
