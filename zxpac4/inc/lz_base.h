@@ -14,6 +14,7 @@
 #define _LZ_BASE_H_INCLUDED
 
 #include <iostream>
+#include <cassert>
 #include "cstdint"
 #include "lz_util.h"
 

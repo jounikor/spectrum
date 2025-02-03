@@ -341,11 +341,11 @@ int zxpac4_32k_cost::impl_match_cost(int pos, cost* c, const char* buf, int offs
     if (pmr_found == false && pos >= pmr_offset) {
         int max_match = lz_get_config()->max_match; 
 
-        n = pos < m_max_len-max_match ? max_match : m_max_len - pos;
+        n = pos < m_max_len - max_match ? max_match : m_max_len - pos;
         length = check_match(&buf[pos],&buf[pos-pmr_offset],n);
         assert(length <= max_match);
 
-        if (length >= 2) {
+        if (length >= lz_get_config()->min_match) {
             new_cost = p_ctx->arrival_cost + tag_cost;
             new_cost += get_length_bits(length);
             
@@ -356,11 +356,9 @@ int zxpac4_32k_cost::impl_match_cost(int pos, cost* c, const char* buf, int offs
                 p_ctx[length].arrival_cost = new_cost;
                 p_ctx[length].length       = length;
                 p_ctx[length].last_was_literal = false;
-            }
-        }
-    }
+    }   }   }
 
-    return 0;
+    return length >= lz_get_config()->good_match ? lz_get_config()->good_match : 1;
 }
 
 int zxpac4_32k_cost::impl_init_cost(cost* p_ctx, int sta, int len, int pmr)

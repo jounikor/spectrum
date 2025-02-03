@@ -375,7 +375,7 @@ int zxpac4_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset, 
     if (pmr_found == false && pos >= pmr_offset) {
         int max_match = lz_get_config()->max_match;
 
-        n = pos < m_max_len-max_match ? max_match : m_max_len - pos;
+        n = pos < m_max_len - max_match ? max_match : m_max_len - pos;
         length = check_match(&buf[pos],&buf[pos-pmr_offset],n);
         assert(length <= max_match);
 
@@ -384,15 +384,12 @@ int zxpac4_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset, 
             new_cost += get_length_bits(length);
             
             if (p_ctx[length].arrival_cost >= new_cost) {
-            //std::cerr << "PMR at " << pos << ", " << pmr_offset << ", " << length << "\n";
                 p_ctx[length].offset       = 0;
                 p_ctx[length].pmr_offset   = pmr_offset;
                 p_ctx[length].arrival_cost = new_cost;
                 p_ctx[length].length       = length;
                 p_ctx[length].last_was_literal = false;
-            }
-        }
-    }
+    }   }   }
 
     return length >= lz_get_config()->good_match ? length : 1;
 }

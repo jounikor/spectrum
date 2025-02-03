@@ -1,10 +1,11 @@
 /**
  * @file cost4b.cpp
  * @brief Calculates an approximate cost for the LZ encoding.
- * @version 0.2
+ * @version 0.3
  * @author Jouni 'Mr.Spiv' Korhonen
  * @date 7-Apr-2024
  * @date 4-Aug-2024
+ * @date 3-Feb-2025
  * @copyright The Unlicense
  *
  * @note TODOs - the current design still has few (pun intended) flaws I want to change:
@@ -347,11 +348,13 @@ int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset,
     pmr_offset = p_ctx->pmr_offset;
 
     if (pmr_found == false && pos >= pmr_offset) {
-        n = pos < m_max_len-255 ? 255 : m_max_len+ - pos;
+        int max_match = lz_get_config()->max_match;
+        
+        n = pos < m_max_len - max_match ? max_match : m_max_len - pos;
         length = check_match(&buf[pos],&buf[pos-pmr_offset],n);
-        assert(length < 256);
+        assert(length <= max_match);
 
-        if (length >= 2) {
+        if (length >= lz_get_config()->min_match) {
             new_cost = p_ctx->arrival_cost + tag_cost;
             new_cost += get_length_bits(length);
             
@@ -362,10 +365,9 @@ int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset,
                 p_ctx[length].length       = length;
                 p_ctx[length].last_was_literal = false;
                 p_ctx[length].num_literals = 0;
-            }
-        }
-    }
-    return 0;
+    }   }   }
+    
+    return length >= lz_get_config()->good_match ? lz_get_config()->good_match : 1;
 }
 
 int zxpac4b_cost::impl_init_cost(cost* p_ctx, int sta, int len, int pmr)

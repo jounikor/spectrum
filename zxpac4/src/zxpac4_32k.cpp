@@ -119,7 +119,7 @@ int zxpac4_32k::lz_search_matches(char* buf, int len, int interval)
             for (int match_pos = 0; match_pos < num; match_pos++) {
                 offset = m_match_array[match_pos].offset;
                 length = m_match_array[match_pos].length;
-                m_cost.match_cost(pos,m_cost_array,buf,offset,length);
+                length = m_cost.match_cost(pos,m_cost_array,buf,offset,length);
             }
         }        
         
