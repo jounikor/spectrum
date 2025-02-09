@@ -59,6 +59,7 @@ namespace targets {
         int max_match;              /**< Maximum match length for this target. 0 mean use algorithm maximum. */
         uint32_t load_addr;         /**< Load address of the binary for a target. 0x0 if not used. */
         uint32_t jump_addr;         /**< Jump address to the binary for a target. 0x0 if not used. */
+        const char* file_name;      /**< Filename for the output file e.g. ZX Spectrum TAP file. */
 
         int8_t initial_pmr;         /**< Target specific initial PMR offset. 0 use algorithm default. */
         bool overlay:1;             /**< Amiga target specific: use overlay decompressor. */

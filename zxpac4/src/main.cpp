@@ -50,6 +50,9 @@
 #define ZXPAC_DEFAULT       ZXPAC4
 
 
+static const char* def_filename = "SCOOPEX";
+
+
 // Did not want to "reinvent" a command line parser thus
 // we use the old trusty getopt..
 
@@ -73,6 +76,7 @@ static struct option longopts[] = {
     {"merge-hunks", no_argument,        NULL, 'M'},
     {"equalize-hunks", no_argument,     NULL, 'E'},
     {"help",        no_argument,        NULL, 'h'},
+    {"file-name",   required_argument,  NULL, 'n'},
     {0,0,0,0}
 };
 
@@ -89,7 +93,7 @@ static void usage(char *prg, const targets::target* trg) {
     std::cerr << "  --max-chain,-c num    Maximum number of stored matches per position "
               << "(min 1, max " << MAX_CHAIN << ").\n";
     std::cerr << "  --good-match,-g num   Match length that cuts further searches.\n";
-    std::cerr << "  --max-match,-m len    Set teh maximum match length. Default is an algorithm specific.\n"
+    std::cerr << "  --max-match,-m len    Set the maximum match length. Default is an algorithm specific.\n"
               << "                        (Note, this is an expert option. You better know what you are doing.\n";
     std::cerr << "  --backward,-B num     Number of backward steps after a found match "
               << "(min 0, max " << MAX_BACKWARD_STEPS << ").\n";
@@ -111,6 +115,7 @@ static void usage(char *prg, const targets::target* trg) {
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
     std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
     std::cerr << "  --verbose,-v          Output some additional information to stdout.\n";
+    std::cerr << "  --file-name.-n        Filename, for example, for ZX Spectrum TAP file.\n";
     std::cerr << "  --help,-h             Print this output ;)\n";
     std::cerr << std::flush;
     exit(EXIT_FAILURE); 
@@ -125,6 +130,7 @@ static targets::target my_targets[] = {
         0,
         0x0,
         0x0,
+        NULL,
         4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
@@ -137,6 +143,7 @@ static targets::target my_targets[] = {
         0,
         0x0,
         0x0,
+        NULL,
         4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
@@ -149,6 +156,7 @@ static targets::target my_targets[] = {
         255,
         0x0,
         0x0,
+        def_filename,
         4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
@@ -161,6 +169,7 @@ static targets::target my_targets[] = {
         255,
         0x0,
         0x0,
+        def_filename,
         4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
@@ -173,6 +182,7 @@ static targets::target my_targets[] = {
         0,
         0x0,        // load address
         0x0,        // jump address
+        NULL,
         4,          // initial_pmr
         false,      // overlay
         false,      // merge_hunks
@@ -346,6 +356,7 @@ int main(int argc, char** argv)
     uint32_t trg_load_addr = 0;
     uint32_t trg_jump_addr = 0;
     lz_base* lz = NULL;
+    const char* trg_file_name = NULL;
 
     targets::target* trg = NULL;
 
@@ -464,6 +475,9 @@ int main(int argc, char** argv)
                 trg_equalize_hunks = true;
                 trg_merge_hunks = true;
                 break;
+            case 'n':   // --file-name
+                trg_file_name = optarg;
+                break;
             case '?':
 			case ':':
 				usage(argv[0],trg);
@@ -532,6 +546,7 @@ int main(int argc, char** argv)
     trg->overlay = trg_overlay;
     trg->load_addr = trg_load_addr;
     trg->jump_addr = trg_jump_addr;
+    trg->file_name = trg_file_name;
     cfg.verbose = cfg_verbose_on;
     cfg.debug_level = cfg_debug_level;
 
