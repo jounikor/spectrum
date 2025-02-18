@@ -51,9 +51,10 @@ int  target_ascii::save_header(const char* buf, int len)
     return 0;
 }
 
-int  target_ascii::post_save(int len)
+int  target_ascii::post_save(const char* buf, int len)
 {
     (void)len;
+    (void)buf;
     return len;
 }
 

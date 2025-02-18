@@ -151,7 +151,7 @@ static targets::target my_targets[] = {
     },
     {   "zx",
         (1<<16) - 1,
-        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
+        1<<ZXPAC4_32K,
         ZXPAC4_32K,
         255,
         0x0,
@@ -281,6 +281,7 @@ static int handle_file(const targets::target* trg, lz_base* lz, lz_config_t* cfg
     int n = 0;
     // extra N characters to avoid buffer overrun with 3 byte hash function..
     char* buf = new (std::nothrow) char[len+3];
+    char* tmp = NULL;
     target_base* trg_ptr = create_target(trg,cfg,ofs);
 
     if (buf == NULL) {
@@ -314,9 +315,16 @@ static int handle_file(const targets::target* trg, lz_base* lz, lz_config_t* cfg
 
     lz->lz_search_matches(buf,len,0); 
     lz->lz_parse(buf,len,0); 
-    n = lz->lz_encode(buf,len,ofs); 
 
-    if ((n = trg_ptr->post_save(n)) < 0) {
+    // This is obviously a wrong place to do this type of target checking..
+    if (!(strcmp(trg->target_name,"zx"))) {
+        n = lz->lz_encode(buf,len,NULL);
+        tmp = buf;
+    } else {
+        n = lz->lz_encode(buf,len,&ofs);
+        tmp = NULL;
+    }
+    if ((n = trg_ptr->post_save(tmp,n)) < 0) {
         std::cerr << ERR_PREAMBLE << "Post save failed" << std::endl;
     }
 error_exit: 
@@ -383,7 +391,7 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "Em:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "Em:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:n:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'O':   // --overlay
                 trg_overlay = true;
@@ -522,14 +530,16 @@ int main(int argc, char** argv)
         if (cfg_max_match > trg->max_match || cfg_max_match < 0) {
             cfg_max_match = trg->max_match;
             if (cfg_verbose_on) {
-                std::cout << "**Warning: maximum match too big. Truncating to " << cfg_max_match << "\n";
+                std::cout << "**Warning: maximum match too big for the target. "
+                          << "Truncating to " << cfg_max_match << ".\n";
             }
         }
     }
     if (cfg_max_match > cfg.max_match) {
         cfg_max_match = cfg.max_match;
         if (cfg_verbose_on) {
-            std::cout << "**Warning: maximum match too big. Truncating to " << cfg_max_match << "\n";
+            std::cout << "**Warning: maximum match too big. "
+                      << "Truncating to " << cfg_max_match << ".\n";
         }
     }
     if (cfg_max_match > 0) {
@@ -546,9 +556,15 @@ int main(int argc, char** argv)
     trg->overlay = trg_overlay;
     trg->load_addr = trg_load_addr;
     trg->jump_addr = trg_jump_addr;
-    trg->file_name = trg_file_name;
     cfg.verbose = cfg_verbose_on;
     cfg.debug_level = cfg_debug_level;
+    
+    // file name
+    if (trg_file_name == NULL) {
+        trg->file_name = argv[optind];
+    } else {
+        trg->file_name = trg_file_name;
+    }
 
     // The following stuff is horrible.. Needs to be hidden under
     // multiple functions to avoid recurring cleanup due initialization

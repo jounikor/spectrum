@@ -48,11 +48,13 @@ not_empty:
 ;
 ;
 ;
+    IF 0
 main:
         ld      hl,file_end
         ld      de,file
         call    z80rdec
         ret
+    ENDIF
 
 z80rdec: ;
         xor     a
@@ -217,7 +219,7 @@ _last_byte_copy:
         ;
 
 file:
-        incbin  "../r32k.pac"
+        ;incbin  "../r32k.pac"
 file_end:
 
         END main

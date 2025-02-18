@@ -5,14 +5,10 @@ ZXPAC4 version 0.1 (c) 2024 Jouni 'Mr.Spiv' Korhonen
 
 TODO. Quite few optios/features are still not done:
  * BBC Master A/B target
- * ZX Spectrum target
  * Amiga target overlay decompressor
  * --backward support has not been implemented
  * ZXPAC4(b)(_32k) match searcher and cost calculation
    - With long matched generate costs instead of searching again.
-   - Memory usage reduction i.e. reduce the "found matches" to the 
-     size of window instead of the entire file. This is somewhat
-     involved so I keep pushing it into the future.
  * Add S405 algorithm to Amiga target.
 
 About compiling. You need the following to compile this project:
@@ -54,38 +50,42 @@ Some notes on the targets:
 
 Usage and commandline options summary:
 
+ZXPAC4 v0.1 (c) 2022-24 Jouni 'Mr.Spiv' Korhonen
+
 Usage: ./build/zxpac4 target [options] infile [outfile]
  Targets:
   bin - Binary data file
   asc - 7bit ASCII data file
-  zx  - ZX Spectrum self-executing TAP
-  bbc - BBC Micro self-executing program
-  ami - Amiga self-executing program
+  zx  - ZX Spectrum self executing TAP
+  bbc - BBC Micro self executing program
+  ami - Amiga self executing program
  Options:
   --max-chain,-c num    Maximum number of stored matches per position (min 1, max 9999).
   --good-match,-g num   Match length that cuts further searches.
-  --max-match,-m num    Maximum match length size (default now 0). (Note, this is an expert
-                        option. You better know what you are doing. Default depends on the
-                        current selected target, where 0 means algorithm default maximum).
+  --max-match,-m len    Set the maximum match length. Default is an algorithm specific.
+                        (Note, this is an expert option. You better know what you are doing.
   --backward,-B num     Number of backward steps after a found match (min 0, max 16).
   --only-better,-b      Further matches in the history must always be better than previous
                         matches for the same position (default no).
-  --pmr-offset,-p       Initial PMR offset between 1 and 127 (default depends on the target).
+  --pmr-offset,-p       Initial PMR offset between 1 and 63 (default depends on the target).
   --reverse-encoded,-r  Reverse the encoded file to allow end-to-start decompression
                         (default no reverse)
   --reverse-file,-R     Reverse the input file to allow end-to-start decompression. This
                         setting will enable '--reverse-encoded' as well (default no reverse)
   --algo,-a             Select used algorithm (0=zxpac4, 1=xzpac4b, 2=zxpac4_32k).
-                        (default depends on the target)
+                        (default depends on the target).
   --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).
   --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.
-  --exe,-X              Self-extracting decruncher (Amiga target).
-  --merge_hunks,-M      Merge hunks (Amiga target). 
+  --merge-hunks,-M      Merge hunks (Amiga target).
+  --equalize-hunks,-E   Treat HUNK_CODE/DATA/BSS all the same. This setting will enable
+                        '--merge-hunks' as well (Amiga target).
   --overlay,-O          Self-extracting overlay decruncher (Amiga target).
   --debug,-d            Output a LOT OF debug prints to stderr.
   --DEBUG,-D            Output EVEN MORE debug prints to stderr.
   --verbose,-v          Output some additional information to stdout.
+  --file-name.-n        Filename, for example, for ZX Spectrum TAP file.
   --help,-h             Print this output ;)
+
 
 The following options affect the compression outcome (and typically also the memory usage
 during the compression). 
@@ -322,13 +322,19 @@ Target specific options and features:
 
  ZX Spectrum:
   ZX Spectrum target input file length is restricted to maximum 64KB.
-  TBD
+  The compressed file is saved as a self-executing TAP file. The TAP
+  file contains a simple one line BASIC program that contains an REM
+  command, which includes the decompression routine and the compressed
+  binary file. Obviously, you cannot edit nor view the line as the ROM
+  BASIC interpreter goes wild with the binary content of the REM.
+
+  Note! Only zxpac4_32k is supported at the moment.
 
  BBC:
   BBC Model A/B target input file length is restricted to maximum 64KB.
   TBD:
 
- Acsii:
+ ASCII:
   The ascii target check that the input file is all 7bit ASCII. If not the
   compression is aborted.
 
@@ -338,6 +344,7 @@ Z80 Decompressors:
  * z80rdec_rev.asm - zxpac4(_32k) from higher to lower memory (inplace) decompressor
                      that also reverses the file after decompression
  * z80rdecb.asm    - zxpac4b from higher to lower memory (inplace) decompressor
+ * z80tap.asm      - zxpac4_32k decompressor for self-executing TAP files.
 
 M680x0 Decompressors: 
  * zxpac4_abs.asm      - Absolute address executable decompressor.

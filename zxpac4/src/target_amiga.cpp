@@ -496,7 +496,7 @@ int target_amiga::post_save_abs(int len)
     char tmp[4] = {0};
     int original_len = len;
     int n;
-    
+
     len += abs_decompressors[m_cfg->algorithm].length;
 
     if (len % 4) {
@@ -555,8 +555,10 @@ int target_amiga::post_save_overlay(int len)
     return -1;
 }
 
-int target_amiga::post_save(int len)
+int target_amiga::post_save(const char* buf, int len)
 {
+    (void)buf;
+
     if (m_nohunks) {
         return post_save_abs(len);
     }

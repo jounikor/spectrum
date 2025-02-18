@@ -23,9 +23,10 @@ class conput:
 
 
 def bin2c( lab, b, n, o ):
-   
-    ss = "unsigned char {:s}[{:d}] = {{\n".format(lab,n)
-    o.write(ss.encode())
+  
+    if (lab != ""):
+        ss = "unsigned char {:s}[{:d}] = {{\n".format(lab,n)
+        o.write(ss.encode())
 
     i = 0
 
@@ -43,9 +44,8 @@ def bin2c( lab, b, n, o ):
 
         i = i+1
 
-
-    o.write("\n};\n".encode())
-
+    if (lab != ""):
+        o.write("\n};\n".encode())
 
 #
 #

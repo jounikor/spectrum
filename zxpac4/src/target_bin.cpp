@@ -32,9 +32,10 @@ int  target_binary::save_header(const char* buf, int len)
     return 0;
 }
 
-int  target_binary::post_save(int len)
+int  target_binary::post_save(const char* buf, int len)
 {
     (void)len;
+    (void)buf;
     return len;
 }
 

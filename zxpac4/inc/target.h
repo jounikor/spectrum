@@ -130,12 +130,14 @@ public:
      *  The postamble function may change the content of the input file. The
      *  retuned buffer length may be longer than the original buffer size.
      * 
+     * @param buf[in]    A ptr to compressed data. May be NULL if the buffer 
+     *                   is not available.
      * @param len[in]    The length of the compressed file.
      *
      * @return The final size of the saved file. Negative value if there was
      *         an error.
      */
-    virtual int post_save(int len) = 0;
+    virtual int post_save(const char* buf, int len) = 0;
 };
 
 class target_amiga : public target_base {
@@ -162,7 +164,7 @@ public:
     ~target_amiga(void);
     int preprocess(char* buf, int len);
     int save_header(const char* buf, int len);
-    int post_save(int len);
+    int post_save(const char* buf, int len);
 };
 
 class target_ascii : public target_base {
@@ -171,7 +173,7 @@ public:
     ~target_ascii(void);
     int preprocess(char* buf, int len);
     int save_header(const char* buf, int len);
-    int post_save(int len);
+    int post_save(const char* buf, int len);
 };
 
 class target_binary : public target_base {
@@ -180,16 +182,19 @@ public:
     ~target_binary(void);
     int preprocess(char* buf, int len);
     int save_header(const char* buf, int len);
-    int post_save(int len);
+    int post_save(const char* buf, int len);
 };
 
 class target_spectrum : public target_base {
+    char tap_chksum(const char* b, char c, int n);
+    char m_chksum;      /**< Partial checksum for data */
+
 public:
     target_spectrum(const targets::target* trg, const lz_config_t* cfg, std::ofstream& ofs);
     ~target_spectrum(void);
     int preprocess(char* buf, int len);
     int save_header(const char* buf, int len);
-    int post_save(int len);
+    int post_save(const char* buf, int len);
 };
 
 class target_bbc : public target_base {
@@ -198,7 +203,7 @@ public:
     ~target_bbc(void);
     int preprocess(char* buf, int len);
     int save_header(const char* buf, int len);
-    int post_save(int len);
+    int post_save(const char* buf, int len);
 };
 
 

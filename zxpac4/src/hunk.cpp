@@ -453,8 +453,8 @@ int amiga_hunks::optimize_hunks(char* exe, int len, const std::vector<hunk_info_
     for (seg_num = 0; seg_num < hunk_list.size(); seg_num++) {
         new_hunk_info_t new_seg = {
             .mem_size_typed_longs = (hunk_list[seg_num].memory_size >> 2) | (hunk_list[seg_num].combined_type & 0xc0000000),
-            hunk_list[seg_num].hunk_type,
-            static_cast<uint32_t>(hunk_list[seg_num].data_size >> 2)
+            .hunk_type = hunk_list[seg_num].hunk_type,
+            .data_size_longs = static_cast<uint32_t>(hunk_list[seg_num].data_size >> 2)
         };
         new_segments->push_back(new_seg);
     }
@@ -734,8 +734,8 @@ int amiga_hunks::merge_hunks(char* exe, int len, std::vector<hunk_info_t>& hunk_
     for (m = 0; m < num_new_seg; m++) {
         new_hunk_info_t new_seg = {
             .mem_size_typed_longs = (merged_mem_size[m] >> 2) | (merged_hunk_type[m] & 0xc0000000),
-            merged_hunk_type[m] & 0x3fffffff,
-            merged_data_size[m] >> 2
+            .hunk_type            = merged_hunk_type[m] & 0x3fffffff,
+            .data_size_longs      = merged_data_size[m] >> 2
         };
         new_segments->push_back(new_seg);
     }

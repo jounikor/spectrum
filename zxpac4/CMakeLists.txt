@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.10)
 # set the project name
 project(lz VERSION 0.1 LANGUAGES CXX)
 set (TARGET zxpac4)
-set (CMAKE_CXX_STANDARD 11)
+set (CMAKE_CXX_STANDARD 20)
 set (CMAKE_BUILD_TYPE DEBUG)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/build)
@@ -39,7 +39,7 @@ if (DEFINED CMAKE_BUILD_TYPE)
 endif()
 
 include_directories(inc)
-#target_include_directories(${TARGET}	PUBLIC "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}")
+#target_include_directories(${TARGET} PUBLIC "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}")
 #target_include_directories(${TARGET} PUBLIC "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}" "${PROJECT_SOURCE_DIR}/inc")
 
 # Common files for the adftools
@@ -76,6 +76,9 @@ add_executable(${TARGET} ${COMMON_SRC})
 
 # Add m68k decompressor targets
 add_subdirectory(m68k)
+
+# Add z80 decompressor targets
+add_subdirectory(z80)
 
 # Now set emuation stub active
 #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DEXAMPLE_SET_RX_CONFIG")

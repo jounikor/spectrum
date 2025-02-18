@@ -208,7 +208,7 @@ public:
     virtual const cost* lz_get_result(void) = 0;
     virtual const cost* lz_cost_array_get(int len) = 0;
     virtual void lz_cost_array_done(void) = 0;
-    virtual int lz_encode(const char* buf, int len, std::ofstream& ofs) = 0;
+    virtual int lz_encode(char* buf, int len, std::ofstream* ofs) = 0;
     
     // Methods implemented within the base class
     void set_debug_level(int level) {

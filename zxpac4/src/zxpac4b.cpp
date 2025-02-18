@@ -461,7 +461,7 @@ int zxpac4b::encode_history(const char* buf, char* p_out, int len, int pos)
 }
 
 
-int zxpac4b::lz_encode(const char* buf, int len, std::ofstream& ofs)
+int zxpac4b::lz_encode(char* buf, int len, std::ofstream* ofs)
 {
     int n;
     char* p_out;
@@ -486,8 +486,14 @@ int zxpac4b::lz_encode(const char* buf, int len, std::ofstream& ofs)
         if (verbose()) {
             std::cout << "Compressed length: " << n << std::endl;
         }
-
-        ofs.write(p_out,n);
+        if (ofs) {
+            if (!(ofs->write(p_out,n))) {
+                std::cerr << ERR_PREAMBLE << "writing compressed file failed" << std::endl;
+                n = -1;
+            }
+        } else {
+            ::memcpy(buf,p_out,n);
+        }
     } else {
         if (verbose()) {
             std::cout << "Compression failed.." << std::endl;
