@@ -203,6 +203,12 @@ public:
     const lz_config* lz_get_config(void) {
         return m_lz_config;
     }
+    /**
+     * Performs string matching for the buffer of a given length. Possible
+     * match cost book keeping is also populated at the same time.
+     *
+     *
+     */
     virtual int lz_search_matches(char* buf, int len, int interval) = 0;
     virtual int lz_parse(const char* buf, int len, int interval) = 0;
     virtual const cost* lz_get_result(void) = 0;

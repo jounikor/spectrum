@@ -127,11 +127,19 @@ public:
     /**
      * @brief Save a possible postamble or fix the header in the output file.
      *
-     *  The postamble function may change the content of the input file. The
-     *  retuned buffer length may be longer than the original buffer size.
+     *  The postamble function cannot change the content of the input file but
+     *  may do other computation over the provided buffer. or modify the output
+     *  file stream.
      * 
-     * @param buf[in]    A ptr to compressed data. May be NULL if the buffer 
-     *                   is not available.
+     * @param buf[in]    A ptr to compressed data. Can be NULL if the buffer 
+     *                   is not available. This is useful e.g., in cases where the
+     *                   post_save() function need to calculate a CRC over the
+     *                   compressed data and saving the compressed data is done
+     *                   in post_save() as well.
+     *                   Note! this requires that the main loop passed a NULL ptr
+     *                   instead of std::ofsteam to lz_encode(). In this case the
+     *                   lz_encode() populates the input buffer with compressed
+     *                   data.
      * @param len[in]    The length of the compressed file.
      *
      * @return The final size of the saved file. Negative value if there was
