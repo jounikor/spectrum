@@ -135,6 +135,7 @@ static targets::target my_targets[] = {
         false,      // overlay
         false,      // merge_hunks
         false,      // equalize_hunks
+        false,      // encode_to_ram
     },
     {   "bin",
         (1<<24) - 1,
@@ -148,6 +149,7 @@ static targets::target my_targets[] = {
         false,      // overlay
         false,      // merge_hunks
         false,      // equalize_hunks
+        false,      // encode_to_ram
     },
     {   "zx",
         (1<<16) - 1,
@@ -161,6 +163,7 @@ static targets::target my_targets[] = {
         false,      // overlay
         false,      // merge_hunks
         false,      // equalize_hunks
+        true,       // encode_to_ram
     },
     {   "bbc",
         (1<<16) - 1,
@@ -174,6 +177,7 @@ static targets::target my_targets[] = {
         false,      // overlay
         false,      // merge_hunks
         false,      // equalize_hunks
+        false,      // encode_to_ram
     },
     {   "ami",
         (1<<24) - 1,
@@ -187,6 +191,7 @@ static targets::target my_targets[] = {
         false,      // overlay
         false,      // merge_hunks
         false,      // equalize_hunks
+        false,      // encode_to_ram
     }   
 };
 
@@ -317,7 +322,7 @@ static int handle_file(const targets::target* trg, lz_base* lz, lz_config_t* cfg
     lz->lz_parse(buf,len,0); 
 
     // This is obviously a wrong place to do this type of target checking..
-    if (!(strcmp(trg->target_name,"zx"))) {
+    if (trg->encode_to_ram) {
         n = lz->lz_encode(buf,len,NULL);
         tmp = buf;
     } else {

@@ -65,6 +65,8 @@ namespace targets {
         bool overlay:1;             /**< Amiga target specific: use overlay decompressor. */
         bool merge_hunks:1;         /**< Amiga target specific: merge executable file hunks when possible. */
         bool equalize_hunks:1;      /**< Amiga target specific: treat HUNK_CODE/DATA/BSS the same. */
+        bool encode_to_ram:1;       /**< Set TRUE if the comressed file is provided as a RAM buffer instead
+                                         of directly saving into a file. */
     };
 
     struct decompressor {
