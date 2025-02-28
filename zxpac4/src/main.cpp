@@ -115,7 +115,7 @@ static void usage(char *prg, const targets::target* trg) {
     std::cerr << "  --debug,-d            Output a LOT OF debug prints to stderr.\n";
     std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
     std::cerr << "  --verbose,-v          Output some additional information to stdout.\n";
-    std::cerr << "  --file-name.-n        Filename, for example, for ZX Spectrum TAP file.\n";
+    std::cerr << "  --file-name,-n        Filename, for example, for ZX Spectrum TAP file.\n";
     std::cerr << "  --help,-h             Print this output ;)\n";
     std::cerr << std::flush;
     exit(EXIT_FAILURE); 
