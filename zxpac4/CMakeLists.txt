@@ -70,6 +70,8 @@ set(COMMON_SRC  src/cost4.cpp
                 inc/hunk.h
                 inc/target.h
                 inc/version.h
+
+                z80/z80_offsets.h
 )
 
 add_executable(${TARGET} ${COMMON_SRC})

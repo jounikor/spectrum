@@ -94,7 +94,7 @@ static void usage(char *prg, const targets::target* trg) {
               << "(min 1, max " << MAX_CHAIN << ").\n";
     std::cerr << "  --good-match,-g num   Match length that cuts further searches.\n";
     std::cerr << "  --max-match,-m len    Set the maximum match length. Default is an algorithm specific.\n"
-              << "                        (Note, this is an expert option. You better know what you are doing.\n";
+              << "                        (Note, this is an expert option. You better know what you are doing).\n";
     std::cerr << "  --backward,-B num     Number of backward steps after a found match "
               << "(min 0, max " << MAX_BACKWARD_STEPS << ").\n";
     std::cerr << "  --only-better,-b      Further matches in the history must always be better than previous\n"

@@ -64,15 +64,14 @@ static const uint8_t tapLoader[] = {
 };
 
 #include "../z80/z80tap_255_32k.h"
+#include "../z80/z80_offsets.h"
 
 #define Z80DECSIZE          sizeof(z80tap_255_32k_bin)
 #define TAPLOADERSIZE       sizeof(tapLoader)
-#define TAPBASICSIZE        44+0			            // terminating 0x0d excluded
-#define TAPBASICLOADERSIZE  40+0	                    // excludes terminating 0x0d
-#define Z80LOADADDR         TAPLOADERSIZE+8             // TAP to start of decompressor + 8
-#define Z80JUMPADDR         TAPLOADERSIZE+1            
-
-
+#define TAPBASICSIZE        44+0			                    // terminating 0x0d excluded
+#define TAPBASICLOADERSIZE  40+0	                            // excludes terminating 0x0d
+#define Z80LOADADDR         TAPLOADERSIZE+Z80_LOADADDR_OFFSET   // TAP to start of decompressor + 8
+#define Z80JUMPADDR         TAPLOADERSIZE+Z80_JUMPADDR_OFFSET         
 
 char target_spectrum::tap_chksum(const char *b, char c, int n) {
 	int i;
