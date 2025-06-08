@@ -13,10 +13,11 @@ TODO. Quite few optios/features are still not done:
 
 About compiling. You need the following to compile this project:
  * C++11 or better C++ compiler ('advanced' feature usage is minimal, though)
- * vasmm68k_mot cross assembler (see http://sun.hasenbraten.de/vasm/)
- * python3
- * Recent cmake (like 3.30.x or so)
- * In the future Pasmo or vasm with Z80 target (not integrated yet)
+ * vasmm68k_mot cross assembler (see http://sun.hasenbraten.de/vasm/) to
+   assemble Amiga decompresiion routines.
+ * Pasmo to assembler ZX Spectrum decompression routines.
+ * python3 to produce .h files from assembled binaries.
+ * Recent cmake (like 3.30.x or so).
 
 Some notes on the targets:
  * 'asc' is an 7bit ASCII target. The file will be tested that it is 7bit only.
