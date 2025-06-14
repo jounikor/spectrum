@@ -1,10 +1,9 @@
-#
-#
-#
+# (c) 2025 Jouni 'Mr.Spiv' Korhonen
+# 
+# Some test code for tabled ANS encoder and decoder.
 #
 
 import math
-
 
 #
 #
@@ -38,8 +37,6 @@ class tANS(object):
 #
 
 class tANS_encoder(tANS):
-    MAX_SCALE_RETRIES = 3
-
     #
     def __init__(self, M:int, Ls:[int],DEBUG=False):
         super().__init__(M,DEBUG)
@@ -81,9 +78,9 @@ class tANS_encoder(tANS):
                 for yp_pos in range(yp_tmp,yp_tmp+(1<<k_tmp)):
                     if (self.DEBUG):
                         print("s",s,"p",p,"xp",xp,"k_tmp",k_tmp,"yp_tmp",yp_tmp,"y_pos",yp_pos)
-                    self.next[s][yp_pos % self.M] = xp + self.M
+                    self.next[s][yp_pos % self.M] = xp #+ self.M
                     
-            self.symbol_last[s] = xp + self.M
+            self.symbol_last[s] = xp #+ self.M
 
 
 
@@ -139,6 +136,9 @@ class tANS_encoder(tANS):
         self.L = L
         return True
 
+    def get_scaled_Ls(self):
+        return self.Ls
+
     def init_encoder(self):
         self.state = None
 
@@ -153,15 +153,47 @@ class tANS_encoder(tANS):
         if (self.DEBUG):
             print(f"symbol: {s}, state: {self.state}, ",end="")
 
-        k = self.k[self.state % self.M]
+        #k = self.k[self.state % self.M]
+        k = self.k[self.state]
         b = self.state & ((1 << k) - 1)
-        self.state = self.next[s][self.state % self.M]
+        #self.state = self.next[s][self.state % self.M]
+        self.state = self.next[s][self.state]
 
         if (self.DEBUG):
             print(f"new state: {self.state}")
         return k,b
 
+#
+#
+#
+#
 
+class tANS_decoder(tANS):
+    #
+    def __init__(self, M:int, Ls:[int],DEBUG=False):
+        super().__init__(M,DEBUG)
+        self.buildDecodingTables()
+
+    def buildDecodingTables(self):
+        # Only y and k tables needed..
+        self.y     = [0] * self.M                       # not needed
+        self.k     = [0] * self.M 
+
+        xp = 0
+
+        for s in range(Ls.__len__()):
+            c = Ls[s]
+
+            for p in range(c,2*c):
+                xp = (xp + self.spreadStep()) % self.M
+                self.y[xp] = p
+                
+                # k and next tables for each symbol
+                k_tmp = self.get_k(p,self.M)
+                self.k[xp] = k_tmp
+
+    def init_decoder(self,state):
+        self.state = state
 
 
 if (__name__ == "__main__"):
@@ -191,10 +223,18 @@ if (__name__ == "__main__"):
         k,b = tans.encode(symbol)
         out.append((k,b))
 
-    print(f"Final state: {tans.done_encoder()}\n")
+    state = tans.done_encoder()
+
+    print(f"Final state: {state}\n")
     print(out)
 
+    Ls = tans.get_scaled_Ls()
+
     O = []
+    tans = tANS_decoder(16,Ls,True)
+    tans.init_decoder(state)
+    print(tans.y)
+    print(tans.k)
 
     for i in range(S.__len__()):
         pass
