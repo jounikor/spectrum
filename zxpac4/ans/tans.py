@@ -58,13 +58,16 @@ class tANS_encoder(tANS):
             c = self.Ls[s]
 
             for p in range(c,2*c):
+                # Note that we make the tables indices to be within [0..L)
+                # since values within [L..2L) % M is within [0..M)
                 xp = (xp + self.spreadStep()) % self.M
+                
                 # L for illustration purposes
                 # this is implicity the x value, no need for a table
                 self.L[xp] = s
+                
                 # y is for illustartive purposes
                 self.y[xp] = p
-                
                 
                 # next table for each symbol
                 k_tmp = self.get_k(p,self.M)
@@ -76,7 +79,7 @@ class tANS_encoder(tANS):
                     self.next[s][yp_pos % self.M] = xp #+ self.M
                     self.k[s][yp_pos % self.M] = k_tmp
                     
-            self.symbol_last[s] = xp #+ self.M
+            self.symbol_last[s] = xp
 
     def scaleSymbolFreqs(self, Ls):
         L = sum(Ls)
@@ -192,15 +195,16 @@ class tANS_decoder(tANS):
                 k_tmp = self.get_k(p,self.M)
                 self.k[xp] = k_tmp
 
-    def init_decoder(self,state):
+    def init_decoder(self,state,pos):
         self.state = state
-        self.rpos = 0
+        self.rpos = pos
 
     def decode(self,file):
         s = self.L[self.state]
-        k,b = file[self.rpos]
-        self.rpos += 1
-        self.state = ((self.y[self.state] << k) + b) % self.M
+        if (self.rpos >= 0):
+            self.rpos -= 1
+            k,b = file[self.rpos]
+            self.state = ((self.y[self.state] << k) + b) % self.M
         return s
 
 
@@ -228,9 +232,12 @@ if (__name__ == "__main__"):
 
     tans.init_encoder()
 
-    for symbol in reversed(S):
+    # This encodes from start to end, which is OK, since in a real
+    # application we decode from end to beginning in any case.
+    for symbol in S:
         k,b = tans.encode(symbol)
-        out.insert(0,(k,b))
+        if (k > 0):
+            out.append((k,b))
 
     state = tans.done_encoder()
 
@@ -241,15 +248,15 @@ if (__name__ == "__main__"):
 
     O = []
     tans = tANS_decoder(Ls,True)
-    tans.init_decoder(state)
+    tans.init_decoder(state,out.__len__())
     print(tans.L)
     print(tans.y)
     print(tans.k)
 
-    for i in range(out.__len__()):
+    for i in range(S.__len__()):
         symbol = tans.decode(out)
         print(f"Output: {symbol} and state: {tans.state}");
-        O.append(symbol)
+        O.insert(0,symbol)
 
     print("Original:")
     print(S)
