@@ -1,14 +1,20 @@
-# (c) 2025 Jouni 'Mr.Spiv' Korhonen
+#
+# (c) 2025-06-15 Jouni 'Mr.Spiv' Korhonen
 # 
-# Some test code for tabled ANS encoder and decoder.
+# Some test code for tabled ANS encoder and decoder.. for self
+# learnign and education purposes. Treat the code accordingly ;)
+#
+# The following article provided invaluable help. IMHO one of the
+# best 'hands-on" tutorial for understanding rANS and tANS.
+# https://medium.com/@bredelet/understanding-ans-coding-through-examples-d1bebfc7e076
 #
 
 import math
 
 #
+# The base class for both tANS encoder and decoder subclasses. The base
+# class implement the common functions used by encoder and decoder.
 #
-#
-
 class tANS(object):
     def __init__(self, M, DEBUG=False):
         if (M & (M - 1)):
@@ -32,9 +38,15 @@ class tANS(object):
         self.DEBUG = DEBUG
 
 #
+# The encoder class, which implement three funcdamental functions:
+# 1) Scaling the input symbol frequencies to a desired sum that is
+#    also a power of two.
+# 2) Building the encoding tables for a completely table driver
+#    encoding of symbols.
+# 3) Encoding a symbol, next state computation and outputting the
+#    additional bits required by the decoder to reconstruct the
+#    state for a given symbol.
 #
-#
-
 class tANS_encoder(tANS):
     #
     def __init__(self, M:int, Ls:[int],DEBUG=False):
@@ -46,9 +58,12 @@ class tANS_encoder(tANS):
         self.buildEncodingTables()
 
     def buildEncodingTables(self):
-        self.L     = [0] * self.M                       # not needed
-        self.symbol_last = [-1] * self.Ls.__len__()     # maybe needed..
-        self.y     = [0] * self.M                       # not needed
+        self.L     = [0] * self.M                       # Not needed but used for
+                                                        # debugging purposes.
+        self.symbol_last = [-1] * self.Ls.__len__()     # Used to select the 
+                                                        # initial state.
+        self.y     = [0] * self.M                       # Not needed but used for
+                                                        # debugging purposes.
         self.k     = [[0] * self.M for tmp in range(self.Ls.__len__())] 
         self.next  = [[0] * self.M for tmp in range(self.Ls.__len__())]
 
@@ -58,27 +73,35 @@ class tANS_encoder(tANS):
             c = self.Ls[s]
 
             for p in range(c,2*c):
-                # Note that we make the tables indices to be within [0..L)
-                # since values within [L..2L) % M is within [0..M)
+                # Note that we make the table indices reside between [0..L),
+                # since values within [L..2L) % M is within [0..M). This is 
+                # a simple algorithmic optimization to avoid extra index
+                # adjusting dering decoding..
                 xp = (xp + self.spreadStep()) % self.M
                 
-                # L for illustration purposes
-                # this is implicity the x value, no need for a table
+                # L is for illustration purposes
                 self.L[xp] = s
                 
-                # y is for illustartive purposes
+                # y is for illustration purposes
                 self.y[xp] = p
                 
-                # next table for each symbol
                 k_tmp = self.get_k(p,self.M)
                 yp_tmp = p << k_tmp
                 
                 for yp_pos in range(yp_tmp,yp_tmp+(1<<k_tmp)):
                     if (self.DEBUG):
                         print("s",s,"p",p,"xp",xp,"k_tmp",k_tmp,"yp_tmp",yp_tmp,"y_pos",yp_pos)
-                    self.next[s][yp_pos % self.M] = xp #+ self.M
-                    self.k[s][yp_pos % self.M] = k_tmp
                     
+                    # next table for each symbol.. this will explode in side when the
+                    # symbol set gets bigger.
+                    self.next[s][yp_pos % self.M] = xp #+ self.M
+                    
+                    # k table for each symbol.. this will explode in side when the
+                    # symbol set gets bigger.
+                    self.k[s][yp_pos % self.M] = k_tmp
+            
+            # Record the last state for the symbol. One of these will be used for the
+            # initial state when starting encpding.
             self.symbol_last[s] = xp
 
     def scaleSymbolFreqs(self, Ls):
@@ -96,9 +119,14 @@ class tANS_encoder(tANS):
             rem = 0
             ufl = 0
             for i in range(Ls.__len__()):
+                # Skip symbol if its count is zero
+                if (Ls[i] == 0):
+                    continue
+
                 count = Ls[i] * self.M + rem
                 tmp = int(count / L)
                 
+                # Do we have an underflow..?
                 if (tmp == 0):
                     if (self.DEBUG):
                         print(f"DEBUG: Ls[{i}] would become 0");
@@ -111,6 +139,7 @@ class tANS_encoder(tANS):
             if (self.DEBUG):
                 print(f"Number of underflows is {ufl}")
 
+            # My addition to handle underflows..
             i = Ls.__len__() - 1
             while (ufl > 0 and i > 0):
                 if (Ls[i] > 1):
@@ -154,10 +183,8 @@ class tANS_encoder(tANS):
         if (self.DEBUG):
             print(f"symbol: {s}, state: {self.state}, ",end="")
 
-        #k = self.k[self.state % self.M]
         k = self.k[s][self.state]
         b = self.state & ((1 << k) - 1)
-        #self.state = self.next[s][self.state % self.M]
         self.state = self.next[s][self.state]
 
         if (self.DEBUG):
@@ -176,10 +203,19 @@ class tANS_decoder(tANS):
         self.buildDecodingTables()
 
     def buildDecodingTables(self):
-        # Only iL, y and k tables needed..
-        self.L = [0] * self.M
-        self.y = [0] * self.M
-        self.k = [0] * self.M 
+        # Only L, y and k tables needed..
+        # When implementing the final output file you need the scaled symbol
+        # frequencies in Ls (with a total sum of M (a power of two value)).
+        # The Ls table must have frequency 0 for non-used symbols. Note, the
+        # mnumber of symbols in Ls does not need to be a power of two.
+        #
+        # For example, if Ls has 12 symbols but the sum(Ls) is 32 then you
+        # need 3x 32 bytes of RAM to build all 3 decoding tables. As long
+        # as the M <= 256 then table entries can be 1 unsigned byte each.
+        #
+        self.L = [0] * self.M   # state to symbol mapping table
+        self.y = [0] * self.M   # y values for each state
+        self.k = [0] * self.M   # k values for each state
 
         xp = 0
 
@@ -191,7 +227,7 @@ class tANS_decoder(tANS):
                 self.y[xp] = p
                 self.L[xp] = s
 
-                # k and next tables for each symbol
+                # k for each symbol
                 k_tmp = self.get_k(p,self.M)
                 self.k[xp] = k_tmp
 
@@ -214,7 +250,7 @@ if (__name__ == "__main__"):
     S = [0,2,1,2,0,1,1,2,1,2,1,1]
     out = []
 
-    LLs = [2,6,4]
+    LLs = [2,6,4,0]
     #LLs = [3,3,2]
 
     tans = tANS_encoder(16,LLs,True)
