@@ -1,13 +1,16 @@
+# 
+# (c) 2025 Jouni 'Mr.Spiv' Korhonen
 #
-#
-#
+# This example code implements streaming rANS encoder and decoder.
+# The renormalization part has been 'optimized' for architectures
+# that have 16*16 -> 32 bit multiplication.
 #
 
 import math
 
 #F =   [3,3,2]                  # M = 8
-F =   [12288,12288,8192]       # M = 32768
-#F =   [24576,24576,16384]       # M = 65536
+#F =   [12288,12288,8192]       # M = 32768
+F =   [24576,24576,16384]       # M = 65536
 
 L_BYTE_BOUND = 1 << 23
 
@@ -16,7 +19,10 @@ def encode(out,state,symbol):
     M = get_M(F)
     Fi = F[symbol]
 
-    # renorm
+    # renorm.. note that if M is 2^16 then in 68k assembly
+    # decoder one can you a simple 'SWAP Dx' in places where d is didived by M
+    # and 'MOVE.W" instead of modulo or 'AND.W' to extract the r low bits.
+    # 
     state_max = ((L_BYTE_BOUND // M) << 8) * Fi     # Becomes a shift if M is pow_of_2
     while (state >= state_max):
         print(f"  renorm 0x{state & 0xff:02x}")
@@ -78,37 +84,6 @@ def get_M(freq_array):
     return sum(freq_array)
 
 
-    
-
-
-def quantisize(F):
-
-    O = [0] * F.__len__()
-    P = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-
-    for value in F:
-        p = int(math.log2(value))    
-
-        distLo = int(value - 2**p)
-        distHi = int(2**(p+1) - value)
-
-        print(f"{2**p} <= {value} < {2**(p+1)}")
-        print(f" >> {p}, {distLo},{distHi}")
-
-        if (distLo == distHi):
-            p += 1
-        elif (distLo > distHi):
-            p += 1
-
-        if (p > 15):
-            p = 15
-
-        P[p] += 1
-
-    print(f">>> {P}")
-
-    return O
-
 
 if (__name__ == "__main__"):
 
@@ -120,9 +95,6 @@ if (__name__ == "__main__"):
     M = get_M(F)
     print(C)
     print(M)
-
-
-    #quantisize(F)
 
 
     state = L_BYTE_BOUND
