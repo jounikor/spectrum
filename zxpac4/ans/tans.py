@@ -13,7 +13,7 @@ import math
 
 #
 # The base class for both tANS encoder and decoder subclasses. The base
-# class implement the common functions used by encoder and decoder.
+# class implements the common functions used by encoder and decoder.
 #
 class tANS(object):
     def __init__(self, M, DEBUG=False):
@@ -38,7 +38,7 @@ class tANS(object):
         self.DEBUG = DEBUG
 
 #
-# The encoder class, which implement three funcdamental functions:
+# The encoder class, which implements three fundamental functions:
 # 1) Scaling the input symbol frequencies to a desired sum that is
 #    also a power of two.
 # 2) Building the encoding tables for a completely table driver
@@ -76,7 +76,7 @@ class tANS_encoder(tANS):
                 # Note that we make the table indices reside between [0..L),
                 # since values within [L..2L) % M is within [0..M). This is 
                 # a simple algorithmic optimization to avoid extra index
-                # adjusting dering decoding..
+                # adjusting during decoding..
                 xp = (xp + self.spreadStep()) % self.M
                 
                 # L is for illustration purposes
@@ -92,16 +92,16 @@ class tANS_encoder(tANS):
                     if (self.DEBUG):
                         print("s",s,"p",p,"xp",xp,"k_tmp",k_tmp,"yp_tmp",yp_tmp,"y_pos",yp_pos)
                     
-                    # next table for each symbol.. this will explode in side when the
+                    # next table for each symbol.. this array will explode in side when the
                     # symbol set gets bigger.
                     self.next[s][yp_pos % self.M] = xp #+ self.M
                     
-                    # k table for each symbol.. this will explode in side when the
+                    # k table for each symbol.. this array will explode in side when the
                     # symbol set gets bigger.
                     self.k[s][yp_pos % self.M] = k_tmp
             
-            # Record the last state for the symbol. One of these will be used for the
-            # initial state when starting encpding.
+            # Record the final state for the symbol. One of these will be used for the
+            # initial state when starting encoding.
             self.symbol_last[s] = xp
 
     def scaleSymbolFreqs(self, Ls):
@@ -115,7 +115,7 @@ class tANS_encoder(tANS):
                 print(f"DEBUG> new_L: {self.M}, R: {R}, L: {L}")
 
             # https://stackoverflow.com/questions/31121591/normalizing-integers
-            # The last remined gets always added to the last item in the list..
+            # The last reminder gets always added to the last item in the list..
             rem = 0
             ufl = 0
             for i in range(Ls.__len__()):
@@ -207,7 +207,7 @@ class tANS_decoder(tANS):
         # When implementing the final output file you need the scaled symbol
         # frequencies in Ls (with a total sum of M (a power of two value)).
         # The Ls table must have frequency 0 for non-used symbols. Note, the
-        # mnumber of symbols in Ls does not need to be a power of two.
+        # number of symbols in Ls does not need to be a power of two.
         #
         # For example, if Ls has 12 symbols but the sum(Ls) is 32 then you
         # need 3x 32 bytes of RAM to build all 3 decoding tables. As long
