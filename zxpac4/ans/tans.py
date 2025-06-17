@@ -16,6 +16,14 @@ import math
 # class implements the common functions used by encoder and decoder.
 #
 class tANS(object):
+    #
+    # INITIAL_STEP and SPREAD_STEP determine how symbols are spread into
+    # the L array, which eventually defines the state to the symbol mapping.
+    # The "better" spreading function the better compression they say ;)
+    #
+    INITIAL_STATE = 3
+    SPREAD_STEP = 5
+
     def __init__(self, M, DEBUG=False):
         if (M & (M - 1)):
             raise ValueError("**Error: M is not a power of 2")
@@ -31,8 +39,10 @@ class tANS(object):
 
         return k
 
-    def spreadStep(self):
-        return 5
+    def spreadFunc(self,x):
+        # Cannot go simpler than this ;) The key point is that after M 
+        # iterations all M slots in L are visited exactly once.
+        return (x + self.SPREAD_STEP) % self.M
 
     def debug(self,DEBUG=True):
         self.DEBUG = DEBUG
@@ -61,13 +71,14 @@ class tANS_encoder(tANS):
         self.L     = [0] * self.M                       # Not needed but used for
                                                         # debugging purposes.
         self.symbol_last = [-1] * self.Ls.__len__()     # Used to select the 
-                                                        # initial state.
+                            # Advance to the next state                                            # initial state.
         self.y     = [0] * self.M                       # Not needed but used for
                                                         # debugging purposes.
         self.k     = [[0] * self.M for tmp in range(self.Ls.__len__())] 
         self.next  = [[0] * self.M for tmp in range(self.Ls.__len__())]
 
-        xp = 0
+        # The initial state to start with..
+        xp = self.INITIAL_STATE
 
         for s in range(self.Ls.__len__()):
             c = self.Ls[s]
@@ -77,14 +88,14 @@ class tANS_encoder(tANS):
                 # since values within [L..2L) % M is within [0..M). This is 
                 # a simple algorithmic optimization to avoid extra index
                 # adjusting during decoding..
-                xp = (xp + self.spreadStep()) % self.M
-                
+               
                 # L is for illustration purposes
                 self.L[xp] = s
                 
                 # y is for illustration purposes
                 self.y[xp] = p
                 
+                # Get the k's for the given symbol..
                 k_tmp = self.get_k(p,self.M)
                 yp_tmp = p << k_tmp
                 
@@ -99,10 +110,14 @@ class tANS_encoder(tANS):
                     # k table for each symbol.. this array will explode in side when the
                     # symbol set gets bigger.
                     self.k[s][yp_pos % self.M] = k_tmp
-            
+                
+                # advance to the next state..
+                last_xp = xp
+                xp = self.spreadFunc(xp)
+               
             # Record the final state for the symbol. One of these will be used for the
             # initial state when starting encoding.
-            self.symbol_last[s] = xp
+            self.symbol_last[s] = last_xp
 
     def scaleSymbolFreqs(self, Ls):
         L = sum(Ls)
@@ -217,19 +232,21 @@ class tANS_decoder(tANS):
         self.y = [0] * self.M   # y values for each state
         self.k = [0] * self.M   # k values for each state
 
-        xp = 0
+        xp = self.INITIAL_STATE
 
         for s in range(Ls.__len__()):
             c = Ls[s]
 
             for p in range(c,2*c):
-                xp = (xp + self.spreadStep()) % self.M
                 self.y[xp] = p
                 self.L[xp] = s
 
                 # k for each symbol
                 k_tmp = self.get_k(p,self.M)
                 self.k[xp] = k_tmp
+                
+                # Advance to the next state
+                xp = self.spreadFunc(xp)
 
     def init_decoder(self,state,pos):
         self.state = state
@@ -243,11 +260,15 @@ class tANS_decoder(tANS):
             self.state = ((self.y[self.state] << k) + b) % self.M
         return s
 
+#
+#
+#
+#
 
 if (__name__ == "__main__"):
 
-    #S = [0,1,0,2,2,0,2,1,2,1,2,1,1,1,1,1,0,1,0,2,1,2,2,2,1,2,0,2,0,2,0,0,0,0]
-    S = [0,2,1,2,0,1,1,2,1,2,1,1]
+    S = [0,1,0,2,2,0,2,1,2,1,2,1,1,1,1,1,0,1,0,2,1,2,2,2,1,2,0,2,0,2,0,0,0,0]
+    #S = [0,2,1,2,0,1,1,2,1,2,1,1]
     out = []
 
     LLs = [2,6,4,0]
@@ -285,8 +306,11 @@ if (__name__ == "__main__"):
     O = []
     tans = tANS_decoder(Ls,True)
     tans.init_decoder(state,out.__len__())
+    print("L table for state to symbol mapping")
     print(tans.L)
+    print("y:")
     print(tans.y)
+    print("k:")
     print(tans.k)
 
     for i in range(S.__len__()):
