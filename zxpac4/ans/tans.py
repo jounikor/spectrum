@@ -103,11 +103,11 @@ class tANS_encoder(tANS):
                     if (self.DEBUG):
                         print("s",s,"p",p,"xp",xp,"k_tmp",k_tmp,"yp_tmp",yp_tmp,"y_pos",yp_pos)
                     
-                    # next table for each symbol.. this array will explode in side when the
+                    # next table for each symbol.. this array will explode in size when the
                     # symbol set gets bigger.
                     self.next[s][yp_pos % self.M] = xp #+ self.M
                     
-                    # k table for each symbol.. this array will explode in side when the
+                    # k table for each symbol.. this array will explode in size when the
                     # symbol set gets bigger.
                     self.k[s][yp_pos % self.M] = k_tmp
                 
