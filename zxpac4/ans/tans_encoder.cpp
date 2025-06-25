@@ -1,9 +1,9 @@
 /**
- *
- *
- *
- *
- *
+ * @file src/tans_encoder.cpp
+ * @version 0.1
+ * @author Jouni 'Mr.Spiv' korhonen
+ * @copyright The Unlicense
+ * @brief This file implement the tANS encoder class template.
  */
 
 #include "tans_encoder.h"
@@ -13,9 +13,9 @@ template<class T>
 tans_encoder<T>::tans_encoder(int m, const T* Ls, int Ls_len, debug_t debug) : ans_base(m,debug) {
     int sum = 0;
 
-    y_ = NULL;
+    next_state_ = NULL;
+    symbol_last_ = NULL;
     k_ = NULL;
-    n_ = NULL;
     Ls_ = NULL;
     Ls_len_ = Ls_len;
 
@@ -40,14 +40,15 @@ template<class T>
 tans_encoder<T>::~tans_encoder(void)
 {
     if (Ls_) { delete[] Ls_; }
-    if (y_) { delete[] y_; }
-    if (n_) { delete[] n_; }
+    if (symbol_last_) { delete[] symbol_last_; }
+    if (next_state_) { delete[] next_state_; }
     if (k_) { delete[] k_; }
 }
 
 
 template<class T>
-bool tans_encoder<T>::scaleSymbolFreqs(void) {
+bool tans_encoder<T>::scaleSymbolFreqs(void)
+{
     int L = 0;
 
     for (int i = 0; i < Ls_len_; i++) {
@@ -117,21 +118,62 @@ bool tans_encoder<T>::scaleSymbolFreqs(void) {
 
 
 template<class T>
-void tans_encoder<T>::buildEncodingTables(void) {
-    y_ = new (std::nothrow) T[M_];
+void tans_encoder<T>::buildEncodingTables(void)
+{
+    symbol_last_ = new (std::nothrow) T[Ls_len_];
+    next_state_ = new (std::nothrow) T[M_ * Ls_len_];     // next table
     k_ = new (std::nothrow) T[M_ * Ls_len_];
-    n_ = new (std::nothrow) T[M_ * Ls_len_];     // next table
 
-    if (!(y_ && k_ && n_)) {
+    T(*k)[Ls_len_] = k_;
+    T(*next_state)[Ls_len_] = next_state_;
+
+    if (!(symbol_last_ && k_ && next_state_)) {
         std::stringstream ss;
         ss  << __FILE__ << ":" << __LINE__
             << " -> tans_encoder::buildEncodingTables() failed." << std::endl;
         throw std::bad_alloc(ss);
     }
 
+    // The initial state to start with..
+    int xp = INITIAL_STATE_;
+    int last_xp = INITIAL_STATE_;
 
+    for (int s = 0; s < Ls_len_; s++) {
+        int c = Ls_[s];
 
+        for (int p = c; p < 2*c; p++) {
+            // Note that we make the table indices reside between [0..L),
+            // since values within [L..2L) % M is within [0..M). This is 
+            // a simple algorithmic optimization to avoid extra index
+            // adjusting during decoding..
+            
+            // Get the k's for the given symbol..
+            int k_tmp = get_k_(p,M_);
+            int yp_tmp = p << k_tmp;
 
+            for (int yp_pos = yp_tmp; yp_pos < yp_tmp + (1 << k_tmp); yp_pos++) {
+                TRACE_DBUG("s: " << s << ", p: " << p ", xp: " << xp    \
+                    << ", k_tmp: " << k_tmp << ", yp_tmp: " << yp_tmp   \
+                    << ", yp_pos: " << yp_pos << std::endl)
+            
+                // next table for each symbol.. this array will explode in size when the
+                // symbol set gets bigger.
+                next_state[s][yp_pos & M_MASK_] = k_tmp;
+                
+                // k table for each symbol.. this array will explode in size when the
+                // symbol set gets bigger.
+                k[s][yp_pos & M_MASK_] = k_tmp;
+            }
+
+            // advance to the next state..
+            last_xp = xp;
+            xp = spreadFunc_(xp);
+        }
+
+        // Record the final state for the symbol. One of these will be used for the
+        // initial state when starting encoding.
+        symbol_last_[s] = last_xp; 
+    }
 }
 
 

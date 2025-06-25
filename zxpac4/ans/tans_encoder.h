@@ -21,9 +21,9 @@
  */
 template<class T> class tans_encoder : public ans_base {
     T* Ls_;
-    T* y_;
-    T* n_;
     T* k_;
+    T* next_state_;
+    T* symbol_last_;
     int Ls_len_;
 
     bool scaleSymbolFreqs(void);

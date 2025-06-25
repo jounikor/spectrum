@@ -41,7 +41,7 @@ public:
         return k;
     }
 
-    int spreadFund_(int x) {
+    int spreadFunc_(int x) {
         return (x + SPREAD_STEP_) & M_MASK_;
     }
 

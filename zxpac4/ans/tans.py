@@ -121,13 +121,12 @@ class tANS_encoder(tANS):
 
     def scaleSymbolFreqs(self, Ls):
         L = sum(Ls)
-        R = int(math.floor(math.log2(L)))
 
         if (L != self.M):
             # not M i.e. a power of two.. scale up or down
             
             if (self.DEBUG):
-                print(f"DEBUG> new_L: {self.M}, R: {R}, L: {L}")
+                print(f"DEBUG> new_L: {self.M}, L: {L}")
 
             # https://stackoverflow.com/questions/31121591/normalizing-integers
             # The last reminder gets always added to the last item in the list..
@@ -163,7 +162,6 @@ class tANS_encoder(tANS):
                 i -= 1
 
             L = sum(Ls)
-            R = int(math.log2(L))
             
             if (self.DEBUG):
                 print("DEBUG> New Ls -> ",Ls)
@@ -271,10 +269,11 @@ if (__name__ == "__main__"):
     #S = [0,2,1,2,0,1,1,2,1,2,1,1]
     out = []
 
-    LLs = [2,6,4,0]
+    LLs = [12,2,2,0]
+    #LLs = [2,6,4,0]
     #LLs = [3,3,2]
 
-    tans = tANS_encoder(16,LLs,True)
+    tans = tANS_encoder(32,LLs,True)
     print("L:")
     print(tans.L)
     print("y:")
