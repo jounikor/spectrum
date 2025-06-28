@@ -35,7 +35,7 @@ public:
     virtual ~tans_encoder(void);
     const T* get_scaled_Ls(void) const;
     int get_Ls_len(void) const;
-    void init_encoder(void);
+    void init_encoder(T& );
     ans_state_t done_encoder(void) const;
     ans_state_t encode(T s, uint8_t& k, uint32_t& b);
 };
