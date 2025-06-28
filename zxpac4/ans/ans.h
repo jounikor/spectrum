@@ -22,21 +22,26 @@
 
 /*
  *
+ */
+typedef uint32_t ans_state_t;
+
+/*
+ *
  *
  */
 class ans_base {
-    static int SPREAD_STEP_;
-    static int INITIAL_STATE_;
+    int SPREAD_STEP_;
+    int INITIAL_STATE_;
 protected:
     int M_;
     int M_MASK_;
     debug_t DEBUG_;
 
 public:
-    int get_k_(int base, int threshold, int min_k=1) {
+    uint8_t get_k_(int base, int threshold, uint8_t min_k=1) {
         // The minimum k setting is for tANS, where we always send
         // at least 1 bit..
-        int k = min_k;
+        uint8_t k = min_k;
         while ((base << k) < threshold) { ++k; }
         return k;
     }
@@ -61,17 +66,14 @@ public:
         }
         M_ = m;
         M_MASK_ = m - 1;
+    
+        // Initialize static variables
+        SPREAD_STEP_ = 5;
+        INITIAL_STATE_ = 3;
     }
     virtual ~ans_base(void) {
     }
 };
-
-
-// Initialize static variables
-int ans_base::SPREAD_STEP_ = 5;
-int ans_base::INITIAL_STATE_ = 3;
-
-
 
 
 #endif      // _ANS_H_INCLUDED

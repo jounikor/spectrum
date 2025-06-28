@@ -122,9 +122,9 @@ void tans_encoder<T>::buildEncodingTables(void)
 {
     symbol_last_ = new (std::nothrow) T[Ls_len_];
     next_state_ = new (std::nothrow) T[M_ * Ls_len_];     // next table
-    k_ = new (std::nothrow) T[M_ * Ls_len_];
+    k_ = new (std::nothrow) uint8_t[M_ * Ls_len_];
 
-    T(*k)[Ls_len_] = k_;
+    uint8_t (*k)[Ls_len_] = k_;
     T(*next_state)[Ls_len_] = next_state_;
 
     if (!(symbol_last_ && k_ && next_state_)) {
@@ -148,7 +148,7 @@ void tans_encoder<T>::buildEncodingTables(void)
             // adjusting during decoding..
             
             // Get the k's for the given symbol..
-            int k_tmp = get_k_(p,M_);
+            uint8_t k_tmp = get_k_(p,M_);
             int yp_tmp = p << k_tmp;
 
             for (int yp_pos = yp_tmp; yp_pos < yp_tmp + (1 << k_tmp); yp_pos++) {
@@ -176,6 +176,49 @@ void tans_encoder<T>::buildEncodingTables(void)
     }
 }
 
+template<class T>
+const T* tans_encoder<T>::get_scaled_Ls(void) const
+{
+    return Ls_;
+}
+
+template<class T>
+int tans_encoder<T>::get_Ls_len(void) const
+{
+    return Ls_len_;
+}
+
+template<class T>
+void tans_encoder<T>::init_encoder(void) {
+    state_ = ~0;
+}
+
+template<class T>
+ans_state_t tans_encoder<T>::done_encoder(void) const
+{
+    return state_;
+}
+
+template<class T>
+ans_state_t tans_encoder<T>::encode(T s, uint8_t& k, uint32_t& b)
+{
+    if (state_ == ~0) {
+        state_ = symbol_last_[s];
+        k = 0;
+        b = 0;
+        return state_;
+    }
+
+    TRACE_DBUG("symbol: " << std::hex << s << ", state: " << state_)
+
+    k = k_[s][state_];
+    b = state_ & ((1 << k) - 1);
+    state_ = next_state_[s][state_];
+
+    TRACE_DBUG("new state: " << state_ << ", k: " << k << ", b: " << b << std::endl)
+
+return state_;
+}
 
 
 
