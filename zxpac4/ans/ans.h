@@ -30,9 +30,9 @@ typedef uint32_t ans_state_t;
  *
  */
 class ans_base {
+protected:
     int SPREAD_STEP_;
     int INITIAL_STATE_;
-protected:
     int M_;
     int M_MASK_;
     debug_t DEBUG_;

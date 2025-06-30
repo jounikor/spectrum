@@ -22,7 +22,7 @@ int main(void) {
     try {
         TRACE_INFO("Testinf info level" << std::endl)
         std::cerr.flush();
-        ans_base tans(31);
+        ans_base tans(32);
         std::cout << tans.get_k_(13,32) << std::endl;
     } catch (std::exception& e) {
         TRACE_DBUG("bedug level")

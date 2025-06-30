@@ -7,7 +7,7 @@
  */
 
 #include "tans_encoder.h"
-    
+ 
 
 template<class T>
 tans_encoder<T>::tans_encoder(int m, const T* Ls, int Ls_len, debug_t debug) : ans_base(m,debug) {
@@ -24,7 +24,7 @@ tans_encoder<T>::tans_encoder(int m, const T* Ls, int Ls_len, debug_t debug) : a
     if (Ls_ == NULL) {
         std::stringstream ss;
         ss << __FILE__ << ":" << __LINE__ << " -> tans_encoder() constructor failed." << std::endl;
-        throw std::bad_alloc(ss);
+        throw std::bad_alloc();
     }
 
     for (int i = 0; i < Ls_len; i++) {
@@ -131,7 +131,7 @@ void tans_encoder<T>::buildEncodingTables(void)
         std::stringstream ss;
         ss  << __FILE__ << ":" << __LINE__
             << " -> tans_encoder::buildEncodingTables() failed." << std::endl;
-        throw std::bad_alloc(ss);
+        throw std::bad_alloc();
     }
 
     // The initial state to start with..
@@ -189,7 +189,7 @@ int tans_encoder<T>::get_Ls_len(void) const
 }
 
 template<class T>
-void tans_encoder<T>::init_encoder(void) {
+void tans_encoder<T>::init_encoder(T& s) {
     state_ = ~0;
 }
 
@@ -206,6 +206,7 @@ ans_state_t tans_encoder<T>::encode(T s, uint8_t& k, uint32_t& b)
         state_ = symbol_last_[s];
         k = 0;
         b = 0;
+        TRACE_DBUG("symbol: " << s << ", initial state: " << state_ << std::endl);
         return state_;
     }
 
