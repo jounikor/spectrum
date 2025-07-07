@@ -35,7 +35,8 @@ protected:
     int INITIAL_STATE_;
     int M_;
     int M_MASK_;
-    debug_t DEBUG_;
+    debug_e DEBUG_;
+    ans_state_t state_;
 
 public:
     uint8_t get_k_(int base, int threshold, uint8_t min_k=1) {
@@ -51,13 +52,13 @@ public:
     }
 
 public:
-    int debug(debug_t value=TRACE_LEVEL_NONE) {
+    int debug(debug_e value=TRACE_LEVEL_NONE) {
         int old = DEBUG_;
         DEBUG_ = value;
         return old;
     }
 
-    ans_base(int m, debug_t debug=0) {
+    ans_base(int m, debug_e debug=TRACE_LEVEL_NONE) {
         DEBUG_ = debug;
         if (m & (m - 1)) {
             std::stringstream ss;

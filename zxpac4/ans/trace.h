@@ -26,10 +26,12 @@
 #ifndef _TRACE_H_INCLUDED
 #define _TRACE_H_INCLUDED
 
-#define TRACE_LEVEL_NONE    0
-#define TRACE_LEVEL_INFO    1
-#define TRACE_LEVEL_WARN    2
-#define TRACE_LEVEL_DBUG    3
+typedef enum {
+    TRACE_LEVEL_NONE = 0,
+    TRACE_LEVEL_INFO,
+    TRACE_LEVEL_WARN,
+    TRACE_LEVEL_DBUG,
+} debug_e;
 
 /* One can set the trace level for a source module using the
  * macro below or then use e.g., a same name variable in 
@@ -41,9 +43,7 @@
  *  WARN
  *  DBUG
  */
-typedef int debug_t;
-
-#define SET_TRACE_LEVEL(x) static debug_t DEBUG_ = TRACE_LEVEL_##x;
+#define SET_TRACE_LEVEL(x) static debug_e DEBUG_ = TRACE_LEVEL_##x;
 #define MOD_TRACE_LEVEL(x) DEBUG_ = TRACE_LEVEL_##x;
 
 

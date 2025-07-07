@@ -10,22 +10,27 @@
  */
 #define TRACE_ENABLED
 
+
 #include "ans.h"
 #include "tans_encoder.h"
-#include "trace.h"
 
 
-SET_TRACE_LEVEL(NONE)
+SET_TRACE_LEVEL(INFO)
+
+
+static const uint8_t Ls[] = {4,3,1,0,0,5,3,1};
+
+
+
 
 int main(void) {
 
     try {
-        TRACE_INFO("Testinf info level" << std::endl)
+        TRACE_INFO("Testing info level" << std::endl)
         std::cerr.flush();
-        ans_base tans(32);
-        std::cout << tans.get_k_(13,32) << std::endl;
+        tans_encoder<uint8_t,32> tans(reinterpret_cast<const uint8_t*>(Ls),sizeof(Ls),TRACE_LEVEL_NONE);
     } catch (std::exception& e) {
-        TRACE_DBUG("bedug level")
+        TRACE_DBUG("debug level" << std::endl);
         std::cout << e.what() << std::endl;
         return 0;
     }
