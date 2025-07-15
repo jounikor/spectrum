@@ -216,19 +216,18 @@ class tANS_decoder(tANS):
         self.buildDecodingTables()
 
     def buildDecodingTables(self):
-        # Only L, y and k tables needed..
+        # Only L, and y tables needed..
         # When implementing the final output file you need the scaled symbol
         # frequencies in Ls (with a total sum of M (a power of two value)).
         # The Ls table must have frequency 0 for non-used symbols. Note, the
         # number of symbols in Ls does not need to be a power of two.
         #
         # For example, if Ls has 12 symbols but the sum(Ls) is 32 then you
-        # need 3x 32 bytes of RAM to build all 3 decoding tables. As long
+        # need 2x 32 bytes of RAM to build all 3 decoding tables. As long
         # as the M <= 256 then table entries can be 1 unsigned byte each.
         #
         self.L = [0] * self.M   # state to symbol mapping table
         self.y = [0] * self.M   # y values for each state
-        self.k = [0] * self.M   # k values for each state
 
         xp = self.INITIAL_STATE
 
@@ -239,10 +238,6 @@ class tANS_decoder(tANS):
                 self.y[xp] = p
                 self.L[xp] = s
 
-                # k for each symbol
-                k_tmp = self.get_k(p,self.M)
-                self.k[xp] = k_tmp
-                
                 # Advance to the next state
                 xp = self.spreadFunc(xp)
 
@@ -255,7 +250,17 @@ class tANS_decoder(tANS):
         if (self.rpos >= 0):
             self.rpos -= 1
             k,b = file[self.rpos]
-            self.state = ((self.y[self.state] << k) + b) % self.M
+            y = self.y[self.state] << 1
+            
+            # k would be the count how many bots to read from input
+            k = 1
+
+            while (y <= self.M):
+                y = y << 1
+                k = k + 1
+            
+            self.state = (y + b) % self.M
+            #self.state = ((self.y[self.state] << k) + b) % self.M
         return s
 
 #
@@ -310,8 +315,6 @@ if (__name__ == "__main__"):
     print(tans.L)
     print("y:")
     print(tans.y)
-    print("k:")
-    print(tans.k)
 
     for i in range(S.__len__()):
         symbol = tans.decode(out)
