@@ -118,7 +118,7 @@ bool tans_encoder<T,M>::scaleSymbolFreqs(void)
             reminder = count % L;
         }
     
-        TRACE_DBUG("Number of underfloes is " << underflow << std::endl)
+        TRACE_DBUG("Number of underflows is " << underflow << std::endl)
 
         // Handle underflows
         i = Ls_len_ - 1;
@@ -136,9 +136,9 @@ bool tans_encoder<T,M>::scaleSymbolFreqs(void)
 
         TRACE_DBUG("New Ls = [")
         for (i = 0; i < Ls_len_; i++) {
-            TRACE_DBUG(Ls_[i] << " ")
+            std::cout << std::hex << static_cast<uint32_t>(Ls_[i]) << " ";
         }
-        TRACE_DBUG("]" << std::endl)
+        std::cout << "]" << std::dec << std::endl;
     }
 
     if (L != M) {
@@ -185,13 +185,16 @@ void tans_encoder<T,M>::buildEncodingTables(void)
             int yp_tmp = p << k_tmp;
 
             for (int yp_pos = yp_tmp; yp_pos < yp_tmp + (1 << k_tmp); yp_pos++) {
-                TRACE_DBUG("s: " << s << ", p: " << p << ", xp: " << xp    \
-                    << ", k_tmp: " << k_tmp << ", yp_tmp: " << yp_tmp   \
+                TRACE_DBUG("s: " << s 
+                    << ", p: " << p 
+                    << ", xp: " << xp    \
+                    << ", k_tmp: " << static_cast<uint32_t>(k_tmp)
+                    << ", yp_tmp: " << yp_tmp   \
                     << ", yp_pos: " << yp_pos << std::endl)
             
                 // next table for each symbol.. this array will explode in size when the
                 // symbol set gets bigger.
-                next_state[s][yp_pos & (M-1)] = k_tmp;
+                next_state[s][yp_pos & (M-1)] = xp;
                 
                 // k table for each symbol.. this array will explode in size when the
                 // symbol set gets bigger.
@@ -237,13 +240,16 @@ ans_state_t tans_encoder<T,M>::done_encoder(void) const
 template<class T, int M>
 ans_state_t tans_encoder<T,M>::encode(T s, uint8_t& k, uint32_t& b)
 {
-    TRACE_DBUG("symbol: " << std::hex << s << ", state: " << state_)
+    TRACE_DBUG("symbol: " << std::hex << static_cast<uint32_t>(s) << ", state: 0x" 
+        << state_ << std::dec << std::endl)
 
     k = k_[s][state_];
     b = state_ & ((1 << k) - 1);
     state_ = next_state_[s][state_];
 
-    TRACE_DBUG(", new state: " << state_ << std::dec <<", k: " << k << ", b: " << b << std::endl)
+    TRACE_DBUG("new state: 0x" << state_ 
+        << ", k: 0x" << static_cast<uint32_t>(k) 
+        << ", b: 0x" << b << std::dec << std::endl)
 
     return state_;
 }
