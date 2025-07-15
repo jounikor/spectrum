@@ -255,7 +255,7 @@ class tANS_decoder(tANS):
             # k would be the count how many bots to read from input
             k = 1
 
-            while (y <= self.M):
+            while (y < self.M):
                 y = y << 1
                 k = k + 1
             
