@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef _TANS_H_INCLUDED
-#define _TANS_H_INCLUDED
+#ifndef _TANS_ENCODER_H_INCLUDED
+#define _TANS_ENCODER_H_INCLUDED
 
 #include <cstdint>
 #include "ans.h"
@@ -36,8 +36,8 @@ public:
     const T* get_scaled_Ls(void) const;
     int get_Ls_len(void) const;
     ans_state_t init_encoder(T& );
-    ans_state_t done_encoder(void) const;
-    ans_state_t encode(T s, uint8_t& k, uint32_t& b);
+    ans_state_t done_encoder(ans_state_t state) const;
+    ans_state_t encode(T s, ans_state_t state, uint8_t& k, uint32_t& b);
 };
 
 template<class T, int M>
@@ -55,8 +55,6 @@ tans_encoder<T,M>::tans_encoder(const T* Ls, int Ls_len, debug_e debug) :
     // Yes.. we make a copy of the original array..
     Ls_ = new (std::nothrow) T[Ls_len]; 
     if (Ls_ == NULL) {
-        //std::stringstream ss;
-        //ss << __FILE__ << ":" << __LINE__ << " -> tans_encoder() constructor failed." << std::endl;
         throw std::bad_alloc();
     }
 
@@ -161,9 +159,6 @@ void tans_encoder<T,M>::buildEncodingTables(void)
     T (*next_state)[M] = reinterpret_cast<T(*)[M]>(next_state_);
 
     if (!(symbol_last_ && k_ && next_state_)) {
-        //std::stringstream ss;
-        //ss  << __FILE__ << ":" << __LINE__
-        //    << " -> tans_encoder::buildEncodingTables() failed." << std::endl;
         throw std::bad_alloc();
     }
 
@@ -226,35 +221,36 @@ int tans_encoder<T,M>::get_Ls_len(void) const
 
 template<class T, int M>
 ans_state_t tans_encoder<T,M>::init_encoder(T& s) {
-    state_ = symbol_last_[s];
-    TRACE_DBUG("symbol: " << s << ", initial state: " << state_ << std::endl);
-    return state_;
+    ans_state_t state = symbol_last_[s];
+    TRACE_DBUG("symbol: " << s << ", initial state: " << state << std::endl);
+    return state;
 }
 
 template<class T, int M>
-ans_state_t tans_encoder<T,M>::done_encoder(void) const
+ans_state_t tans_encoder<T,M>::done_encoder(ans_state_t state) const
 {
-    return state_;
+    // Dummy function.. subject to removal.
+    return state;
 }
 
 template<class T, int M>
-ans_state_t tans_encoder<T,M>::encode(T s, uint8_t& k, uint32_t& b)
+ans_state_t tans_encoder<T,M>::encode(T s, ans_state_t state, uint8_t& k, uint32_t& b)
 {
     TRACE_DBUG("symbol: " << std::hex << static_cast<uint32_t>(s) << ", state: 0x" 
-        << state_ << std::dec << std::endl)
+        << state << std::dec << std::endl)
 
-    k = k_[s][state_];
-    b = state_ & ((1 << k) - 1);
-    state_ = next_state_[s][state_];
+    k = k_[s][state];
+    b = state & ((1 << k) - 1);
+    state = next_state_[s][state];
 
-    TRACE_DBUG("new state: 0x" << state_ 
+    TRACE_DBUG("new state: 0x" << state 
         << ", k: 0x" << static_cast<uint32_t>(k) 
         << ", b: 0x" << b << std::dec << std::endl)
 
-    return state_;
+    return state;
 }
 
 
 
 
-#endif      // _TANS_H_INCLUDED
+#endif      // _TANS_ENCODER_H_INCLUDED

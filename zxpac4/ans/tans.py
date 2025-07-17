@@ -101,7 +101,7 @@ class tANS_encoder(tANS):
                 
                 for yp_pos in range(yp_tmp,yp_tmp+(1<<k_tmp)):
                     if (self.DEBUG):
-                        print("s",s,"p",p,"xp",xp,"k_tmp",k_tmp,"yp_tmp",yp_tmp,"y_pos",yp_pos)
+                        print(f"DEBUG> s",s,"p",p,"xp",xp,"k_tmp",k_tmp,"yp_tmp",yp_tmp,"y_pos",yp_pos)
                     
                     # next table for each symbol.. this array will explode in size when the
                     # symbol set gets bigger.
@@ -216,18 +216,25 @@ class tANS_decoder(tANS):
         self.buildDecodingTables()
 
     def buildDecodingTables(self):
-        # Only L, and y tables needed..
+        # Only L, and y tables are needed. A table for precomputed k values
+        # is also possible to reduce one loop. However, it does not make sense
+        # in a case the CPU arch does not provide a shift instruction that can
+        # shift more than one bit at a time.
+        #
         # When implementing the final output file you need the scaled symbol
         # frequencies in Ls (with a total sum of M (a power of two value)).
         # The Ls table must have frequency 0 for non-used symbols. Note, the
         # number of symbols in Ls does not need to be a power of two.
         #
         # For example, if Ls has 12 symbols but the sum(Ls) is 32 then you
-        # need 2x 32 bytes of RAM to build all 3 decoding tables. As long
+        # need 2x 32 bytes of RAM to build both decoding tables. As long
         # as the M <= 256 then table entries can be 1 unsigned byte each.
         #
         self.L = [0] * self.M   # state to symbol mapping table
         self.y = [0] * self.M   # y values for each state
+        
+        # This is an optional k-table if a direct lookup for k is desired
+        #self.k = [0] * self.M   # k values for each state
 
         xp = self.INITIAL_STATE
 
@@ -238,7 +245,11 @@ class tANS_decoder(tANS):
                 self.y[xp] = p
                 self.L[xp] = s
 
-                # Advance to the next state
+                # This is an optional k-table if a direct lookup for k is desired
+                # k for each symbol
+                #k_tmp = self.get_k(p,self.M)
+                #self.k[xp] = k_tmp                # Advance to the next state
+                
                 xp = self.spreadFunc(xp)
 
     def init_decoder(self,state,pos):
@@ -249,15 +260,20 @@ class tANS_decoder(tANS):
         s = self.L[self.state]
         if (self.rpos >= 0):
             self.rpos -= 1
-            k,b = file[self.rpos]
+
+            k_not_needed,b = file[self.rpos]
             y = self.y[self.state] << 1
-            
-            # k would be the count how many bots to read from input
-            k = 1
 
             while (y < self.M):
                 y = y << 1
-                k = k + 1
+                # Here the implementation would read 1 bit from the input
+                # and add the bit to y.. we do not do it in this example as
+                # we already know the content of b..
+                # However, for 8-bit systems this shift+add saves one table
+                # and the shifting bit by bit needs to be done in any case,
+                # thus finding k first saves nothing abd optimizing the loop
+                # away is not possible without additional lookup table for
+                # preshifted y values.
             
             self.state = (y + b) % self.M
             #self.state = ((self.y[self.state] << k) + b) % self.M
@@ -270,7 +286,8 @@ class tANS_decoder(tANS):
 
 if (__name__ == "__main__"):
 
-    S = [0,1,0,2,2,0,2,1,2,1,2,1,1,1,1,1,0,1,0,2,1,2,2,2,1,2,0,2,0,2,0,0,0,0,5,5,5,5,5,5,5,5,5,5,5,5,5,6]
+    #S = [0,1,0,2,2,0,2,1,2,1,2,1,1,1,1,1,0,1,0,2,1,2,2,2,1,2,0,2,0,2,0,0,0,0,5,5,5,5,5,5,5,5,5,5,5,5,5,6]
+    S = [0,1,0,2,2,0,2,1,2,1,2,1,1,1,1,1,0,1,0,2,1,2,2,2,1,2,0,2,0,2,0,0,0,0]
     #S = [0,2,1,2,0,1,1,2,1,2,1,1]
     out = []
 

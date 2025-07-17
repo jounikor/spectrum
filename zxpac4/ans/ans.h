@@ -36,7 +36,6 @@ protected:
     int M_;
     int M_MASK_;
     debug_e DEBUG_;
-    ans_state_t state_;
 
 public:
     uint8_t get_k_(int base, int threshold, uint8_t min_k=1) {
