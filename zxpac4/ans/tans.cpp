@@ -14,6 +14,7 @@
 #include "ans.h"
 #include "tans_encoder.h"
 #include "tans_decoder.h"
+//#include "tans_decoder_k.h"
 
 
 SET_TRACE_LEVEL(INFO)
@@ -72,7 +73,7 @@ int main(void)
     p_detans = new tans_decoder<uint8_t,M>(
         p_tans->get_scaled_Ls(),
         p_tans->get_Ls_len(),
-        TRACE_LEVEL_NONE);
+        TRACE_LEVEL_DBUG);
     
     state = p_detans->init_decoder(state);
     for (int i = 0; i < sizeof(S); i++) { 

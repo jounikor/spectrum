@@ -241,6 +241,8 @@ class tANS_decoder(tANS):
         for s in range(Ls.__len__()):
             c = Ls[s]
 
+            // If symbol fequency is 0 then the following loop is not
+            // executed.
             for p in range(c,2*c):
                 self.y[xp] = p
                 self.L[xp] = s

@@ -53,6 +53,10 @@ tans_decoder<T,M>::tans_decoder(const T* Ls, int Ls_len, debug_e debug) :
             // since values within [L..2L) % M is within [0..M). This is 
             // a simple algorithmic optimization to avoid extra index
             // adjusting during decoding..
+            // This optimization does not come for free and introduces a 
+            // corner case when state==0. During decoding and next state
+            // calculation that has to be taken into account if k-values
+            // are not taken from a precalculated table.
 
             TRACE_DBUG(s << ", " << c << ", " << p << ", " << xp << std::endl)
 
@@ -88,7 +92,7 @@ ans_state_t tans_decoder<T,M>::done_decoder(ans_state_t state) const
  *
  * @brief k-tableless symbol decoder.
  *
- *   It is possible (and simple) to lookup k-value from a tabe. However,
+ *   It is possible (and simple) to lookup k-value from a table. However,
  *   That would require yet another M bytes size table and with certain
  *   8-bit systems that is not desired.
  *
@@ -101,28 +105,28 @@ T tans_decoder<T,M>::decode(ans_state_t& state, uint8_t& k)
 {
     TRACE_DBUG("Old state: 0x" << std::hex << state << std::dec << std::endl)
 
-    ans_state_t mask = ~0;          // k-tableless optimization
     T s = L_[state];
-    state = y_[state];
     k = 0;
+    state = y_[state];
+
+    // Unfortunate comparison and handling of a corner case.
+    if (state == 0) {
+        state = 1;
+    }
 
     do {
         // This is a bit akward/slow solution, but I wanted to isolate
         // the bit input entirely away from the next state calculation. 
-        // The masking and adding 1 to the shifted state is only needed
-        // for the special case when the old state is 0.
         // 
         // An alternative implementation is to input 'b' bit by bit each
         // time the old state is shifted left. That's how I would do it
-        // using Z80, for example..
+        // using Z80, for example. However, even that does not fix the 
+        // state==0 corner case.
 
-        state = (state << 1) + 1;   // k-tableless optimization
-        ;state <<= 1;
-        mask <<= 1;                 // k-tableless optimization
+        state <<= 1;   // k-tableless optimization
         k++;
     } while (state < M);
 
-    state &= mask;                  // k-tableless optimization
     return s;
 }
 
