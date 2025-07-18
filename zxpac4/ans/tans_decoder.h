@@ -108,11 +108,7 @@ T tans_decoder<T,M>::decode(ans_state_t& state, uint8_t& k)
     T s = L_[state];
     k = 0;
     state = y_[state];
-
-    // Unfortunate comparison and handling of a corner case.
-    if (state == 0) {
-        state = 1;
-    }
+    assert(state > 0);
 
     do {
         // This is a bit akward/slow solution, but I wanted to isolate
@@ -120,8 +116,7 @@ T tans_decoder<T,M>::decode(ans_state_t& state, uint8_t& k)
         // 
         // An alternative implementation is to input 'b' bit by bit each
         // time the old state is shifted left. That's how I would do it
-        // using Z80, for example. However, even that does not fix the 
-        // state==0 corner case.
+        // using Z80, for example.
 
         state <<= 1;   // k-tableless optimization
         k++;
