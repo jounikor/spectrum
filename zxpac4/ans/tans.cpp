@@ -13,8 +13,8 @@
 #include <cassert>
 #include "ans.h"
 #include "tans_encoder.h"
-#include "tans_decoder.h"
-//#include "tans_decoder_k.h"
+//#include "tans_decoder.h"
+#include "tans_decoder_k.h"
 
 
 SET_TRACE_LEVEL(INFO)
@@ -75,11 +75,11 @@ int main(void)
         p_tans->get_Ls_len(),
         TRACE_LEVEL_DBUG);
     
-    state = p_detans->init_decoder(state);
+    p_detans->init_decoder(state);
     for (int i = 0; i < sizeof(S); i++) { 
         s = p_detans->decode(state,k);
         --p_b;
-        state = p_detans->next_state(state,*p_b);
+        p_detans->next_state(state,*p_b);
         TRACE_INFO("new state: 0x" << std::hex << state
             << ", s: 0x" << static_cast<uint32_t>(s)
             << ", k: 0x" << static_cast<uint32_t>(k)
