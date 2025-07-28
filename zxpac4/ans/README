@@ -1,0 +1,29 @@
+(c) 2025 Jouni 'Mr.Spiv' Korhonen
+
+Version 0.1
+
+The two following Python3 programs implement my ANS ancoders/decoders. These
+are simple and should be very readable, since they were implemented for my
+ANS concept self-learning purposes.
+
+  rans.py - An example implementation of rANS encoder and decoder.
+  tans.py - An example implementation of tANS encoder and decoder.
+
+The following C++ (v11 should be enough) program implement a tANS encoder
+and decoder template classes. These classes are purposely designed to mimic
+low spec target platforms - read 8-bit systems.
+
+  tans.cpp - An example driver program for encoding/decoding.
+  ans.h - The base class for encoder/decoder template classes.
+  tans_encoder.h - tANS encoder template class.
+  tans_decoder.h - tANS decoder templets class that does NOT use k-table.
+  tans_decoder_k.h - tANS decoder templete class that uses k-table.
+  trace.h - Some tracing macros.
+
+The following Z80 assembly file implements a tANS decoder and a required
+function for building L- and Y-value decoding tables. The implementation 
+currently is 86 bytes, excluding L- and Y-tables.
+
+  z80_tans_decoder.asm
+
+
