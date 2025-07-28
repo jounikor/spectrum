@@ -2,22 +2,38 @@
 ; 
 ; v0.1 (c) 2025 Jouni 'Mr.Spiv' Korhonen
 ;
-; NOTE: still untested code!
 ;
 
         org     $8000
-        
+
+;----------------------------------------------------------------------------
+;
+; Notes concerning this particular tANS decoder Z80 implementation.
+; Some of the properties are configurable compile time:
+;  * Size of the alphabet (no power of two requirement) -> LS_LEN
+;  * Total sum of symbol frequencies must be a power of two -> M_
+;  * Maximum bits for a symbol frequence is 8 -> SYMBOL_FREQ_BITS
+;  * Two decoding tables size of M_ entries are built:
+;    - L_ index to symbol mapping 
+;    - Y_ next state y-values  
+;  * There is no k-table, since with Z80 we can shift one bit at time from a
+;    stream anyway, the k-value becomes implicitly known.
+;  * Indices to both Y_ and L_ tablesmust be arranged such that given
+;    a 256 bytes page pointed by IX all table access must be within
+;    that page. That means IXL+M_+M_ is always < 256.
+;
+; The decoding is done from the end to the start, thus there is no need to
+; encode the original stream of symbols in a reverse order. This arrangement
+; fits well for the intended inplace decompression.
+;
 
 INITIAL_STATE   equ     3
-M_              equ     32
-LS_LEN          equ     8
-SYMBOL_FREQ_BITS    equ 5
 SPREAD_STEP     equ     5
 
-; Indices to both Y and L tables.. Tables must be arranged such that
-; give a 256 bytes page pointed by IX all table access must be within
-; that page. That means IXL+M+M is always < 256.
-;
+SYMBOL_FREQ_BITS    equ 5
+
+M_              equ     32
+LS_LEN          equ     8
 Y_              equ     M_
 L_              equ     0
 
@@ -45,6 +61,7 @@ EXTRACT_BYTE    MACRO   reg,ptr
         ENDM
 
 
+; The main functions & loop is just for testing purposes..
 
 main:
         ld      hl,temp_ls_table_end
@@ -71,6 +88,10 @@ loop:
 
         ret
 
+
+
+;----------------------------------------------------------------------------
+;
 ; Build decoding tables
 ;
 ; Inputs:
@@ -84,13 +105,13 @@ loop:
 ;       by L bytes.
 ;  
 ; Returns:
-;  D (bitbuffer)
+;  D (reminder of the bitbuffer)
 ;
 ; Changes:
 ;  HL
 ;
 ; Trashes:
-;  A,AF',B,D,E
+;  AF,AF',B,D,E
 ;
 ;
 ; Note: The sum of symbol frequencies must be a power of two!
@@ -103,7 +124,7 @@ tans_build_decoding_tables:
 
         ; A = xp
         ; B = M i.e. the size of Ls i.e. Ls_len, which is fixed in this case.
-        ; E = s
+        ; E = s(ymbol)
 _main_loop:
         push    bc
         ex      af,af'
@@ -148,7 +169,7 @@ _zero_symbol:
 
         ret
 
-;
+;----------------------------------------------------------------------------
 ;
 ; Inputs:
 ;  IX  = ptr to Y_ and L_ tables. Tables must fit into 256 bytes aligned page.
@@ -166,6 +187,11 @@ _zero_symbol:
 ;
 ; Trashes:
 ;  
+; Note:
+;  The bit stream extractor expects the following:
+;   * bits are left-shifted out
+;   * a 1-bit is added as the least significant bit as the end marker
+;   * Bytes are read from the stream in a reverse order
 ;
 
 tans_decode_symbol:
@@ -193,6 +219,9 @@ _not_empty:
         ex      af,af'
         ret
 
+;;
+; The rest are just for testing purposes..
+;
 ; The symbol freq table must be in reverse order !
 temp_ls_table:
         ;   7 6 5 4 3 2 1 9 and total sum of 32
