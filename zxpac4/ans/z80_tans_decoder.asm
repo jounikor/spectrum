@@ -72,17 +72,18 @@ main:
         ld      hl,temp_packed_array_end
         ld      de,temp_dest_end
         ld      c,0x80
-        ex      af,af'
         ld      a,8
         ex      af,af'
         ld      a,34
 loop:
+        ex      af,af'
         ld      ix,L_table
         call    tans_decode_symbol
         ex      de,hl
         dec     hl
         ld      (hl),b
         ex      de,hl
+        ex      af,af'
         dec     a
         jr nz,  loop
 
@@ -172,15 +173,15 @@ _zero_symbol:
 ;----------------------------------------------------------------------------
 ;
 ; Inputs:
-;  IX  = ptr to Y_ and L_ tables. Tables must fit into 256 bytes aligned page.
-;  AF' = state
-;  C   = bit buffer
-;  HL  = ptr to source
+;  IX = ptr to Y_ and L_ tables. Tables must fit into 256 bytes aligned page.
+;  A  = state
+;  C  = bit buffer
+;  HL = ptr to source
 ;
 ; Returns:
 ;
-;  AF' = next state
-;  B   = symbol
+;  A  = next state
+;  B  = symbol
 ;
 ; Changes:
 ;  C,HL,IXL
@@ -195,7 +196,6 @@ _zero_symbol:
 ;
 
 tans_decode_symbol:
-        ex      af,af'
         add     a,ixl
         ld      ixl,a
 
@@ -216,7 +216,6 @@ _not_empty:
 
         ; Scale state between [0..M) or rather [0..L)
         and     M_-1
-        ex      af,af'
         ret
 
 ;;
