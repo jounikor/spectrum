@@ -56,7 +56,7 @@ not_empty_bitbuf:
         ENDM
 
 EXTRACT_BYTE    MACRO   reg,ptr
-        dec     hl
+        dec     ptr
         ld      reg,(ptr)
         ENDM
 
