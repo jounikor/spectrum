@@ -12,19 +12,19 @@
 ; Some of the properties are configurable compile time:
 ;  * Size of the alphabet (no power of two requirement) -> LS_LEN
 ;  * Total sum of symbol frequencies must be a power of two -> M_
-;  * Maximum bits for a symbol frequence is 8 -> SYMBOL_FREQ_BITS
+;  * Maximum bits for a symbol frequency is 8 -> SYMBOL_FREQ_BITS
 ;  * Two decoding tables size of M_ entries are built:
-;    - L_ index to symbol mapping 
+;    - L_ state to symbol mapping 
 ;    - Y_ next state y-values  
-;  * There is no k-table, since with Z80 we can shift one bit at time from a
-;    stream anyway, the k-value becomes implicitly known.
-;  * Indices to both Y_ and L_ tablesmust be arranged such that given
+;  * There is no k-table, since with Z80 we can shift one bit at time from an
+;    input stream anyway, the k-value becomes implicitly known.
+;  * Indices to both Y_ and L_ tables must be arranged such that given
 ;    a 256 bytes page pointed by IX all table access must be within
-;    that page. That means IXL+M_+M_ is always < 256.
+;    that page. This means IXL+M_+M_ is always <= 256.
 ;
 ; The decoding is done from the end to the start, thus there is no need to
 ; encode the original stream of symbols in a reverse order. This arrangement
-; fits well for the intended inplace decompression.
+; fits well for the intended inplace decompression use case.
 ;
 
 INITIAL_STATE   equ     3
@@ -61,7 +61,7 @@ EXTRACT_BYTE    MACRO   reg,ptr
         ENDM
 
 
-; The main functions & loop is just for testing purposes..
+; The main function & loop is just for testing purposes..
 
 main:
         ld      hl,temp_ls_table_end
@@ -100,9 +100,9 @@ loop:
 ;       frequency is for the symbol 0 etc.
 ;       The array has a predefined length LS_LEN.
 ;  IX = a ptr to generated tables. HL must be such that
-;       the geenrated table fits into 256 bytes aligned
-;       memory area. Start of the table can be shiftes
-;       by L bytes.
+;       the generated table fits into 256 bytes aligned
+;       memory area. Start of the table can be shifted
+;       by M_ bytes.
 ;  
 ; Returns:
 ;  D (reminder of the bitbuffer)
