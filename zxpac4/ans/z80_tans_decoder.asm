@@ -50,7 +50,25 @@ main:
         ld      hl,temp_ls_table_end
         ld      ix,L_table
         call    tans_build_decoding_tables
-        
+     
+
+        ld      hl,temp_packed_array_end
+        ld      de,temp_dest_end
+        ld      c,0x80
+        ex      af,af'
+        ld      a,8
+        ex      af,af'
+        ld      a,34
+loop:
+        ld      ix,L_table
+        call    tans_decode_symbol
+        ex      de,hl
+        dec     hl
+        ld      (hl),b
+        ex      de,hl
+        dec     a
+        jr nz,  loop
+
         ret
 
 ; Build decoding tables
@@ -69,7 +87,7 @@ main:
 ;  D (bitbuffer)
 ;
 ; Changes:
-;  HL, IX
+;  HL
 ;
 ; Trashes:
 ;  A,AF',B,D,E
@@ -183,6 +201,62 @@ temp_ls_table:
         db  11000010b,00100100b,00000000b,10000100b,00111001b
 temp_ls_table_end:
 
+;
+; Original 34 symbols
+;  [0,1,0,2,2,0,2,1,2,1,2,1,1,1,1,1,0,1,0,2,1,2,2,2,1,2,0,2,0,2,0,0,0,0]
+;
+; Final state: 8
+; 
+;   k  b
+; [(2, 1), (2, 0), (4, 12), (4, 9), (2, 0), (4, 13), (2, 0), (4, 5),
+;  (2, 1), (4, 10), (2, 1), (3, 2), (2, 3), (3, 2), (2, 3), (3, 2),
+;  (2, 3), (2, 0), (4, 12), (2, 1), (4, 10), (4, 9), (4, 4), (2, 0),
+; (4, 5), (2, 1), (4, 2), (2, 1), (4, 2), (2, 1), (2, 2), (3, 4),
+; (2, 3)]
+
+
+; Symbols must be decoded from the end to start.
+temp_packed_array:
+    IF 0
+        .01
+        .00
+        .1100
+        .1001
+        .00
+        .1101
+        .00
+        .0101
+        .01
+        .1010
+        .01
+        .010
+        .11
+        .010
+        .11
+        .010
+        .11
+        .00
+        .1100
+        .01
+        .1010
+        .1001
+        .0100
+        .00
+        .0101
+        .01
+        .0010
+        .01
+        .0010
+        .01
+        .10
+        .100
+        .11
+    ENDIF
+        db  00000100b,00100111b,01001101b,10100101b,01101001b,10101101b
+        db  11100001b,00110100b,10001001b,01001010b,10010010b,11100100b
+temp_packed_array_end:
+
+
 
         org     ($+255) & 0xff00
 
@@ -194,6 +268,13 @@ L_table:
 ; [7,D,D,7,2,8,6,E,8,3,9,7,F,9,9,A,8,10,A,A,B,9,11,B,B,2,A,6,C,C,3,B]
 Y_table:
         ds      M_
+
+        org     ($+255) & 0xff00
+        db      0xff
+temp_dest:
+        ds      34
+temp_dest_end:
+        db      0xff
 
 
 
