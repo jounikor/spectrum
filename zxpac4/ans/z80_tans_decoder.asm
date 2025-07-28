@@ -10,6 +10,7 @@
 
 INITIAL_STATE   equ     3
 M_              equ     32
+LS_LEN          equ     8
 SPREAD_STEP     equ     5
 
 ; Indices to both Y and L tables.. Tables must be arranged such that
@@ -33,12 +34,16 @@ EXTRACT_BYTE    MACRO   reg,ptr
 
 
 main:
-
+        ld      hl,temp_ls_table_end
+        ld      ix,L_table
+        call    tans_build_decoding_tables
+        
+        ret
 
 ; Build decoding tables
 ;
 ; Inputs:
-;  HL = a ptr to Ls
+;  HL = a ptr to the end of the Ls array
 ;  IX = a ptr to generated tables. HL must be such that
 ;       the geenrated table fits into 256 bytes aligned
 ;       memory area. Start of the table can be shiftes
@@ -51,7 +56,7 @@ main:
 ;  HL, IX
 ;
 ; Trashes:
-;  A,B,C,E
+;  A,B,D,E
 ;
 ;
 ; Note: The sum of symbol frequencies must be a power of two!
@@ -59,7 +64,7 @@ main:
 
 tans_build_decoding_tables:
         ld      a,INITIAL_STATE
-        ld      b,M_
+        ld      b,LS_LEN
         ld      e,0
 
         ; A = xp
@@ -73,7 +78,7 @@ _main_loop:
         and     a
         jr z,   _zero_symbol
         ld      b,a     ; B = counter
-        ld      c,a     ; C = p
+        ld      d,a     ; D = p
         pop     af
 _per_symbol_loop:
         push    ix
@@ -83,8 +88,8 @@ _per_symbol_loop:
         ld      ixl,a
         
         ; self.y[xp] = p
-        ld      (ix+Y_),c
-        inc     c
+        ld      (ix+Y_),d
+        inc     d
         
         ; self.L[xp] = s
         ld      (ix+L_),e
@@ -98,9 +103,11 @@ _per_symbol_loop:
         ;
         djnz    _per_symbol_loop
 
+        db      $fe
 _zero_symbol:
-        inc     e
+        pop     af
         pop     bc
+        inc     e
         djnz    _main_loop
 
         ret
@@ -122,7 +129,7 @@ _zero_symbol:
 ;  C,HL,IXL
 ;
 ; Trashes:
-;  A
+;  
 ;
 
 tans_decode_symbol:
@@ -149,6 +156,25 @@ _not_empty:
         and     M_-1
         ex      af,af'
         ret
+
+; The symbol freq table must be in reverse order !
+temp_ls_table:
+        ;   7 6 5 4 3 2 1 9 and total sum of 32
+        ;db  7,6,2,0,0,9,6,2
+        db  2,6,9,0,0,2,6,7
+temp_ls_table_end:
+
+
+        org     ($+255) & 0xff00
+
+; L table for state to symbol mapping
+; [6,0,5,0,2,6,1,5,0,2,6,1,5,0,5,6,1,5,0,5,6,1,5,0,5,7,1,6,0,5,7,1]
+L_table:
+        ds      M_
+; y:
+; [7,D,D,7,2,8,6,E,8,3,9,7,F,9,9,A,8,10,A,A,B,9,11,B,B,2,A,6,C,C,3,B]
+Y_table:
+        ds      M_
 
 
 

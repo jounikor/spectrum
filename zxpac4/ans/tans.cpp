@@ -68,6 +68,14 @@ int main(void)
     state = p_tans->done_encoder(state);
     TRACE_INFO("Final state: 0x" << std::hex << state << std::dec << std::endl)
 
+
+    TRACE_INFO("Scaled Ls table:\n")
+    for (int i = 0; i < p_tans->get_Ls_len(); i++) {
+        TRACE_INFO( i << ": " << static_cast<uint32_t>(p_tans->get_scaled_Ls()[i]) << std::endl)
+    }
+
+
+
     // We need to use already scaled symbol frequencies, since the
     // tand_decoder class does not implement scaleSymbolFreqs().
     p_detans = new tans_decoder<uint8_t,M>(
