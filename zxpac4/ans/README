@@ -2,6 +2,8 @@
 
 Version 0.1
 
+NOTE! Testing has been minimal so there MAY BE bugs around.
+
 The two following Python3 programs implement my ANS ancoders/decoders. These
 are simple and should be very readable, since they were implemented for my
 ANS concept self-learning purposes.
@@ -22,6 +24,6 @@ low spec target platforms - read 8-bit systems.
 
 The following Z80 assembly file implements a tANS decoder and a required
 function for building L- and Y-value decoding tables. The implementation 
-currently is 86 bytes, excluding L- and Y-tables.
+currently is 84 bytes, excluding L- and Y-tables.
 
   z80_tans_decoder.asm

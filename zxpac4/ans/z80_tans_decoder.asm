@@ -106,7 +106,7 @@ loop:
 ;       by M_ bytes.
 ;  
 ; Returns:
-;  D (reminder of the bitbuffer)
+;  D (reminder of the bit buffer)
 ;
 ; Changes:
 ;  HL
@@ -116,6 +116,9 @@ loop:
 ;
 ;
 ; Note: The sum of symbol frequencies must be a power of two!
+;       The bit buffer is reset on each time this function is called,
+;       thus plan accordingly i.e. the new set of symbol frequencies
+;       must start from a byte boundary.
 ;
 
 tans_build_decoding_tables:
@@ -161,6 +164,7 @@ _per_symbol_loop:
         ;
         djnz    _per_symbol_loop
 
+        ; Old trick to avoid a jump..
         db      $fe
 _zero_symbol:
         ex      af,af'
@@ -218,6 +222,7 @@ _not_empty:
         and     M_-1
         ret
 
+;;
 ;;
 ; The rest are just for testing purposes..
 ;
