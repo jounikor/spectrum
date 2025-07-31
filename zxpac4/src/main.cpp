@@ -25,6 +25,7 @@
 #include "zxpac4.h"
 #include "zxpac4_32k.h"
 #include "zxpac4b.h"
+#include "zxpac4c.h"
 #include "lz_util.h"
 #include "lz_base.h"
 #include "hunk.h"
@@ -47,7 +48,18 @@
 #define ZXPAC4              0
 #define ZXPAC4B             1
 #define ZXPAC4_32K          2
+#define ZXPAC4C             3
 #define ZXPAC_DEFAULT       ZXPAC4
+#define ZXPAC_MAX           ZXPAC4C
+
+
+static const char *algo_names[] = {
+    "zxpac4",
+    "zxpac4b",
+    "zxpac4_32k",
+    "zxpac4c",
+};
+
 
 
 static const char* def_filename = "SCOOPEX";
@@ -75,12 +87,16 @@ static struct option longopts[] = {
     {"abs",         required_argument,  NULL, 'A'},
     {"merge-hunks", no_argument,        NULL, 'M'},
     {"equalize-hunks", no_argument,     NULL, 'E'},
+    {"list",        no_argument,        NULL, 'l'},
     {"help",        no_argument,        NULL, 'h'},
     {"file-name",   required_argument,  NULL, 'n'},
     {0,0,0,0}
 };
 
-static void usage(char *prg, const targets::target* trg) {
+static void usage(char *prg, const targets::target* trg)
+{
+    (void)trg;
+
     std::cerr << "ZXPAC4 v" << ZXPAC4_MAJOR << "." << ZXPAC4_MINOR << " (c) 2022-24 Jouni 'Mr.Spiv' Korhonen\n\n";
     std::cerr << "Usage: " << prg << " target [options] infile [outfile]\n";
 	std::cerr << " Targets:\n";
@@ -104,9 +120,12 @@ static void usage(char *prg, const targets::target* trg) {
               << "                        (default no reverse)\n";
     std::cerr << "  --reverse-file,-R     Reverse the input file to allow end-to-start decompression. This \n"
               << "                        setting will enable '--reverse-encoded' as well (default no reverse)\n";
-    std::cerr << "  --algo,-a             Select used algorithm (0=zxpac4, 1=xzpac4b, 2=zxpac4_32k). \n"
-              << "                        (default depends on the target).\n";
-    std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target).\n";
+    std::cerr << "  --algo,-a             Select used algorithm (default depends on the target):\n"
+              << "                          0=zxpac4      LZSS, 128K window\n"
+              << "                          1=xzpac4b     LZSS, literal runs, 128K window\n"
+              << "                          2=zxpac4_32k  Same as zxpac4 with 32K window\n"
+              << "                          3=zxpac4c     LZSS, literal runs, 128K window, tANS backend, no ascii\n";
+    std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target):\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --merge-hunks,-M      Merge hunks (Amiga target).\n";
     std::cerr << "  --equalize-hunks,-E   Treat HUNK_CODE/DATA/BSS all the same. This setting will enable\n"
@@ -116,6 +135,7 @@ static void usage(char *prg, const targets::target* trg) {
     std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
     std::cerr << "  --verbose,-v          Output some additional information to stdout.\n";
     std::cerr << "  --file-name,-n        Filename, for example, for ZX Spectrum TAP file.\n";
+    std::cerr << "  --list,-l             Print defaults & details of each supported target and algorithm.\n";
     std::cerr << "  --help,-h             Print this output ;)\n";
     std::cerr << std::flush;
     exit(EXIT_FAILURE); 
@@ -124,6 +144,7 @@ static void usage(char *prg, const targets::target* trg) {
 
 static targets::target my_targets[] = {
     {   "asc",
+        "Draft: 7-bit ASCII only target. 8-bit input causes an error.",
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
@@ -132,12 +153,13 @@ static targets::target my_targets[] = {
         0x0,
         NULL,
         4,          // initial_pmr
-        false,      // overlay
-        false,      // merge_hunks
-        false,      // equalize_hunks
-        false,      // encode_to_ram
+        TRG_NSUP,      // overlay
+        TRG_NSUP,      // merge_hunks
+        TRG_NSUP,      // equalize_hunks
+        TRG_NSUP,      // encode_to_ram
     },
     {   "bin",
+        "Draft: 8-bit binary data target.",
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4,
@@ -146,12 +168,13 @@ static targets::target my_targets[] = {
         0x0,
         NULL,
         4,          // initial_pmr
-        false,      // overlay
-        false,      // merge_hunks
-        false,      // equalize_hunks
-        false,      // encode_to_ram
+        TRG_NSUP,      // overlay
+        TRG_NSUP,      // merge_hunks
+        TRG_NSUP,      // equalize_hunks
+        TRG_NSUP,      // encode_to_ram
     },
     {   "zx",
+        "Draft: A TAP file contains a decompressor and runs the compressed program.",
         (1<<16) - 1,
         1<<ZXPAC4_32K,
         ZXPAC4_32K,
@@ -159,13 +182,14 @@ static targets::target my_targets[] = {
         0x0,
         0x0,
         def_filename,
-        4,          // initial_pmr
-        false,      // overlay
-        false,      // merge_hunks
-        false,      // equalize_hunks
-        true,       // encode_to_ram
+        4,              // initial_pmr
+        TRG_NSUP,       // overlay
+        TRG_NSUP,       // merge_hunks
+        TRG_NSUP,       // equalize_hunks
+        TRG_NSUP,       // encode_to_ram
     },
     {   "bbc",
+        "Draft: BBC Model A/B self-extracting executable file.",
         (1<<16) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
         ZXPAC4_32K,
@@ -173,13 +197,14 @@ static targets::target my_targets[] = {
         0x0,
         0x0,
         def_filename,
-        4,          // initial_pmr
-        false,      // overlay
-        false,      // merge_hunks
-        false,      // equalize_hunks
-        false,      // encode_to_ram
+        4,              // initial_pmr
+        TRG_NSUP,       // overlay
+        TRG_NSUP,       // merge_hunks
+        TRG_NSUP,       // equalize_hunks
+        TRG_NSUP,       // encode_to_ram
     },
     {   "ami",
+        "Amiga compressed executable.",
         (1<<24) - 1,
         1<<ZXPAC4 | 1<<ZXPAC4_32K,
         ZXPAC4,
@@ -188,10 +213,10 @@ static targets::target my_targets[] = {
         0x0,        // jump address
         NULL,
         4,          // initial_pmr
-        false,      // overlay
-        false,      // merge_hunks
-        false,      // equalize_hunks
-        false,      // encode_to_ram
+        TRG_NSUP,       // overlay
+        TRG_FALSE,      // merge_hunks
+        TRG_FALSE,      // equalize_hunks
+        TRG_FALSE,      // encode_to_ram
     }   
 };
 
@@ -206,7 +231,7 @@ static const lz_config algos[] {
         false,      // only_better_matches
         false,      // reverse_file
         false,      // reverse_encoded
-        false,      // is_ascii
+        LZ_CFG_FALSE,      // is_ascii
         false,      // preshift_last_ascii_literal
         false       // verbose
     },
@@ -219,7 +244,7 @@ static const lz_config algos[] {
         false,      // only_better_matches
         false,      // reverse_file
         false,      // reverse_encoded
-        false,      // is_ascii
+        LZ_CFG_FALSE,      // is_ascii
         false,      // preshift_last_ascii_literal
         false       // verbose
     },
@@ -232,7 +257,20 @@ static const lz_config algos[] {
         false,      // only_better_matches
         false,      // reverse_file
         false,      // reverse_encoded
-        false,      // is_ascii
+        LZ_CFG_FALSE,      // is_ascii
+        false,      // preshift_last_ascii_literal
+        false       // verbose
+    },
+    // ZXPAC4C - max 128K window, literal runs, 
+    {   ZXPAC4C_WINDOW_MAX,  DEF_CHAIN, ZXPAC4C_MATCH_MIN, ZXPAC4C_MATCH_MAX, ZXPAC4C_MATCH_GOOD,
+        DEF_BACKWARD_STEPS, ZXPAC4C_OFFSET_MATCH2_THRESHOLD, ZXPAC4C_OFFSET_MATCH3_THRESHOLD,
+        ZXPAC4C_INIT_PMR_OFFSET,
+        DEBUG_LEVEL_NONE,
+        ZXPAC4C,
+        false,      // only_better_matches
+        false,      // reverse_file
+        false,      // reverse_encoded
+        LZ_CFG_NSUP,      // is_ascii
         false,      // preshift_last_ascii_literal
         false       // verbose
     }
@@ -240,6 +278,68 @@ static const lz_config algos[] {
 
 #define LZ_TARGET_SIZE static_cast<int>((sizeof(my_targets)/sizeof(targets::target)))
 #define LZ_ALGO_SIZE static_cast<int>((sizeof(algos)/sizeof(lz_config)))
+
+/**
+ * @brief List all supported targets and their details.
+ * @param[in]   a ptr to the shell command name.
+ *
+ * @return  VOID
+ *
+ */
+void list(const char* argv, const targets::target* trg)
+{
+    (void)argv;
+    int mm;
+
+    std::cout << "Details for target '" << trg->target_name << "':\n";
+    std::cout << "  Brief: " << trg->target_brief << "\n";
+    std::cout << "  Supported allgorithms:\n";
+    for (int i = 0; i < ZXPAC_MAX; i++) {
+        if (trg->supported_algorithms & (1 << i)) {
+            std::cout << "    " << algo_names[i] << "\n";
+        }
+    }
+    std::cout << "  Default algorithm: " << algo_names[trg->algorithm] << "\n";
+    
+    mm = trg->max_match;;
+    if (mm == 0) {
+        std::cout << "  Maximum match length uses selected algorithm default\n";
+    } else {
+        std::cout << "  Maximum match length: " << mm << "\n";
+    }
+    
+    mm = trg->initial_pmr;
+    if (mm == 0) {
+        std::cout << "  Initial PMR offset uses selected algorithm default\n";
+    } else {
+        std::cout << "  Initial PMR offset: " << mm << "\n";
+    }
+
+    if (trg->overlay != TRG_NSUP) {
+        std::cout << "  Amiga specific executable file decompression using overlay supported\n";
+    }
+    if (trg->merge_hunks != TRG_NSUP) {
+        std::cout << "  Executable file hunk/segment merging supported\n";
+    }
+    if (trg->equalize_hunks != TRG_NSUP) {
+        std::cout << "  Amiga specific executable file HUNK_CODE/DATA/BSS merging supported\n";
+    }
+
+    for (int i = 0; i < ZXPAC_MAX; i++) {
+        if (trg->supported_algorithms & (1 << i)) {
+            std::cout << algo_names[i] << " details and defaults:\n";
+        
+            std::cout << "  Window size: " << algos[i].window_size << "\n";
+            std::cout << "  Default length of hash linked list of matches: " << algos[i].max_chain << "\n";
+            std::cout << "  Minimum match length: " << algos[i].min_match << "\n";
+            std::cout << "  Maximum mstch length: " << algos[i].max_match << "\n";
+            std::cout << "  Good match length threshold: " << algos[i].good_match << "\n";
+            std::cout << "  Default PMR offset: " << algos[i].initial_pmr_offset << "\n";
+            if (algos[i].is_ascii != LZ_CFG_NSUP) {
+                std::cout << "  7-bit ASCII compression mode supported\n";
+}   }   }   }
+
+
 
 /**
  * @brief A factory function to instantiate a required target.
@@ -396,7 +496,7 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "Em:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:n:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "Em:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:n:l", longopts, NULL)) != -1) {
 		switch (n) {
             case 'O':   // --overlay
                 trg_overlay = true;
@@ -491,6 +591,9 @@ int main(int argc, char** argv)
             case 'n':   // --file-name
                 trg_file_name = optarg;
                 break;
+            case 'l':   // --list
+                list(argv[0],trg);
+                exit(EXIT_FAILURE);
             case '?':
 			case ':':
 				usage(argv[0],trg);

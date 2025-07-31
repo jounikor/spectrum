@@ -71,6 +71,9 @@ set(COMMON_SRC  src/cost4.cpp
                 inc/target.h
                 inc/version.h
 
+                inc/ans.h
+                inc/tans_encoder.h
+
                 z80/z80_offsets.h
 )
 

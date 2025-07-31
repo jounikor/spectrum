@@ -51,6 +51,10 @@ struct cost {
  * @brief A structure containing basic LZ engine configurations.
  */
 
+#define LZ_CFG_FALSE    0
+#define LZ_CFG_TRUE     1
+#define LZ_CFG_NSUP     -1
+
 typedef struct lz_config {
     int window_size;                                // Only power of two allowed
     int max_chain;
@@ -67,7 +71,7 @@ typedef struct lz_config {
     bool only_better_matches:1;
     mutable bool reverse_file:1;                    // Safe to change by target constructor
     mutable bool reverse_encoded:1;                 // Safe to change by target constructor
-    mutable bool is_ascii:1;                        // Safe to change by target constructor
+    mutable int8_t is_ascii;                        // Safe to change by target constructor
     mutable bool preshift_last_ascii_literal:1;     // Safe to change by target constructor
     bool verbose:1;
 } lz_config_t;

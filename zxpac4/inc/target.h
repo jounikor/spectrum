@@ -24,6 +24,11 @@
 #define AMIGA_EXE_SECURITY_DISTANCE     8
 #define AMIGA_OVERLAY_BUFFER_SIZE       2048
 
+#define TRG_FALSE   0       // false
+#define TRG_TRUE    1       // true
+#define TRG_NSUP    -1      // feature not supported
+
+
 namespace targets {
     
     /**
@@ -39,6 +44,7 @@ namespace targets {
                                          "bbc" for BBC Model A/B self-extracting files.
                                          "ami" for Amiga self-extracting exeutable files. */
 
+        const char* target_brief;   /**< Brief description of the target. */
         int max_file_size;          /**< Maximum original file size for the target.
                                          zxpac4 algorithm limit is 2^24-1 bytes. */
 
@@ -62,10 +68,10 @@ namespace targets {
         const char* file_name;      /**< Filename for the output file e.g. ZX Spectrum TAP file. */
 
         int8_t initial_pmr;         /**< Target specific initial PMR offset. 0 use algorithm default. */
-        bool overlay:1;             /**< Amiga target specific: use overlay decompressor. */
-        bool merge_hunks:1;         /**< Amiga target specific: merge executable file hunks when possible. */
-        bool equalize_hunks:1;      /**< Amiga target specific: treat HUNK_CODE/DATA/BSS the same. */
-        bool encode_to_ram:1;       /**< Set TRUE if the comressed file is provided as a RAM buffer instead
+        int8_t overlay;             /**< Amiga target specific: use overlay decompressor. */
+        int8_t merge_hunks;         /**< Amiga target specific: merge executable file hunks when possible. */
+        int8_t equalize_hunks;      /**< Amiga target specific: treat HUNK_CODE/DATA/BSS the same. */
+        int8_t encode_to_ram;       /**< Set TRUE if the comressed file is provided as a RAM buffer instead
                                          of directly saving into a file. */
     };
 

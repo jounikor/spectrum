@@ -40,7 +40,7 @@ int  target_ascii::preprocess(char* buf, int len)
         }
     }
 
-    m_cfg->is_ascii = true;
+    m_cfg->is_ascii = LZ_CFG_TRUE;
     return len;
 }
 

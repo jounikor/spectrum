@@ -66,6 +66,7 @@ EXTRACT_BYTE    MACRO   reg,ptr
 main:
         ld      hl,temp_ls_table_end
         ld      ix,L_table
+        ld      b,LS_LEN
         call    tans_build_decoding_tables
      
 
@@ -104,6 +105,7 @@ loop:
 ;       the generated table fits into 256 bytes aligned
 ;       memory area. Start of the table can be shifted
 ;       by M_ bytes.
+;  B  = the number of entries in the Ls array.
 ;  
 ; Returns:
 ;  D (reminder of the bit buffer)
@@ -112,7 +114,7 @@ loop:
 ;  HL
 ;
 ; Trashes:
-;  AF,AF',B,D,E
+;  AF,B,D,E
 ;
 ;
 ; Note: The sum of symbol frequencies must be a power of two!
@@ -123,7 +125,6 @@ loop:
 
 tans_build_decoding_tables:
         ld      a,INITIAL_STATE
-        ld      b,LS_LEN
         ld      de,0x8000
 
         ; A = xp
@@ -131,7 +132,7 @@ tans_build_decoding_tables:
         ; E = s(ymbol)
 _main_loop:
         push    bc
-        ex      af,af'
+        push    af
 
         ; Bit extract trashes B, which is OK in this case. Bits are returned
         ; in A and Z-flag is set accordingly to what A contains.
@@ -140,7 +141,7 @@ _main_loop:
         
         ld      b,a     ; B = counter
         ld      c,a     ; C = p
-        ex      af,af'
+        pop     af
 _per_symbol_loop:
         push    ix
         push    af
@@ -167,7 +168,7 @@ _per_symbol_loop:
         ; Old trick to avoid a jump..
         db      $fe
 _zero_symbol:
-        ex      af,af'
+        pop     af
         pop     bc
         inc     e
         djnz    _main_loop
