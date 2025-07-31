@@ -332,8 +332,8 @@ void list(const char* argv, const targets::target* trg)
             std::cout << "  Window size: " << algos[i].window_size << "\n";
             std::cout << "  Default length of hash linked list of matches: " << algos[i].max_chain << "\n";
             std::cout << "  Minimum match length: " << algos[i].min_match << "\n";
-            std::cout << "  Maximum mstch length: " << algos[i].max_match << "\n";
-            std::cout << "  Good match length threshold: " << algos[i].good_match << "\n";
+            std::cout << "  Maximum match length: " << algos[i].max_match << "\n";
+            std::cout << "  Default good match length: " << algos[i].good_match << "\n";
             std::cout << "  Default PMR offset: " << algos[i].initial_pmr_offset << "\n";
             if (algos[i].is_ascii != LZ_CFG_NSUP) {
                 std::cout << "  7-bit ASCII compression mode supported\n";
