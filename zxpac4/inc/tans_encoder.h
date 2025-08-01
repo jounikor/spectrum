@@ -29,27 +29,49 @@ class tans_encoder : public ans_base {
 
     bool scaleSymbolFreqs(void);
     void buildEncodingTables(void);
+    void free_tables(void);
 
 public:
-    tans_encoder(const T* Ls, int n, debug_e debug=TRACE_LEVEL_NONE);
+    tans_encoder(void);
+    tans_encoder(const T* Ls, int n);
     ~tans_encoder();
+
+    void init_tans(const T* Ls, int n);
+
     const T* get_scaled_Ls(void) const;
     int get_Ls_len(void) const;
-    ans_state_t init_encoder(T& );
+    ans_state_t init_encoder(T&);
     ans_state_t done_encoder(ans_state_t state) const;
     ans_state_t encode(T s, ans_state_t state, uint8_t& k, uint32_t& b);
 };
 
 template<class T, int M>
-tans_encoder<T,M>::tans_encoder(const T* Ls, int Ls_len, debug_e debug) :
-    ans_base(M,debug)
+tans_encoder<T,M>::tans_encoder(void) : ans_base(M)
+{
+    k_ = NULL;
+    Ls_ = NULL;
+    next_state_ = NULL;
+    symbol_last_ = NULL;
+    Ls_len_ = 0;
+}
+
+template<class T, int M>
+tans_encoder<T,M>::tans_encoder(const T* Ls, int Ls_len) : ans_base(M)
+{
+    k_ = NULL;
+    Ls_ = NULL;
+    next_state_ = NULL;
+    symbol_last_ = NULL;
+    init_tans(Ls,Ls_len);
+}
+
+
+template<class T, int M>
+void tans_encoder<T,M>::init_tans(const T* Ls, int Ls_len)
 {
     int sum = 0;
 
-    next_state_ = NULL;
-    symbol_last_ = NULL;
-    k_ = NULL;
-    Ls_ = NULL;
+    free_tables();
     Ls_len_ = Ls_len;
 
     // Yes.. we make a copy of the original array..
@@ -70,10 +92,16 @@ tans_encoder<T,M>::tans_encoder(const T* Ls, int Ls_len, debug_e debug) :
 template<class T, int M>
 tans_encoder<T,M>::~tans_encoder()
 {
-    if (Ls_) { delete[] Ls_; }
-    if (symbol_last_) { delete[] symbol_last_; }
-    if (next_state_) { delete[] next_state_; }
-    if (k_) { delete[] k_; }
+    free_tables();
+}
+
+template<class T, int M>
+void tans_encoder<T,M>::free_tables(void)
+{
+    if (Ls_) { delete[] Ls_; Ls_ = NULL; }
+    if (symbol_last_) { delete[] symbol_last_; symbol_last_ = NULL; }
+    if (next_state_) { delete[] next_state_; next_state_ = NULL; }
+    if (k_) { delete[] k_; k_ = NULL; }
 }
 
 
@@ -92,8 +120,6 @@ bool tans_encoder<T,M>::scaleSymbolFreqs(void)
         // https://stackoverflow.com/questions/31121591/normalizing-integers
         // The last reminder gets always added to the last item in the list..
         
-        TRACE_DBUG("L should be: " << M << ", L is now: " << L << std::endl)
-        
         int reminder = 0;
         int underflow = 0;
 
@@ -109,15 +135,12 @@ bool tans_encoder<T,M>::scaleSymbolFreqs(void)
             if (tmp == 0) {
                 ++underflow;
                 tmp = 1;
-                TRACE_DBUG("Ls[" << i << "] would become 0" << std::endl)
             }
 
             Ls_[i] = tmp;
             reminder = count % L;
         }
     
-        TRACE_DBUG("Number of underflows is " << underflow << std::endl)
-
         // Handle underflows
         i = Ls_len_ - 1;
         while (underflow > 0 && i > 0) {
@@ -131,16 +154,9 @@ bool tans_encoder<T,M>::scaleSymbolFreqs(void)
         for (i = L = 0; i < Ls_len_; i++) {
             L += Ls_[i];
         }
-
-        TRACE_DBUG("New Ls = [")
-        for (i = 0; i < Ls_len_; i++) {
-            std::cout << std::hex << static_cast<uint32_t>(Ls_[i]) << " ";
-        }
-        std::cout << "]" << std::dec << std::endl;
     }
 
     if (L != M) {
-        TRACE_WARN("M (" << M << ") != L (" << L << ")" << std::endl)
         return false;
     }
 
@@ -180,13 +196,6 @@ void tans_encoder<T,M>::buildEncodingTables(void)
             int yp_tmp = p << k_tmp;
 
             for (int yp_pos = yp_tmp; yp_pos < yp_tmp + (1 << k_tmp); yp_pos++) {
-                TRACE_DBUG("s: " << s 
-                    << ", p: " << p 
-                    << ", xp: " << xp    \
-                    << ", k_tmp: " << static_cast<uint32_t>(k_tmp)
-                    << ", yp_tmp: " << yp_tmp   \
-                    << ", yp_pos: " << yp_pos << std::endl)
-            
                 // next table for each symbol.. this array will explode in size when the
                 // symbol set gets bigger.
                 next_state[s][yp_pos & (M-1)] = xp;
@@ -222,7 +231,6 @@ int tans_encoder<T,M>::get_Ls_len(void) const
 template<class T, int M>
 ans_state_t tans_encoder<T,M>::init_encoder(T& s) {
     ans_state_t state = symbol_last_[s];
-    TRACE_DBUG("symbol: " << s << ", initial state: " << state << std::endl);
     return state;
 }
 
@@ -236,21 +244,10 @@ ans_state_t tans_encoder<T,M>::done_encoder(ans_state_t state) const
 template<class T, int M>
 ans_state_t tans_encoder<T,M>::encode(T s, ans_state_t state, uint8_t& k, uint32_t& b)
 {
-    TRACE_DBUG("symbol: " << std::hex << static_cast<uint32_t>(s) << ", state: 0x" 
-        << state << std::dec << std::endl)
-
     k = k_[s][state];
     b = state & ((1 << k) - 1);
     state = next_state_[s][state];
-
-    TRACE_DBUG("new state: 0x" << state 
-        << ", k: 0x" << static_cast<uint32_t>(k) 
-        << ", b: 0x" << b << std::dec << std::endl)
-
     return state;
 }
-
-
-
 
 #endif      // _TANS_ENCODER_H_INCLUDED

@@ -46,9 +46,11 @@ include_directories(inc)
 set(COMMON_SRC  src/cost4.cpp
                 src/cost4_32k.cpp
                 src/cost4b.cpp
+                src/cost4c.cpp
                 src/zxpac4.cpp
                 src/zxpac4_32k.cpp
                 src/zxpac4b.cpp
+                src/zxpac4c.cpp
                 src/hash.cpp
                 src/main.cpp
                 src/hunk.cpp
@@ -64,6 +66,7 @@ set(COMMON_SRC  src/cost4.cpp
                 inc/cost4.h
                 inc/cost4_32k.h
                 inc/zxpac4b.h
+                inc/zxpac4c.h
                 inc/cost4b.h
                 inc/lz_base.h
                 inc/hash.h

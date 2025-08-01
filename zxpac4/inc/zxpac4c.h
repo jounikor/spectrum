@@ -73,7 +73,7 @@ to be tested later
   6 + [6] =  8192 -> 16383    // nnnnnn
   7 + [7] = 16384 -> 32767    // nnnnnnn
   8 + [8] = 32768 -> 65535    // nnnnnnnn
-  9 + [9] = 65536 -> 131072   // nnnnnnnnn <- provisional..
+  9 + [9] = 65536 -> 131071   // nnnnnnnnn <- provisional..
 
  alternative offset tANS symbols from 0 to 8 
   

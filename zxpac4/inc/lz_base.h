@@ -41,6 +41,7 @@ struct cost {
     int32_t offset;
     int32_t length;
     int32_t pmr_offset;         ///< tbd
+    int32_t pmr_length;         ///< tbd
     uint32_t arrival_cost;
     int16_t num_literals;       ///< Number of consequtive literal up to this match node.
     bool last_was_literal:1;

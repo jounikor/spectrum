@@ -1,19 +1,15 @@
 /**
- * @file cost4b.cpp
+ * @file cost4c.cpp
  * @brief Calculates an approximate cost for the LZ encoding.
- * @version 0.3
+ * @version 0.1
  * @author Jouni 'Mr.Spiv' Korhonen
- * @date 7-Apr-2024
- * @date 4-Aug-2024
- * @date 3-Feb-2025
+ * @date 1-Aug-2025
  * @copyright The Unlicense
  *
  * @note TODOs - the current design still has few (pun intended) flaws I want to change:
  *   - For the literal/match/PMR selection prefix codes are still shared between
  *     the cost class and the encoder class. They should all be within the
  *     cost class -> requires 'some' refactoring and interface changes.
- *   - Allow two maximum window sizes: 32K and 128K. This would allow shorter emcoding
- *     of offset prefixes when the source file is e.g. never longer than 32K or so.
  */
 
 #include <iostream>
@@ -21,8 +17,8 @@
 #include <cassert>
 #include <stdint.h>
 #include <string.h>
-#include "cost4b.h"
-#include "zxpac4b.h"
+#include "cost4c.h"
+#include "zxpac4c.h"
 
 /**
  * @brief The default constructor for the cost class. 
@@ -38,7 +34,7 @@
  * @note The constructor may throw exceptions.
  */
 
-zxpac4b_cost::zxpac4b_cost(
+zxpac4c_cost::zxpac4c_cost(
     const lz_config* p_cfg, int ins, int max): 
     lz_cost(p_cfg)
 {
@@ -53,115 +49,52 @@ zxpac4b_cost::zxpac4b_cost(
     m_verbose = false;
 }
 
-zxpac4b_cost::~zxpac4b_cost(void)
+zxpac4c_cost::~zxpac4c_cost(void)
 {
 }
 
-int zxpac4b_cost::impl_get_offset_tag(int offset, char& byte_tag, int& bit_tag)
+int zxpac4c_cost::impl_get_offset_tag(int offset, char& byte_tag, int& bit_tag)
 {
-    if (offset < 128) {
-        // (0ooooooo)
-        byte_tag = offset;
-        bit_tag = 0;
-        return 0;
-    } else if (offset < 256) {
-        // (1ooooooo) + 00
-        byte_tag = offset;
-        bit_tag = 0;
-        return 2;
-    } else if (offset < 512) {
-        // (1ooooooo) + 01 + o
-        byte_tag = offset >> 1;
-        bit_tag = (0x1 << 1) | (offset & 0x01);
-        return 3;
-    } else if (offset < 1024) {
-        // (1ooooooo) + 100 + oo
-        byte_tag = offset >> 2;
-        bit_tag = (0x4 << 2) | (offset & 0x03);
-        return 5;
-    } else if (offset < 2048) {
-        // (1ooooooo) + 101 + ooo
-        byte_tag = offset >> 3;
-        bit_tag = (0x5 << 3) | (offset & 0x07);
-        return 6;
-    } else if (offset < 4096) {
-        // (1ooooooo) + 1100 + oooo
-        byte_tag = offset >> 4;
-        bit_tag = (0xc << 4) | (offset & 0x0f);
-        return 8;
-    } else if (offset < 8192) {
-        // (1ooooooo) + 1101 + oooo + o
-        byte_tag = offset >> 5;
-        bit_tag = (0xd << 5) | (offset & 0x1f);
-        return 9;
-    } else if (offset < 16384) {
-        // (1ooooooo) + 11100 + ooo + ooo
-        byte_tag = offset >> 6;
-        bit_tag = (0x1c << 6) | (offset & 0x3f);
-        return 11;
-    } else if (offset < 32768) {
-        // (1ooooooo) + 11101 + ooo + oooo
-        byte_tag = offset >> 7;
-        bit_tag = (0x1d << 7) | (offset & 0x7f);
-        return 12;
-    } else if (offset < 65536) {
-        // (1ooooooo) + 11110 + ooo + ooooo
-        byte_tag = offset >> 8;
-        bit_tag = (0x1e << 8) | (offset & 0xff);
-        return 13;
-    } else /*(offset < 131072)*/ {
-    // (1ooooooo) + 11111 + ooo + oooooo
-        byte_tag = offset >> 9;
-        bit_tag = (0x1f << 9) | (offset & 0x1ff);
-        return 14;
-    }
-}
+    int bits = 8;
 
-int zxpac4b_cost::impl_get_length_tag(int length, int& bit_tag)
-{
-    assert(length > 0);
-    assert(length < 256);
+    // Must hold: 0 < offset < 131072
+    assert(offset < (1 << 17));
+    assert(offset > 0);
 
-    int mask_bit = 7;
-    int bits = 1;
-    int mask;
-    bit_tag = 0;
-
-    while ((1 << mask_bit) > length) {
-        mask_bit--;
-    }
-
-    if (mask_bit == 0) {
-        // 0 + [0] = 1
-        return bits;
-    }
-
-    mask = 1 << (mask_bit - 1);
-   
-    while (mask > 0) {
-        bit_tag = (bit_tag | 0x1) << 2;
-        bit_tag = mask & length ? bit_tag | 0x2 : bit_tag;
-        bits += 2;
-        mask >>= 1;
-    }
-
-    if (mask_bit == 7) {
-        bit_tag >>= 1;
-        bits -= 1;
+    while (offset >= (1 << bits)) {
+        ++bits;
     }
 
     return bits;
 }
 
-int zxpac4b_cost::impl_get_literal_tag(const char* literals, int length, char& byte_tag, int& bit_tag)
+int zxpac4c_cost::impl_get_length_tag(int length, int& bit_tag)
 {
+    assert(length > 0);
+    assert(length < 256);
+
+    int bits = 1;
+
+    while (length >= (1 << bits)) {
+        ++bits;
+    }
+
+    return bits;
+}
+
+int zxpac4c_cost::impl_get_literal_tag(const char* literals, int length, char& byte_tag, int& bit_tag)
+{
+    // This API sucks quite hard.. but lets try to abuse it anyway.
+
+
+
     (void)literals;
     (void)byte_tag;
     assert(length < 256);
     return impl_get_length_tag(length,bit_tag);
 }
 
-int zxpac4b_cost::impl_get_offset_bits(int offset)
+int zxpac4c_cost::impl_get_offset_bits(int offset)
 {
     assert(offset < 131072);
     
@@ -194,7 +127,7 @@ int zxpac4b_cost::impl_get_offset_bits(int offset)
     return 0;
 }
 
-int zxpac4b_cost::impl_get_length_bits(int length)
+int zxpac4c_cost::impl_get_length_bits(int length)
 {
     assert(length > 0);
     assert(length < 256);
@@ -219,7 +152,7 @@ int zxpac4b_cost::impl_get_length_bits(int length)
     return (7+7);
 }
 
-int zxpac4b_cost::impl_get_literal_bits(char literal, bool is_ascii)
+int zxpac4c_cost::impl_get_literal_bits(char literal, bool is_ascii)
 {
     (void)literal;
     (void)is_ascii;
@@ -228,7 +161,7 @@ int zxpac4b_cost::impl_get_literal_bits(char literal, bool is_ascii)
 
 /**
  * @brief Calculate the cost for encoding a literal character at the
- *        file @p pos in the @p buf.
+ *        file @p pos in the @p buf. Also update literals tANS frequencies.
  *
  * @param[in] pos  The current absolute position in the input buffer.
  * @param[inout] c A ptr to the array of costs where we calculate
@@ -241,7 +174,7 @@ int zxpac4b_cost::impl_get_literal_bits(char literal, bool is_ascii)
  */
 
 
-int zxpac4b_cost::impl_literal_cost(int pos, cost* c, const char* buf)
+int zxpac4c_cost::impl_literal_cost(int pos, cost* c, const char* buf)
 {
     cost* p_ctx = &c[pos];
     uint32_t new_cost = p_ctx->arrival_cost;
@@ -303,7 +236,7 @@ int zxpac4b_cost::impl_literal_cost(int pos, cost* c, const char* buf)
  */
 
 
-int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset, int length)
+int zxpac4c_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset, int length)
 {
     cost* p_ctx = &c[pos];
     bool pmr_found = false;
@@ -370,24 +303,46 @@ int zxpac4b_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset,
     return length >= lz_get_config()->good_match ? lz_get_config()->good_match : 1;
 }
 
-int zxpac4b_cost::impl_init_cost(cost* p_ctx, int sta, int len, int pmr)
+
+/**
+ * @brief Initialize cost and tANS..
+ *
+ *
+ *
+ */
+int zxpac4c_cost::impl_init_cost(cost* p_ctx, int sta, int len, int pmr)
 {
+    int n;
     assert(p_ctx != NULL);
 
+    // Initialize the cost array
     p_ctx[sta].next         = 0;
     p_ctx[sta].num_literals = 0;
     p_ctx[sta].arrival_cost = 0;
     p_ctx[sta].pmr_offset   = pmr;
+    p_ctx[sta].pmr_length   = 0;
     p_ctx[sta].last_was_literal = false;
 
-    for (int n = sta+1; n < len+1; n++) {
+    for (n = sta+1; n < len+1; n++) {
         p_ctx[n].arrival_cost = LZ_MAX_COST;
         p_ctx[n].num_literals = 0;
     }
+    
+    // Initialize tANS symbol frequencies
+    for (n = 0; n < TANS_NUM_LITERAL_SYM; n++) {
+        m_literal_sym_freq[n] = 0;
+    }
+    for (n = 0; n < TANS_NUM_MATCH_SYM; n++) {
+        m_match_sym_freq[n] = 0;
+    }
+    for (n = 0; n < TANS_NUM_OFFSET_SYM; n++) {
+        m_offset_sym_freq[n] = 0;
+    }
+
     return 0;
 }
 
-cost* zxpac4b_cost::impl_alloc_cost(int len, int max_chain)
+cost* zxpac4c_cost::impl_alloc_cost(int len, int max_chain)
 {
     cost* cc;
     (void)max_chain;
@@ -404,7 +359,7 @@ cost* zxpac4b_cost::impl_alloc_cost(int len, int max_chain)
 }
 
 
-int zxpac4b_cost::impl_free_cost(cost* cost)
+int zxpac4c_cost::impl_free_cost(cost* cost)
 {
     if (cost) {
         delete[] cost;

@@ -50,7 +50,7 @@
 #define ZXPAC4_32K          2
 #define ZXPAC4C             3
 #define ZXPAC_DEFAULT       ZXPAC4
-#define ZXPAC_MAX           ZXPAC4C
+#define ZXPAC_MAX           ZXPAC4C+1
 
 
 static const char *algo_names[] = {
@@ -146,7 +146,7 @@ static targets::target my_targets[] = {
     {   "asc",
         "Draft: 7-bit ASCII only target. 8-bit input causes an error.",
         (1<<24) - 1,
-        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
+        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K | 1<<ZXPAC4C,
         ZXPAC4,
         0,
         0x0,
@@ -161,7 +161,7 @@ static targets::target my_targets[] = {
     {   "bin",
         "Draft: 8-bit binary data target.",
         (1<<24) - 1,
-        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
+        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K | 1<<ZXPAC4C,
         ZXPAC4,
         0,
         0x0,
@@ -177,7 +177,7 @@ static targets::target my_targets[] = {
         "Draft: A TAP file contains a decompressor and runs the compressed program.",
         (1<<16) - 1,
         1<<ZXPAC4_32K,
-        ZXPAC4_32K,
+        ZXPAC4_32K | 1<<ZXPAC4C,
         255,
         0x0,
         0x0,
@@ -206,7 +206,7 @@ static targets::target my_targets[] = {
     {   "ami",
         "Amiga compressed executable.",
         (1<<24) - 1,
-        1<<ZXPAC4 | 1<<ZXPAC4_32K,
+        1<<ZXPAC4 | 1<<ZXPAC4_32K | 1<<ZXPAC4C,
         ZXPAC4,
         0,
         0x0,        // load address
@@ -267,12 +267,12 @@ static const lz_config algos[] {
         ZXPAC4C_INIT_PMR_OFFSET,
         DEBUG_LEVEL_NONE,
         ZXPAC4C,
-        false,      // only_better_matches
-        false,      // reverse_file
-        false,      // reverse_encoded
-        LZ_CFG_NSUP,      // is_ascii
-        false,      // preshift_last_ascii_literal
-        false       // verbose
+        false,          // only_better_matches
+        true,           // reverse_file
+        true,           // reverse_encoded
+        LZ_CFG_NSUP,    // is_ascii
+        false,          // preshift_last_ascii_literal
+        false           // verbose
     }
 };
 
@@ -335,6 +335,12 @@ void list(const char* argv, const targets::target* trg)
             std::cout << "  Maximum match length: " << algos[i].max_match << "\n";
             std::cout << "  Default good match length: " << algos[i].good_match << "\n";
             std::cout << "  Default PMR offset: " << algos[i].initial_pmr_offset << "\n";
+            if (algos[i].reverse_encoded) {
+                std::cout << "  Backwards decompression forced\n";
+            }
+            if (algos[i].reverse_file) {
+                std::cout << "  File is reversed for backwards decompression\n";
+            }
             if (algos[i].is_ascii != LZ_CFG_NSUP) {
                 std::cout << "  7-bit ASCII compression mode supported\n";
 }   }   }   }
@@ -711,6 +717,9 @@ int main(int argc, char** argv)
             break;
         case ZXPAC4_32K:
             lz = new zxpac4_32k(&cfg);
+            break;
+        case ZXPAC4C:
+            lz = new zxpac4c(&cfg); 
             break;
         case ZXPAC4:
         default:

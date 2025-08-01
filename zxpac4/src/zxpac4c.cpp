@@ -1,9 +1,9 @@
 /**
- * @file zxpac4b.cpp
- * @brief zxpac4b for ASCII only data and binary data
+ * @file zxpac4c.cpp
+ * @brief zxpac4c for ASCII only data and binary data
  * @version 0.1
  * @author Jouni Korhonen
- * @date somewhere in 2024
+ * @date somewhere in 2025
  *
  * @copyright The Unlicense
  *
@@ -14,14 +14,14 @@
 #include <fstream>
 #include <new>
 #include <cstring>
-#include "zxpac4b.h"
+#include "zxpac4c.h"
 #include "lz_util.h"
 
 #include <cctype>
 #include <cassert>
 
 
-zxpac4b::zxpac4b(const lz_config* p_cfg, int ins, int max) :
+zxpac4c::zxpac4c(const lz_config* p_cfg, int ins, int max) :
     lz_base(p_cfg),
     m_lz(p_cfg->window_size,
         p_cfg->min_match,
@@ -37,7 +37,7 @@ zxpac4b::zxpac4b(const lz_config* p_cfg, int ins, int max) :
     m_alloc_len  = 0;
 }
 
-zxpac4b::~zxpac4b(void)
+zxpac4c::~zxpac4c(void)
 {
     if (m_cost_array) {
         lz_cost_array_done();
@@ -46,7 +46,7 @@ zxpac4b::~zxpac4b(void)
 
 
 
-int zxpac4b::lz_search_matches(char* buf, int len, int interval)
+int zxpac4c::lz_search_matches(char* buf, int len, int interval)
 {
     int pos = 0;
     int num;
@@ -108,7 +108,7 @@ int zxpac4b::lz_search_matches(char* buf, int len, int interval)
         m_cost.literal_cost(pos,m_cost_array,buf);
         
         // match cost calculation if not at the end of file and there was a match
-        if (pos < (len - ZXPAC4B_MATCH_MIN)) {
+        if (pos < (len - ZXPAC4C_MATCH_MIN)) {
             for (int match_pos = 0; match_pos < num; match_pos++) {
                 offset = m_match_array[match_pos].offset;
                 length = m_match_array[match_pos].length;
@@ -123,7 +123,7 @@ int zxpac4b::lz_search_matches(char* buf, int len, int interval)
 }
 
 
-int zxpac4b::lz_parse(const char* buf, int len, int interval)
+int zxpac4c::lz_parse(const char* buf, int len, int interval)
 {
     int length;
     int offset;
@@ -296,7 +296,7 @@ int zxpac4b::lz_parse(const char* buf, int len, int interval)
 }
 
 
-const cost* zxpac4b::lz_cost_array_get(int len)
+const cost* zxpac4c::lz_cost_array_get(int len)
 {
     if (len < 1) {
        return NULL;
@@ -308,7 +308,7 @@ const cost* zxpac4b::lz_cost_array_get(int len)
     return m_cost_array;
 }
 
-void zxpac4b::lz_cost_array_done(void)
+void zxpac4c::lz_cost_array_done(void)
 {
     if (m_alloc_len > 0) {
         m_cost.free_cost(m_cost_array); 
@@ -317,7 +317,7 @@ void zxpac4b::lz_cost_array_done(void)
     m_cost_array = NULL;
 }
 
-int zxpac4b::encode_history(const char* buf, char* p_out, int len, int pos)
+int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
 {
     char* last_literal_ptr;
     char literal;
@@ -461,12 +461,12 @@ int zxpac4b::encode_history(const char* buf, char* p_out, int len, int pos)
 }
 
 
-int zxpac4b::lz_encode(char* buf, int len, std::ofstream* ofs)
+int zxpac4c::lz_encode(char* buf, int len, std::ofstream* ofs)
 {
     int n;
     char* p_out;
 
-    if (( p_out = new(std::nothrow) char[len+ZXPAC4B_HEADER_SIZE]) == NULL) {
+    if (( p_out = new(std::nothrow) char[len+ZXPAC4C_HEADER_SIZE]) == NULL) {
         std::cerr << "**Error: Allocating memory for the file failed" << std::endl;
         return -1;
     }

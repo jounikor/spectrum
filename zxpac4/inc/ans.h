@@ -18,8 +18,6 @@
 #include <iostream>     // std::cout
 #include <sstream>      // std::stringstream
 
-#include "trace.h"
-
 /*
  *
  */
@@ -35,7 +33,6 @@ protected:
     int INITIAL_STATE_;
     int M_;
     int M_MASK_;
-    debug_e DEBUG_;
 
 public:
     uint8_t get_k_(int base, int threshold, uint8_t min_k=1) {
@@ -51,14 +48,8 @@ public:
     }
 
 public:
-    int debug(debug_e value=TRACE_LEVEL_NONE) {
-        int old = DEBUG_;
-        DEBUG_ = value;
-        return old;
-    }
+    ans_base(int m) {
 
-    ans_base(int m, debug_e debug=TRACE_LEVEL_NONE) {
-        DEBUG_ = debug;
         if (m & (m - 1)) {
             std::stringstream ss;
             ss <<__FILE__ << ":" << __LINE__ << " -> M is not a power of two.";
@@ -74,6 +65,5 @@ public:
     virtual ~ans_base(void) {
     }
 };
-
 
 #endif      // _ANS_H_INCLUDED
