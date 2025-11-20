@@ -8,7 +8,7 @@ cmake_minimum_required(VERSION 3.10)
 project(lz VERSION 0.1 LANGUAGES CXX)
 set (TARGET zxpac4)
 set (CMAKE_CXX_STANDARD 20)
-set (CMAKE_BUILD_TYPE DEBUG)
+#set (CMAKE_BUILD_TYPE DEBUG)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/build)
 set(CMAKE_INSTALL_PREFIX ${PROJECT_BINARY_DIR})
@@ -38,6 +38,7 @@ if (DEFINED CMAKE_BUILD_TYPE)
 	endif()
 endif()
 
+# Other stuff
 include_directories(inc)
 #target_include_directories(${TARGET} PUBLIC "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}")
 #target_include_directories(${TARGET} PUBLIC "${PROJECT_BINARY_DIR}" "${PROJECT_SOURCE_DIR}" "${PROJECT_SOURCE_DIR}/inc")

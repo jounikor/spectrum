@@ -112,7 +112,7 @@ public:
     ~zxpac4b();
     int lz_search_matches(char* buf, int len, int interval);
     int lz_parse(const char* buf, int len, int interval);
-    int lz_encode(char* buf, int len, std::ofstream* ofs);
+    int lz_encode(char* buf, int len, char* outb, std::ofstream* ofs);
 
     const cost* lz_get_result(void) { return m_cost_array; }
     const cost* lz_cost_array_get(int len);

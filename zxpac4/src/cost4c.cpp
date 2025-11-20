@@ -15,8 +15,10 @@
 #include <iostream>
 #include <iomanip>
 #include <cassert>
+#include <cmath>
 #include <stdint.h>
 #include <string.h>
+
 #include "cost4c.h"
 #include "zxpac4c.h"
 
@@ -44,118 +46,155 @@ zxpac4c_cost::zxpac4c_cost(
     if (p_cfg->backward_steps < 0 || p_cfg->backward_steps > 256-2) {
         EXCEPTION(std::out_of_range,"Backward steps must be > 0 and < 256");
     }
-
-    m_debug = false;
-    m_verbose = false;
 }
 
 zxpac4c_cost::~zxpac4c_cost(void)
 {
 }
 
-int zxpac4c_cost::impl_get_offset_tag(int offset, char& byte_tag, int& bit_tag)
+/**
+ *
+ *
+ * @return Number of bits needed for the TAG + low part of the offset.
+ *         \p hi_byte up to min_offset bit of the bit part of the offset.
+ *         \p bit_tag contains both TAG + low part of the offset.
+ *
+ */
+
+int zxpac4c_cost::impl_get_offset_tag(int offset, char& hi_byte, int& bit_tag)
 {
-    int bits = 8;
+    uint32_t b;
+    uint8_t k;
+    int len_bits;
+	int encode_offset;
+	int min_offset_bits = log2(m_lz_config->min_offset);
 
-    // Must hold: 0 < offset < 131072
-    assert(offset < (1 << 17));
+    // Must hold: 0 < offset < ZXPAC4C_WINDOW_MAX
+    assert(offset < m_lz_config->window_size);
     assert(offset > 0);
+	assert(min_offset_bits <= 8);
 
-    while (offset >= (1 << bits)) {
-        ++bits;
+	len_bits = impl_get_offset_bits(offset) - min_offset_bits;
+	
+	if (len_bits < 0) {
+		len_bits = 0;
+	}
+
+	hi_byte = offset >> len_bits;
+	encode_offset = offset & ((1 << len_bits) - 1);
+	m_tans_offset.encode(len_bits,k,b);
+
+    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+        std::cerr << "tANS offset: 0x" << std::hex << std::setfill('0') << std::setw(2)
+				  << std::right << static_cast<uint32_t>(hi_byte & 0xff)
+				  << ", " << min_offset_bits << ", " 
+				  << std::dec << std::setw(6) << std::setfill(' ') << encode_offset
+				  << " (" << std::setw(6) << offset << "), "
+				  << std::setw(2) << len_bits
+                  << ", k: " << static_cast<int>(k) << ", b: " << std::setw(2) << b;
     }
 
-    return bits;
+    bit_tag = b << len_bits;
+    bit_tag = bit_tag | encode_offset;
+
+    // tANS + length encoding bits
+    return len_bits + k;
+
 }
 
 int zxpac4c_cost::impl_get_length_tag(int length, int& bit_tag)
 {
+    uint32_t b;
+    uint8_t k;
+    int len_bits;
+    int encode_length = length > m_lz_config->max_literal_run ?  m_lz_config->max_literal_run : length;
+    
     assert(length > 0);
-    assert(length < 256);
+    assert(length <= m_lz_config->max_match);
+    
+	len_bits = impl_get_length_bits(encode_length);
+    m_tans_match.encode(len_bits,k,b);
 
-    int bits = 1;
-
-    while (length >= (1 << bits)) {
-        ++bits;
+    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+        std::cerr << std::dec;
+        std::cerr << "tANS length: "
+				  << std::right << std::dec << std::setw(3) << std::setfill(' ')
+                  << encode_length << " (" << std::setw(3) << length << "), " << len_bits
+                  << ", k: " << static_cast<int>(k) << ", b: " << std::setw(2) << b;
     }
 
-    return bits;
+    bit_tag = b << len_bits;
+    bit_tag = bit_tag | (encode_length & ((1 << len_bits) - 1));
+
+    // tANS + length encoding bits
+    return len_bits + k;
 }
 
 int zxpac4c_cost::impl_get_literal_tag(const char* literals, int length, char& byte_tag, int& bit_tag)
 {
     // This API sucks quite hard.. but lets try to abuse it anyway.
-
-
-
     (void)literals;
     (void)byte_tag;
-    assert(length < 256);
-    return impl_get_length_tag(length,bit_tag);
+
+    assert(length > 0);
+    
+    // get the tANS stuff..
+    uint32_t b;
+    uint8_t k;
+    int len_bits;
+    int encode_length = length > m_lz_config->max_literal_run ?  m_lz_config->max_literal_run : length;
+
+    len_bits = impl_get_length_bits(encode_length);
+    m_tans_literal.encode(len_bits,k,b);
+
+    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+        std::cerr << std::dec;
+        std::cerr << "tANS literal: " << std::left << std::dec
+                  << encode_length << " (" << length << ") -> " << len_bits
+                  << ", k: " << static_cast<int>(k) << ", b: " << b;
+    }
+
+    // tag is 0
+    bit_tag = b << len_bits;
+    bit_tag = bit_tag | (encode_length & ((1 << len_bits) - 1));
+
+    // tANS + length encoding bits
+    return len_bits + k;
 }
+
+/**
+ *
+ *
+ * @return Number of bits needed to encode the offset in full;
+ */
 
 int zxpac4c_cost::impl_get_offset_bits(int offset)
 {
-    assert(offset < 131072);
-    
-    if (offset == 0) {
-        return 0;
+    assert(offset < m_lz_config->window_size);
+    int bits = 0;
+
+    while (offset >= (2 << bits)) {
+        ++bits;
     }
-    if (offset < 128) {
-        return (7+1 + 0);
-    } else if (offset < 256) {
-        return (7+3+0);
-    } else if (offset < 512) {
-        return (7+3+1);
-    } else if (offset < 1024) {
-        return (7+4+2);
-    } else if (offset < 2048) {
-        return (7+4+3);
-    } else if (offset < 4096) {
-        return (7+5+4);
-    } else if (offset < 8192) {
-        return (7+5+5);
-    } else if (offset < 16384) {
-        return (7+6+6);
-    } else if (offset < 32768) {
-        return (7+6+7);
-    } else if (offset < 65536) {         // up to 65535
-        return (7+6+8);
-    } else if (offset < 131072) {
-        return (7+6+9);
-    }
-    return 0;
+
+    return bits;
 }
 
 int zxpac4c_cost::impl_get_length_bits(int length)
 {
-    assert(length > 0);
-    assert(length < 256);
-
-    // matchlen cost..
-    if (length == 1) {
-        return (1+0);
-    } else if (length < 4) {
-        return (2+1);
-    } else if (length < 8) {
-        return (3+2);
-    } else if (length < 16) {
-        return (4+3);
-    } else if (length < 32) {
-        return (5+4);
-    } else if (length < 64) {
-        return (6+5);
-    } else if (length < 128) {
-        return (7+6);
+    int bits = 0;
+    while (length >= (2 << bits)) {
+        ++bits;
     }
-    // < 256
-    return (7+7);
+    
+    return bits;
 }
 
 int zxpac4c_cost::impl_get_literal_bits(char literal, bool is_ascii)
 {
     (void)literal;
     (void)is_ascii;
+    // somewhat a straight shortcut..
     return 8;
 }
 
@@ -177,7 +216,7 @@ int zxpac4c_cost::impl_get_literal_bits(char literal, bool is_ascii)
 int zxpac4c_cost::impl_literal_cost(int pos, cost* c, const char* buf)
 {
     cost* p_ctx = &c[pos];
-    uint32_t new_cost = p_ctx->arrival_cost;
+    uint32_t new_cost = p_ctx->arrival_cost + 1;
     int offset = p_ctx->offset;
     int num_literals = p_ctx->num_literals;
 
@@ -185,22 +224,22 @@ int zxpac4c_cost::impl_literal_cost(int pos, cost* c, const char* buf)
         // PMR of length 1 
         offset = p_ctx->pmr_offset;
         num_literals = 1;
+        new_cost += predict_tans_cost(TANS_LITERAL_RUN_SYMS,num_literals);
     } else {
-        // literal run
+        // get the cost of the new literal
+        new_cost += impl_get_literal_bits(buf[pos],false);
+        // get the cost of literal run encoding
+        new_cost += impl_get_length_bits(num_literals+1);
         if (num_literals > 0) {
+            // substract the previous literal run encoding.. since this is delta..
             new_cost -= impl_get_length_bits(num_literals);
         }
         ++num_literals;
-        new_cost += 8;
+        new_cost += predict_tans_cost(TANS_LITERAL_RUN_SYMS,num_literals);
+
+        // mark as a literal run instead of a PMR with length 1
         offset = 0;
     }
-    if (lz_get_config()->is_ascii == false || p_ctx->last_was_literal == false) {
-        // tag of 1bit
-        new_cost = new_cost + 1;
-    }
-    
-    new_cost += impl_get_length_bits(num_literals);
-
     if (p_ctx[1].arrival_cost >= new_cost) {
         p_ctx[1].arrival_cost = new_cost;
         p_ctx[1].length = 1;
@@ -208,10 +247,8 @@ int zxpac4c_cost::impl_literal_cost(int pos, cost* c, const char* buf)
         p_ctx[1].pmr_offset = p_ctx->pmr_offset;
 
         if (offset == 0) {
-            p_ctx[1].last_was_literal = true;
             p_ctx[1].num_literals = num_literals;
         } else {
-            p_ctx[1].last_was_literal = false;    
             p_ctx[1].num_literals = 0;
         }
     }
@@ -239,66 +276,42 @@ int zxpac4c_cost::impl_literal_cost(int pos, cost* c, const char* buf)
 int zxpac4c_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset, int length)
 {
     cost* p_ctx = &c[pos];
-    bool pmr_found = false;
     int pmr_offset; 
     uint32_t new_cost;
-    int encode_length;
-    int tag_cost;
-    int n;
-    
-    if (lz_get_config()->is_ascii == false || p_ctx->last_was_literal == false) {
-        tag_cost = 1;
-    } else {
-        tag_cost = 0;
-    }
 
+    (void)buf;
+
+    // Do we have a bug?
+    assert(offset < m_lz_config->window_size);
+    assert(length <= m_lz_config->max_match);
+    assert(length > 0);
+
+    // Tag cost is 1 bit as a baseline..
     pmr_offset = p_ctx->pmr_offset; 
-    new_cost = p_ctx->arrival_cost + tag_cost;
-        
-    if (offset == pmr_offset) {
+    new_cost = p_ctx->arrival_cost + 1;
+    
+    if (pos >= pmr_offset && offset == pmr_offset) {
         offset = 0;
-        encode_length = length;
-        pmr_found = true;
     } else {
         pmr_offset = offset;
-        encode_length = length - 1;
     }
-       
-    assert(encode_length > 0);
-    assert(offset < 131072);
-    new_cost += get_offset_bits(offset);
-    new_cost += get_length_bits(encode_length);
-           
+
+    // weight of offset encoding 
+	if (offset > 0) {
+		new_cost += get_offset_bits(offset);
+		new_cost += predict_tans_cost(TANS_OFFSET_SYMS,offset); 
+	}
+	// weight of length encoding 
+    new_cost += get_length_bits(length);
+    new_cost += predict_tans_cost(TANS_LENGTH_SYMS,length);
+
     if (p_ctx[length].arrival_cost >= new_cost) {
         p_ctx[length].offset       = offset;
         p_ctx[length].pmr_offset   = pmr_offset;
         p_ctx[length].arrival_cost = new_cost;
         p_ctx[length].length       = length;
-        p_ctx[length].last_was_literal = false;
         p_ctx[length].num_literals = 0;
     }
-    
-    pmr_offset = p_ctx->pmr_offset;
-
-    if (pmr_found == false && pos >= pmr_offset) {
-        int max_match = lz_get_config()->max_match;
-        
-        n = pos < m_max_len - max_match ? max_match : m_max_len - pos;
-        length = check_match(&buf[pos],&buf[pos-pmr_offset],n);
-        assert(length <= max_match);
-
-        if (length >= lz_get_config()->min_match) {
-            new_cost = p_ctx->arrival_cost + tag_cost;
-            new_cost += get_length_bits(length);
-            
-            if (p_ctx[length].arrival_cost >= new_cost) {
-                p_ctx[length].offset       = 0;
-                p_ctx[length].pmr_offset   = pmr_offset;
-                p_ctx[length].arrival_cost = new_cost;
-                p_ctx[length].length       = length;
-                p_ctx[length].last_was_literal = false;
-                p_ctx[length].num_literals = 0;
-    }   }   }
     
     return length >= lz_get_config()->good_match ? lz_get_config()->good_match : 1;
 }
@@ -320,8 +333,6 @@ int zxpac4c_cost::impl_init_cost(cost* p_ctx, int sta, int len, int pmr)
     p_ctx[sta].num_literals = 0;
     p_ctx[sta].arrival_cost = 0;
     p_ctx[sta].pmr_offset   = pmr;
-    p_ctx[sta].pmr_length   = 0;
-    p_ctx[sta].last_was_literal = false;
 
     for (n = sta+1; n < len+1; n++) {
         p_ctx[n].arrival_cost = LZ_MAX_COST;
@@ -365,4 +376,146 @@ int zxpac4c_cost::impl_free_cost(cost* cost)
         delete[] cost;
     }
     return 0;
+}
+
+// New tANS helper functions
+
+int zxpac4c_cost::predict_tans_cost(int type, int value)
+{
+    (void)value;
+
+    // For now just static costs.. subject to change..
+
+    switch (type) {
+    case TANS_LITERAL_RUN_SYMS:
+        return TANS_LITERAL_RUN_COST; 
+    case TANS_LENGTH_SYMS:
+        return TANS_LENGTH_COST;
+    case TANS_OFFSET_SYMS:
+        return TANS_OFFSET_COST;
+    default:
+        assert(0);
+    }
+
+}
+
+ans_state_t zxpac4c_cost::get_tans_state(int type)
+{ 
+    switch (type) {
+    case TANS_LITERAL_RUN_SYMS:
+        return m_tans_literal.get_state(); 
+    case TANS_LENGTH_SYMS:
+        return m_tans_match.get_state();
+    case TANS_OFFSET_SYMS:
+        return m_tans_offset.get_state();
+    default:
+        return -1;
+    }
+}
+
+int zxpac4c_cost::inc_tans_symbol_freq(int type, uint8_t symbol)
+{
+    switch (type) {
+    case TANS_LITERAL_RUN_SYMS:
+        return ++m_literal_sym_freq[symbol];
+    case TANS_LENGTH_SYMS:
+        return ++m_match_sym_freq[symbol];
+    case TANS_OFFSET_SYMS:
+        return ++m_offset_sym_freq[symbol];
+    default:
+        assert(NULL == "Unknown tANS type");
+        return -1;
+    }
+}
+
+void zxpac4c_cost::set_tans_symbol_freqs(int type, uint8_t* freqs, int len)
+{
+    int* local_freq;
+    int local_len;
+
+    switch (type) {
+    case TANS_LITERAL_RUN_SYMS:
+        local_freq = m_literal_sym_freq;
+        local_len = sizeof(m_literal_sym_freq);
+        break;
+    case TANS_LENGTH_SYMS:
+        local_freq = m_match_sym_freq;
+        local_len = sizeof(m_match_sym_freq);
+        break;
+    case TANS_OFFSET_SYMS:
+        local_freq = m_offset_sym_freq;
+        local_len = sizeof(m_offset_sym_freq);
+        break;
+    default:
+        assert(NULL == "Unknown tANS type");
+    }
+
+    if (freqs == NULL) {
+        ::memset(local_freq,0,local_len);
+    } else {
+        assert(local_len == len);
+        ::memcpy(local_freq,freqs,len);
+    }
+}
+
+
+
+void zxpac4c_cost::build_tans_tables(void)
+{
+    m_tans_literal.init_tans(m_literal_sym_freq,TANS_NUM_LITERAL_SYM);
+    m_tans_match.init_tans(m_match_sym_freq,TANS_NUM_MATCH_SYM);
+    m_tans_offset.init_tans(m_offset_sym_freq,TANS_NUM_OFFSET_SYM);
+}
+
+int zxpac4c_cost::get_tans_scaled_symbol_freqs(int type, uint8_t* freqs, int len)
+{
+    int n,m;
+    const int* p;
+
+    switch (type) {
+    case TANS_LITERAL_RUN_SYMS:
+        assert(len >= m_tans_literal.get_Ls_len());
+        m = m_tans_literal.get_Ls_len();
+        p = m_tans_literal.get_scaled_Ls();
+        break;
+    case TANS_LENGTH_SYMS:
+        assert(len >= m_tans_match.get_Ls_len());
+        m = m_tans_match.get_Ls_len();
+        p = m_tans_match.get_scaled_Ls();
+        break;
+    case TANS_OFFSET_SYMS:
+        assert(len >= m_tans_offset.get_Ls_len());
+        m = m_tans_offset.get_Ls_len();
+        p = m_tans_offset.get_scaled_Ls();
+        break;
+    default:
+        return -1;
+    }
+
+    for (n = 0; n < m; n++) {
+        freqs[n] = p[n];
+    }
+
+    return m;
+}
+
+void zxpac4c_cost::dump(int type)
+{
+    switch (type) {
+    case TANS_LITERAL_RUN_SYMS:
+        std::cerr << "** TANS_LITERAL_RUN_SYMS ";
+        m_tans_literal.dump();
+        break;
+    case TANS_LENGTH_SYMS:
+        std::cerr << "** TANS_LENGTH_SYMS -----";
+        m_tans_match.dump();
+        break;
+    case TANS_OFFSET_SYMS:
+        std::cerr << "** TANS_OFFSET_SYMS -----";
+        m_tans_offset.dump();
+        break;
+    default:
+        assert(0);
+    }
+
 }

@@ -67,17 +67,9 @@ int zxpac4::lz_search_matches(char* buf, int len, int interval)
     
     m_cost.init_cost(m_cost_array,0,len,m_lz_config->initial_pmr_offset);
 
-    if (m_lz_config->reverse_file) {
-        if (verbose()) {
-            std::cout << "Reversing the file for backwards decompression" << std::endl;
-        }
-        reverse_buffer(buf,len);
-    }
     if (verbose()) {
         std::cout << "Finding all matches" << std::endl;
     }
-
-    // find matches..
     if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
         std::cerr << ">- Match debugging phase --------------------------------------------------------\n";
         std::cerr << "  file pos: asc (hx) -> offset:length(s) or 'no macth'\n";
@@ -140,13 +132,6 @@ int zxpac4::lz_parse(const char* buf, int len, int interval)
     // Unused at the moment..
     (void)interval;
 
-    if (verbose()) {
-        if (m_lz_config->reverse_file) {
-            std::cout << "Reversed file parsing engaged" << std::endl;
-        } else {
-            std::cout << "History parsing engaged" << std::endl;
-        }
-    }
     if (verbose()) {
         std::cout << "Calculating arrival costs" << std::endl;
     }
@@ -450,46 +435,18 @@ int zxpac4::encode_history(const char* buf, char* p_out, int len, int pos)
     return n;
 }
 
-int zxpac4::lz_encode(char* buf, int len, std::ofstream* ofs)
+int zxpac4::lz_encode(char* buf, int len, char* p_out, std::ofstream* ofs)
 {
     int n;
-    char* p_out;
+	(void)ofs;
 
-    if (( p_out = new(std::nothrow) char[len+ZXPAC4_HEADER_SIZE]) == NULL) {
-        std::cerr << "**Error: Allocating memory for the file failed" << std::endl;
-        return -1;
-    }
-    if (verbose()) {
-        std::cout << "Encoding the compressed file" << std::endl;
-    }
+	if (p_out == NULL) {
+		std::cerr << ERR_PREAMBLE << "cannot handle directly to file compression" << std::endl;
+		return -1;
+	}
     
     n = encode_history(buf,p_out,len,0);
 
-    if (n > 0) {
-        if (m_lz_config->reverse_encoded) {
-            if (verbose()) {
-                std::cout << "Reversing the encoded file" << std::endl;
-            }
-            reverse_buffer(p_out,n);
-        } 
-        if (verbose()) {
-            std::cout << "Compressed length: " << n << std::endl;
-        }
-        if (ofs) {
-            if (!(ofs->write(p_out,n))) {
-                std::cerr << ERR_PREAMBLE << "writing compressed file failed" << std::endl;
-                n = -1;
-            }
-        } else {
-            ::memcpy(buf,p_out,n);
-        }
-    } else {
-        if (verbose()) {
-            std::cout << "Compression failed.." << std::endl;
-        }
-    }
-
-    delete[] p_out;
     return n;
 }
 

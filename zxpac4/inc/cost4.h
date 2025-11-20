@@ -21,7 +21,6 @@
 #endif
 
 class zxpac4_cost: public lz_cost<zxpac4_cost> {
-    //mtf_encode m_mtf;
     bool m_debug;
     bool m_verbose;
 public:

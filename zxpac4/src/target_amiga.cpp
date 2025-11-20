@@ -116,14 +116,14 @@ target_amiga::target_amiga(const target* trg, const lz_config_t* cfg, std::ofstr
             std::cout << "Enabling reverse file and encoding for Amiga target\n";
         }
 
-        cfg->reverse_file = true;
-        cfg->reverse_encoded = true;
+        cfg->reverse_file = LZ_CFG_TRUE;
+        cfg->reverse_encoded = LZ_CFG_TRUE;
     } else {
         if (cfg->verbose) {
             std::cout << "Disabling reverse file and encoding for Amiga target\n";
         }
-        cfg->reverse_file = false;
-        cfg->reverse_encoded = false;
+        cfg->reverse_file = LZ_CFG_FALSE;
+        cfg->reverse_encoded = LZ_CFG_FALSE;
     }
     if (trg->load_addr == 0 && trg->jump_addr == 0) {
         m_nohunks = false;

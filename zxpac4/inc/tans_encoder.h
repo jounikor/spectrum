@@ -21,11 +21,13 @@
  */
 template<class T, int M>
 class tans_encoder : public ans_base {
-    T* Ls_;
+    int* Ls_;
     T (*next_state_)[M];
     uint8_t (*k_)[M];
     T* symbol_last_;
     int Ls_len_;
+    T symbol_to_k_[M];
+    ans_state_t state_;
 
     bool scaleSymbolFreqs(void);
     void buildEncodingTables(void);
@@ -33,16 +35,20 @@ class tans_encoder : public ans_base {
 
 public:
     tans_encoder(void);
-    tans_encoder(const T* Ls, int n);
+    tans_encoder(const int* Ls, int n);
     ~tans_encoder();
 
-    void init_tans(const T* Ls, int n);
+    void init_tans(const int* Ls, int n);
 
-    const T* get_scaled_Ls(void) const;
+    const int* get_scaled_Ls(void) const;
     int get_Ls_len(void) const;
     ans_state_t init_encoder(T&);
-    ans_state_t done_encoder(ans_state_t state) const;
-    ans_state_t encode(T s, ans_state_t state, uint8_t& k, uint32_t& b);
+    ans_state_t done_encoder(void) const;
+    ans_state_t encode(T s, uint8_t& k, uint32_t& b);
+    ans_state_t get_state(void) {
+        return state_;
+    };
+    void dump(void);
 };
 
 template<class T, int M>
@@ -56,7 +62,7 @@ tans_encoder<T,M>::tans_encoder(void) : ans_base(M)
 }
 
 template<class T, int M>
-tans_encoder<T,M>::tans_encoder(const T* Ls, int Ls_len) : ans_base(M)
+tans_encoder<T,M>::tans_encoder(const int* Ls, int Ls_len) : ans_base(M)
 {
     k_ = NULL;
     Ls_ = NULL;
@@ -67,15 +73,13 @@ tans_encoder<T,M>::tans_encoder(const T* Ls, int Ls_len) : ans_base(M)
 
 
 template<class T, int M>
-void tans_encoder<T,M>::init_tans(const T* Ls, int Ls_len)
+void tans_encoder<T,M>::init_tans(const int* Ls, int Ls_len)
 {
-    int sum = 0;
-
     free_tables();
     Ls_len_ = Ls_len;
 
     // Yes.. we make a copy of the original array..
-    Ls_ = new (std::nothrow) T[Ls_len]; 
+    Ls_ = new (std::nothrow) int[Ls_len]; 
     if (Ls_ == NULL) {
         throw std::bad_alloc();
     }
@@ -217,7 +221,7 @@ void tans_encoder<T,M>::buildEncodingTables(void)
 }
 
 template<class T, int M>
-const T* tans_encoder<T,M>::get_scaled_Ls(void) const
+const int* tans_encoder<T,M>::get_scaled_Ls(void) const
 {
     return Ls_;
 }
@@ -230,24 +234,52 @@ int tans_encoder<T,M>::get_Ls_len(void) const
 
 template<class T, int M>
 ans_state_t tans_encoder<T,M>::init_encoder(T& s) {
-    ans_state_t state = symbol_last_[s];
-    return state;
+    state_ = symbol_last_[s];
+    return state_;
 }
 
 template<class T, int M>
-ans_state_t tans_encoder<T,M>::done_encoder(ans_state_t state) const
+ans_state_t tans_encoder<T,M>::done_encoder(void) const
 {
     // Dummy function.. subject to removal.
-    return state;
+    return state_;
 }
 
 template<class T, int M>
-ans_state_t tans_encoder<T,M>::encode(T s, ans_state_t state, uint8_t& k, uint32_t& b)
+ans_state_t tans_encoder<T,M>::encode(T s, uint8_t& k, uint32_t& b)
 {
-    k = k_[s][state];
-    b = state & ((1 << k) - 1);
-    state = next_state_[s][state];
-    return state;
+    k = k_[s][state_];
+    b = state_ & ((1 << k) - 1);
+    state_ = next_state_[s][state_];
+    return state_;
 }
+
+template<class T, int M>
+void tans_encoder<T,M>::dump(void)
+{
+    std::cerr << "-- Scaled Ls --\n";
+    const int* ls = get_scaled_Ls();
+    int n;
+    
+    std::cerr << std::dec << std::left;
+    
+    for (n = 0; n < get_Ls_len(); n++) {
+        std::cerr << std::setw(8) << n;
+    }
+    std::cerr << "\n";
+
+    for (n = 0; n < get_Ls_len(); n++) {
+        std::cerr << std::setw(8) << ls[n];
+    }
+    std::cerr << std::right << "\n";
+
+
+    //std::cerr << "-- k table: ------------------------------------------------\n";
+    //std::cerr << "-- b table: ------------------------------------------------\n";
+    //std::cerr << "-- next table: ---------------------------------------------\n";
+    //std::cerr << "-- Ls table: -----------------------------------------------\n";
+    //std::cerr << "-- last symbol table: --------------------------------------\n";
+}
+
 
 #endif      // _TANS_ENCODER_H_INCLUDED

@@ -37,6 +37,19 @@
 //
 //
 
+
+#define MAX_HEADER_OVERHEAD	ZXPAC4_HEADER_SIZE
+#if ZXPAC4_32K_HEADER_SIZE > MAX_HEADER_OVERHEAD
+  #define MAX_HEADER_OVERHEAD ZXPAC4_32K_HEADER_SIZE
+#endif
+#if ZXPAC4B_HEADER_SIZE > MAX_HEADER_OVERHEAD
+  #define MAX_HEADER_OVERHEAD ZXPAC4B_HEADER_SIZE
+#endif
+#if ZXPAC4C_HEADER_SIZE > MAX_HEADER_OVERHEAD
+  #define MAX_HEADER_OVERHEAD ZXPAC4C_HEADER_SIZE
+#endif
+
+
 #define DEF_OUTPUT_NAME     "zx.pac"
 #define MAX_CHAIN	        9999
 #define DEF_CHAIN           16
@@ -53,7 +66,7 @@
 #define ZXPAC_MAX           ZXPAC4C+1
 
 
-static const char *algo_names[] = {
+static const char *algo_names[] = {
     "zxpac4",
     "zxpac4b",
     "zxpac4_32k",
@@ -90,6 +103,7 @@ static struct option longopts[] = {
     {"list",        no_argument,        NULL, 'l'},
     {"help",        no_argument,        NULL, 'h'},
     {"file-name",   required_argument,  NULL, 'n'},
+    {"preload",     required_argument,  NULL, 'L'},
     {0,0,0,0}
 };
 
@@ -135,6 +149,10 @@ static void usage(char *prg, const targets::target* trg)
     std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
     std::cerr << "  --verbose,-v          Output some additional information to stdout.\n";
     std::cerr << "  --file-name,-n        Filename, for example, for ZX Spectrum TAP file.\n";
+    std::cerr << "  --preload,-L file     Preload tANS scaled frequencies for ZXPac4c\n";
+	std::cerr << "  --preset profile      Preset internal tNAS profile for ZXPac4c:\n"
+			  << "                          0=default\n"
+			  << "                          1=Amiga exe)\n";
     std::cerr << "  --list,-l             Print defaults & details of each supported target and algorithm.\n";
     std::cerr << "  --help,-h             Print this output ;)\n";
     std::cerr << std::flush;
@@ -223,55 +241,59 @@ static targets::target my_targets[] = {
 
 static const lz_config algos[] {
     // ZXPAC4
-    {   ZXPAC4_WINDOW_MAX,  DEF_CHAIN, ZXPAC4_MATCH_MIN, ZXPAC4_MATCH_MAX, ZXPAC4_MATCH_GOOD,
-        DEF_BACKWARD_STEPS, ZXPAC4_OFFSET_MATCH2_THRESHOLD, ZXPAC4_OFFSET_MATCH3_THRESHOLD,
+    {   ZXPAC4_WINDOW_MAX,  128, DEF_CHAIN, ZXPAC4_MATCH_MIN, ZXPAC4_MATCH_MAX, ZXPAC4_MATCH_GOOD,
+        1,
+		DEF_BACKWARD_STEPS, ZXPAC4_OFFSET_MATCH2_THRESHOLD, ZXPAC4_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4_INIT_PMR_OFFSET,
         DEBUG_LEVEL_NONE,
         ZXPAC4,
         false,      // only_better_matches
-        false,      // reverse_file
-        false,      // reverse_encoded
+        LZ_CFG_FALSE,      // reverse_file
+        LZ_CFG_FALSE,      // reverse_encoded
         LZ_CFG_FALSE,      // is_ascii
-        false,      // preshift_last_ascii_literal
+        LZ_CFG_FALSE,      // preshift_last_ascii_literal
         false       // verbose
     },
     // ZXPAC4B
-    {   ZXPAC4B_WINDOW_MAX,  DEF_CHAIN, ZXPAC4B_MATCH_MIN, ZXPAC4B_MATCH_MAX, ZXPAC4B_MATCH_GOOD,
-        DEF_BACKWARD_STEPS, ZXPAC4B_OFFSET_MATCH2_THRESHOLD, ZXPAC4B_OFFSET_MATCH3_THRESHOLD,
+    {   ZXPAC4B_WINDOW_MAX,  128, DEF_CHAIN, ZXPAC4B_MATCH_MIN, ZXPAC4B_MATCH_MAX, ZXPAC4B_MATCH_GOOD,
+        255,
+		DEF_BACKWARD_STEPS, ZXPAC4B_OFFSET_MATCH2_THRESHOLD, ZXPAC4B_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4B_INIT_PMR_OFFSET,
         DEBUG_LEVEL_NONE,
         ZXPAC4B,
         false,      // only_better_matches
-        false,      // reverse_file
-        false,      // reverse_encoded
+        LZ_CFG_FALSE,      // reverse_file
+        LZ_CFG_FALSE,      // reverse_encoded
         LZ_CFG_FALSE,      // is_ascii
-        false,      // preshift_last_ascii_literal
+        LZ_CFG_FALSE,      // preshift_last_ascii_literal
         false       // verbose
     },
     // ZXPAC4_32K - max 32K window
-    {   ZXPAC4_32K_WINDOW_MAX,  DEF_CHAIN, ZXPAC4_32K_MATCH_MIN, ZXPAC4_32K_MATCH_MAX, ZXPAC4_32K_MATCH_GOOD,
-        DEF_BACKWARD_STEPS, ZXPAC4_32K_OFFSET_MATCH2_THRESHOLD, ZXPAC4_32K_OFFSET_MATCH3_THRESHOLD,
+    {   ZXPAC4_32K_WINDOW_MAX,  128, DEF_CHAIN, ZXPAC4_32K_MATCH_MIN, ZXPAC4_32K_MATCH_MAX, ZXPAC4_32K_MATCH_GOOD,
+        1,
+		DEF_BACKWARD_STEPS, ZXPAC4_32K_OFFSET_MATCH2_THRESHOLD, ZXPAC4_32K_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4_32K_INIT_PMR_OFFSET,
         DEBUG_LEVEL_NONE,
         ZXPAC4_32K,
         false,      // only_better_matches
-        false,      // reverse_file
-        false,      // reverse_encoded
+        LZ_CFG_FALSE,      // reverse_file
+        LZ_CFG_FALSE,      // reverse_encoded
         LZ_CFG_FALSE,      // is_ascii
-        false,      // preshift_last_ascii_literal
+        LZ_CFG_FALSE,      // preshift_last_ascii_literal
         false       // verbose
     },
     // ZXPAC4C - max 128K window, literal runs, 
-    {   ZXPAC4C_WINDOW_MAX,  DEF_CHAIN, ZXPAC4C_MATCH_MIN, ZXPAC4C_MATCH_MAX, ZXPAC4C_MATCH_GOOD,
-        DEF_BACKWARD_STEPS, ZXPAC4C_OFFSET_MATCH2_THRESHOLD, ZXPAC4C_OFFSET_MATCH3_THRESHOLD,
+    {   ZXPAC4C_WINDOW_MAX,  256, DEF_CHAIN, ZXPAC4C_MATCH_MIN, ZXPAC4C_MATCH_MAX, ZXPAC4C_MATCH_GOOD,
+        255,
+		DEF_BACKWARD_STEPS, ZXPAC4C_OFFSET_MATCH2_THRESHOLD, ZXPAC4C_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4C_INIT_PMR_OFFSET,
         DEBUG_LEVEL_NONE,
         ZXPAC4C,
         false,          // only_better_matches
-        true,           // reverse_file
-        true,           // reverse_encoded
+        LZ_CFG_TRUE|LZ_CFG_CONST,           // reverse_file
+        LZ_CFG_TRUE|LZ_CFG_CONST,           // reverse_encoded
         LZ_CFG_NSUP,    // is_ascii
-        false,          // preshift_last_ascii_literal
+        LZ_CFG_FALSE|LZ_CFG_CONST,          // preshift_last_ascii_literal
         false           // verbose
     }
 };
@@ -335,16 +357,45 @@ void list(const char* argv, const targets::target* trg)
             std::cout << "  Maximum match length: " << algos[i].max_match << "\n";
             std::cout << "  Default good match length: " << algos[i].good_match << "\n";
             std::cout << "  Default PMR offset: " << algos[i].initial_pmr_offset << "\n";
-            if (algos[i].reverse_encoded) {
-                std::cout << "  Backwards decompression forced\n";
+            if (algos[i].reverse_encoded & LZ_CFG_TRUE) {
+                std::cout << "  Backwards decompression ";
+				if (algos[i].reverse_encoded & LZ_CFG_CONST) {
+					std::cout << "forced";
+				} else {
+					std::cout << "set but changeable";
+				}
+				std::cout << "\n";
             }
-            if (algos[i].reverse_file) {
-                std::cout << "  File is reversed for backwards decompression\n";
+            if (algos[i].reverse_file & (LZ_CFG_TRUE)) {
+                std::cout << "  File reversed for backwards decompression ";
+				if (algos[i].reverse_encoded & LZ_CFG_CONST) {
+					std::cout << "forced";
+				} else {
+					std::cout << "set but changeable";
+				}
+				std::cout << "\n";
             }
             if (algos[i].is_ascii != LZ_CFG_NSUP) {
                 std::cout << "  7-bit ASCII compression mode supported\n";
 }   }   }   }
 
+
+
+/**
+ *
+ *
+ *
+ *
+ *
+ */
+static void reverse_buffer(char* p_buf, int len) {
+    char t;
+    for (int n = 0; n < len/2; n++) {
+        t = p_buf[n];
+        p_buf[n] = p_buf[len-n-1];
+        p_buf[len-n-1] = t;
+    }
+}
 
 
 /**
@@ -392,22 +443,28 @@ static int handle_file(const targets::target* trg, lz_base* lz, lz_config_t* cfg
     int n = 0;
     // extra N characters to avoid buffer overrun with 3 byte hash function..
     char* buf = new (std::nothrow) char[len+3];
-    char* tmp = NULL;
+    char* p_out = NULL;
     target_base* trg_ptr = create_target(trg,cfg,ofs);
 
     if (buf == NULL) {
         std::cerr << ERR_PREAMBLE << "failed to allocate memory for the input file\n";
-        return -1;
+        n = -1;
+		goto error_exit;
     }
     if (trg_ptr == NULL) {
         std::cerr << ERR_PREAMBLE << "failed to instantiate a target object\n";
-        delete[] buf;
-        return -1;
+        n = -1;
+		goto error_exit;
     }
+	if (( p_out = new(std::nothrow) char[len+MAX_HEADER_OVERHEAD]) == NULL) {
+		std::cerr << "**Error: Allocating memory for the file failed" << std::endl;
+		n = -1;
+		goto error_exit;
+	}
     if (!ifs.read(buf,len)) {
         std::cerr << ERR_PREAMBLE << "reading the input file failed\n";
-        delete[] buf;
-        return -1;
+        n = -1;
+		goto error_exit;
     }
     
     len = trg_ptr->preprocess(buf,len);
@@ -423,24 +480,51 @@ static int handle_file(const targets::target* trg, lz_base* lz, lz_config_t* cfg
         std::cerr << ERR_PREAMBLE << "Saving file header failed" << std::endl;
         goto error_exit;
     }
+	if (cfg->reverse_file) {
+		if (cfg->verbose) {
+			std::cout << "Reversing the file for backwards decompression" << std::endl;
+		}
+		reverse_buffer(buf,len);
+	}
 
     lz->lz_search_matches(buf,len,0); 
     lz->lz_parse(buf,len,0); 
 
-    // This is obviously a wrong place to do this type of target checking..
-    if (trg->encode_to_ram) {
-        n = lz->lz_encode(buf,len,NULL);
-        tmp = buf;
-    } else {
-        n = lz->lz_encode(buf,len,&ofs);
-        tmp = NULL;
+    if (cfg->verbose) {
+        std::cout << "Encoding the compressed file" << std::endl;
     }
-    if ((n = trg_ptr->post_save(tmp,n)) < 0) {
+
+	n = lz->lz_encode(buf,len,p_out,NULL);
+    
+	if (n > 0) {
+        if (cfg->reverse_encoded) {
+            if (cfg->verbose) {
+                std::cout << "Reversing the encoded file.." << std::endl;
+            }
+            reverse_buffer(p_out,n);
+        } 
+        if (cfg->verbose) {
+            std::cout << "Compressed length: " << n << std::endl;
+        }
+    } else {
+        if (cfg->verbose) {
+            std::cout << "Compression failed.." << std::endl;
+			n = -1;
+			goto error_exit;
+        }
+    }
+    if (!(ofs.write(p_out,n))) {
+        std::cerr << ERR_PREAMBLE << "writing compressed file failed" << std::endl;
+        n = -1;
+		goto error_exit;
+    }
+    if ((n = trg_ptr->post_save(p_out,n)) < 0) {
         std::cerr << ERR_PREAMBLE << "Post save failed" << std::endl;
     }
 error_exit: 
     delete trg_ptr;
     delete[] buf;
+	delete[] p_out;
     return n;
 }
 
@@ -502,7 +586,7 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "Em:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:n:l", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "Em:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:n:lL:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'O':   // --overlay
                 trg_overlay = true;
@@ -600,6 +684,9 @@ int main(int argc, char** argv)
             case 'l':   // --list
                 list(argv[0],trg);
                 exit(EXIT_FAILURE);
+            case 'L':
+                std::cerr << "--preload is not suppoprted yet\n";
+                exit(EXIT_FAILURE);
             case '?':
 			case ':':
 				usage(argv[0],trg);
@@ -661,10 +748,24 @@ int main(int argc, char** argv)
     }
     
     // We do not check for all possible dump combinations..
-    cfg.preshift_last_ascii_literal = cfg_preshift;
     cfg.only_better_matches = cfg_only_better_matches;
-    cfg.reverse_file = cfg_reverse_file;
-    cfg.reverse_encoded = cfg_reverse_encoded;
+    
+	if ((cfg.preshift_last_ascii_literal & LZ_CFG_CONST) && cfg_preshift) {
+		std::cout << "**Warning: -P,--preshift not applicable for this target\n";
+	} else {
+		cfg.preshift_last_ascii_literal = LZ_CFG_TRUE;
+	}
+	if ((cfg.reverse_file & LZ_CFG_CONST) && cfg_reverse_file) {
+		std::cout << "**Warning: -R,--reverse-file not applicable for this target\n";
+	} else {
+		cfg.reverse_file = LZ_CFG_TRUE;
+    }
+	if ((cfg.reverse_encoded & LZ_CFG_CONST) && cfg_reverse_encoded) {
+		std::cout << "**Warning: -r,--reverse-encoded not applicable for this target\n";
+	} else {
+		cfg.reverse_encoded = LZ_CFG_TRUE;
+	}
+
     trg->merge_hunks = trg_merge_hunks;
     trg->equalize_hunks = trg_equalize_hunks;
     trg->overlay = trg_overlay;

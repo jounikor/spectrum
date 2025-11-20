@@ -41,10 +41,9 @@ struct cost {
     int32_t offset;
     int32_t length;
     int32_t pmr_offset;         ///< tbd
-    int32_t pmr_length;         ///< tbd
     uint32_t arrival_cost;
     int16_t num_literals;       ///< Number of consequtive literal up to this match node.
-    bool last_was_literal:1;
+    bool last_was_literal;
 };
 
 /**
@@ -52,29 +51,36 @@ struct cost {
  * @brief A structure containing basic LZ engine configurations.
  */
 
-#define LZ_CFG_FALSE    0
-#define LZ_CFG_TRUE     1
-#define LZ_CFG_NSUP     -1
+#define LZ_CFG_FALSE    0x00
+#define LZ_CFG_TRUE     0x01
+#define LZ_CFG_NSUP     0xff
+#define LZ_CFG_CONST	0x80
+#define LZ_CFG_MASK		0x7f
+#define LZ_CFG_BOOLMASK	0x01
+
+
 
 typedef struct lz_config {
     int window_size;                                // Only power of two allowed
-    int max_chain;
+    int min_offset;									// Only power of two allowed
+	int max_chain;
     int min_match;
     int max_match;
     int good_match;
-    int backward_steps;                             // currently not used
+    int max_literal_run;
+	int backward_steps;                             // currently not used
     int min_match2_threshold;                       // currently not used
     int min_match3_threshold;                       // currently not used
     int initial_pmr_offset;
     int debug_level;                                // 
     int algorithm;                                  // Selected algorithm..
     //
-    bool only_better_matches:1;
-    mutable bool reverse_file:1;                    // Safe to change by target constructor
-    mutable bool reverse_encoded:1;                 // Safe to change by target constructor
-    mutable int8_t is_ascii;                        // Safe to change by target constructor
-    mutable bool preshift_last_ascii_literal:1;     // Safe to change by target constructor
-    bool verbose:1;
+    bool only_better_matches;
+    mutable uint8_t reverse_file;                   // Safe to change by target constructor
+    mutable uint8_t reverse_encoded;                // Safe to change by target constructor
+    mutable uint8_t is_ascii;                        // Safe to change by target constructor
+    mutable uint8_t preshift_last_ascii_literal;     // Safe to change by target constructor
+    bool verbose;
 } lz_config_t;
 
 /**
@@ -89,8 +95,8 @@ template <typename Derived> class lz_cost {
     }
     int m_debug_level;
     bool m_verbose;
-    const lz_config* m_lz_config;
 protected:
+    const lz_config* m_lz_config;
     int m_max_len;
     int m_max_bits;
 
@@ -113,7 +119,10 @@ public:
                 ++m_max_bits;
                 mask = mask * 2 + 1;
             }
-        }
+        
+			m_debug_level = p_cfg->debug_level;
+			m_verbose = p_cfg->verbose;
+		}
     virtual ~lz_cost() {}
 
     const lz_config* lz_get_config(void) {
@@ -188,15 +197,6 @@ protected:
     int m_debug_level;
     bool m_verbose;
     int m_security_distance;
-protected:
-    void reverse_buffer(char* p_buf, int len) {
-        char t;
-        for (int n = 0; n < len/2; n++) {
-            t = p_buf[n];
-            p_buf[n] = p_buf[len-n-1];
-            p_buf[len-n-1] = t;
-        }
-    }
 public:
     lz_base(const lz_config* p_cfg): m_lz_config(p_cfg), 
         m_debug_level(DEBUG_LEVEL_NONE), 
@@ -219,7 +219,7 @@ public:
     virtual const cost* lz_get_result(void) = 0;
     virtual const cost* lz_cost_array_get(int len) = 0;
     virtual void lz_cost_array_done(void) = 0;
-    virtual int lz_encode(char* buf, int len, std::ofstream* ofs) = 0;
+    virtual int lz_encode(char* buf, int len, char* outb, std::ofstream* ofs) = 0;
     
     // Methods implemented within the base class
     void set_debug_level(int level) {
