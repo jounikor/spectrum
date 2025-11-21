@@ -136,9 +136,6 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
     // Unused at the moment..
     (void)interval;
 
-	std::cout << "min_offset + bits -> " << m_lz_config->min_offset << "," << min_offset_bits << std::endl;
-
-
     if (verbose()) {
         std::cout << "Calculating arrival costs" << std::endl;
     }
@@ -349,7 +346,13 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
                 }
             } else {
                 // This is a normal match
-                sym = m_cost.impl_get_offset_bits(offset) - min_offset_bits;
+                sym = m_cost.impl_get_offset_bits(offset);
+				if (offset < m_lz_config->min_offset) {
+					sym = 0;
+				} else {
+					sym = sym - min_offset_bits + 1;	
+				}
+
                 m_cost.inc_tans_symbol_freq(TANS_OFFSET_SYMS,sym);
                 if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", OFFSET_SYMS " << std::setw(8) << std::right

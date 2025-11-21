@@ -61,11 +61,12 @@ zxpac4c_cost::~zxpac4c_cost(void)
  *
  */
 
-int zxpac4c_cost::impl_get_offset_tag(int offset, char& hi_byte, int& bit_tag)
+int zxpac4c_cost::impl_get_offset_tag(int offset, char& literal, int& bit_tag)
 {
     uint32_t b;
     uint8_t k;
     int len_bits;
+	int sym;
 	int encode_offset;
 	int min_offset_bits = log2(m_lz_config->min_offset);
 
@@ -74,19 +75,25 @@ int zxpac4c_cost::impl_get_offset_tag(int offset, char& hi_byte, int& bit_tag)
     assert(offset > 0);
 	assert(min_offset_bits <= 8);
 
-	len_bits = impl_get_offset_bits(offset) - min_offset_bits;
+	len_bits = impl_get_offset_bits(offset);
 	
-	if (len_bits < 0) {
+	if (offset < m_lz_config->min_offset) {
+		sym = 0;
 		len_bits = 0;
+		encode_offset = 0;
+	} else {
+		len_bits = len_bits - min_offset_bits;
+		sym = len_bits + 1;
+		encode_offset = offset >> min_offset_bits;
+		encode_offset = encode_offset & ((1 << len_bits) - 1);
 	}
 
-	hi_byte = offset >> len_bits;
-	encode_offset = offset & ((1 << len_bits) - 1);
-	m_tans_offset.encode(len_bits,k,b);
+	literal = offset & ((1 << min_offset_bits) - 1);
+	m_tans_offset.encode(sym,k,b);
 
     if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
         std::cerr << "tANS offset: 0x" << std::hex << std::setfill('0') << std::setw(2)
-				  << std::right << static_cast<uint32_t>(hi_byte & 0xff)
+				  << std::right << static_cast<uint32_t>(literal & 0xff)
 				  << ", " << min_offset_bits << ", " 
 				  << std::dec << std::setw(6) << std::setfill(' ') << encode_offset
 				  << " (" << std::setw(6) << offset << "), "
@@ -166,6 +173,7 @@ int zxpac4c_cost::impl_get_literal_tag(const char* literals, int length, char& b
  *
  *
  * @return Number of bits needed to encode the offset in full;
+ *         Using (1 << num_bits) | get_bits(num_bits) formula;
  */
 
 int zxpac4c_cost::impl_get_offset_bits(int offset)

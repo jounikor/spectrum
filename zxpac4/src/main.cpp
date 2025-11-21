@@ -93,6 +93,7 @@ static struct option longopts[] = {
 	{"reverse-file",no_argument,        NULL, 'R'},
 	{"reverse-encoded",no_argument,     NULL, 'r'},
 	{"verbose",     no_argument,        NULL, 'v'},
+	{"preshift",    no_argument,        NULL, 'P'},
 	{"DEBUG",       no_argument,        NULL, 'D'},
 	{"debug",       no_argument,        NULL, 'd'},
 	{"overlay",     no_argument,        NULL, 'O'},
@@ -100,10 +101,12 @@ static struct option longopts[] = {
     {"abs",         required_argument,  NULL, 'A'},
     {"merge-hunks", no_argument,        NULL, 'M'},
     {"equalize-hunks", no_argument,     NULL, 'E'},
+    {"win-scale",   required_argument,  NULL, 'w'},
     {"list",        no_argument,        NULL, 'l'},
     {"help",        no_argument,        NULL, 'h'},
     {"file-name",   required_argument,  NULL, 'n'},
     {"preload",     required_argument,  NULL, 'L'},
+    {"preset",      required_argument,  NULL, 'S'},
     {0,0,0,0}
 };
 
@@ -131,14 +134,14 @@ static void usage(char *prg, const targets::target* trg)
               << "                        matches for the same position (default no).\n";
     std::cerr << "  --pmr-offset,-p       Initial PMR offset between 1 and 63 (default depends on the target).\n";
     std::cerr << "  --reverse-encoded,-r  Reverse the encoded file to allow end-to-start decompression\n"
-              << "                        (default no reverse)\n";
+              << "                        (default no reverse).\n";
     std::cerr << "  --reverse-file,-R     Reverse the input file to allow end-to-start decompression. This \n"
-              << "                        setting will enable '--reverse-encoded' as well (default no reverse)\n";
+              << "                        setting will enable '--reverse-encoded' as well (default no reverse).\n";
     std::cerr << "  --algo,-a             Select used algorithm (default depends on the target):\n"
-              << "                          0=zxpac4      LZSS, 128K window\n"
-              << "                          1=xzpac4b     LZSS, literal runs, 128K window\n"
-              << "                          2=zxpac4_32k  Same as zxpac4 with 32K window\n"
-              << "                          3=zxpac4c     LZSS, literal runs, 128K window, tANS backend, no ascii\n";
+              << "                          0=zxpac4     LZSS, 128K window\n"
+              << "                          1=xzpac4b    LZSS, literal runs, 128K window\n"
+              << "                          2=zxpac4_32k Same as zxpac4 with 32K window\n"
+              << "                          3=zxpac4c    LZSS, literal runs, 16/32/64/128K window, tANS backend\n";
     std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target):\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --merge-hunks,-M      Merge hunks (Amiga target).\n";
@@ -149,10 +152,12 @@ static void usage(char *prg, const targets::target* trg)
     std::cerr << "  --DEBUG,-D            Output EVEN MORE debug prints to stderr.\n";
     std::cerr << "  --verbose,-v          Output some additional information to stdout.\n";
     std::cerr << "  --file-name,-n        Filename, for example, for ZX Spectrum TAP file.\n";
-    std::cerr << "  --preload,-L file     Preload tANS scaled frequencies for ZXPac4c\n";
-	std::cerr << "  --preset profile      Preset internal tNAS profile for ZXPac4c:\n"
-			  << "                          0=default\n"
-			  << "                          1=Amiga exe)\n";
+    std::cerr << "  --preload,-L file     Preload tANS scaled frequencies for zxpac4c.\n";
+	std::cerr << "  --win-scale,-w scaler Scale zxpac4c window by 1 (64K),2 (32K) or 3 (16K).\n";
+	std::cerr << "  --preset profile      Preset internal tNAS profile for zxpac4c:\n"
+			  << "                          0=no profile\n"
+			  << "                          1=default\n"
+			  << "                          2=Amiga exe)\n";
     std::cerr << "  --list,-l             Print defaults & details of each supported target and algorithm.\n";
     std::cerr << "  --help,-h             Print this output ;)\n";
     std::cerr << std::flush;
@@ -352,6 +357,7 @@ void list(const char* argv, const targets::target* trg)
             std::cout << algo_names[i] << " details and defaults:\n";
         
             std::cout << "  Window size: " << algos[i].window_size << "\n";
+            std::cout << "  Minimum offset: " << algos[i].min_offset << "\n";
             std::cout << "  Default length of hash linked list of matches: " << algos[i].max_chain << "\n";
             std::cout << "  Minimum match length: " << algos[i].min_match << "\n";
             std::cout << "  Maximum match length: " << algos[i].max_match << "\n";
@@ -550,6 +556,7 @@ int main(int argc, char** argv)
     int cfg_initial_pmr_offset = -1;
     int cfg_max_chain = -1;
     int cfg_max_match = -1;
+	int cfg_win_scale = 0;
     bool cfg_only_better_matches = false;
     bool cfg_reverse_file = false;
     bool cfg_reverse_encoded = false;
@@ -586,7 +593,7 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "Em:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:n:lL:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "Em:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:n:lL:S:w:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'O':   // --overlay
                 trg_overlay = true;
@@ -609,7 +616,7 @@ int main(int argc, char** argv)
             case 'a':   // --algo
                 cfg_algo = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_algo < 0 || cfg_algo > LZ_ALGO_SIZE) {
-                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
+                    std::cerr << ERR_PREAMBLE << "Invalid --algo value '" << optarg << "'\n";
                     usage(argv[0],trg);
                 }
                 if (!(trg->supported_algorithms & (1 << cfg_algo))) {
@@ -618,6 +625,13 @@ int main(int argc, char** argv)
                     usage(argv[0],trg);
                 }
                 break;
+			case 'w':	// --win-scale
+                cfg_win_scale = std::strtoul(optarg,&endptr,10);
+                if (*endptr != '\0' || cfg_win_scale < 1 || cfg_win_scale > 3) {
+                    std::cerr << ERR_PREAMBLE << "Invalid --win-scale value '" << optarg << "'\n";
+                    usage(argv[0],trg);
+                }
+				break;
             case 'r':   // --reverse-encoded
                 cfg_reverse_encoded = true;
                 break;
@@ -631,35 +645,35 @@ int main(int argc, char** argv)
             case 'p':   // --pmr-offset
                 cfg_initial_pmr_offset = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_initial_pmr_offset > 63 || cfg_initial_pmr_offset < 1) {
-                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
+                    std::cerr << ERR_PREAMBLE << "Invalid --pmr-offset value '" << optarg << "'\n";
                     usage(argv[0],trg);
                 }
                 break;
             case 'c':   // --max-chain
                 cfg_max_chain = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_max_chain > MAX_CHAIN || cfg_max_chain < 1) {
-                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
+                    std::cerr << ERR_PREAMBLE << "Invalid --max-chain value '" << optarg << "'\n";
                     usage(argv[0],trg);
                 }
                 break;
             case 'm':   // --large-max-match
                 cfg_max_match = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_max_match < 2) {
-                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
+                    std::cerr << ERR_PREAMBLE << "Invalid --large-max-match value '" << optarg << "'\n";
                     usage(argv[0],trg);
                 }
                 break;
             case 'g':   // --good-match
                 cfg_good_match = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0') {
-                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
+                    std::cerr << ERR_PREAMBLE << "Invalid --good-match value '" << optarg << "'\n";
                     usage(argv[0],trg);
                 }
                 break;
             case 'B':   // --backsteps
                 cfg_backward_steps = std::strtoul(optarg,&endptr,10);
                 if (*endptr != '\0' || cfg_backward_steps > MAX_BACKWARD_STEPS || cfg_backward_steps < 0) {
-                    std::cerr << ERR_PREAMBLE << "Invalid parameter value '" << optarg << "'\n";
+                    std::cerr << ERR_PREAMBLE << "Invalid --backsteps value '" << optarg << "'\n";
                     usage(argv[0],trg);
                 }
                 break;
@@ -686,6 +700,9 @@ int main(int argc, char** argv)
                 exit(EXIT_FAILURE);
             case 'L':
                 std::cerr << "--preload is not suppoprted yet\n";
+                exit(EXIT_FAILURE);
+            case 'S':
+                std::cerr << "--preset is not suppoprted yet\n";
                 exit(EXIT_FAILURE);
             case '?':
 			case ':':
@@ -764,6 +781,12 @@ int main(int argc, char** argv)
 		std::cout << "**Warning: -r,--reverse-encoded not applicable for this target\n";
 	} else {
 		cfg.reverse_encoded = LZ_CFG_TRUE;
+	}
+
+	// Check for the window scaling
+	if (cfg_algo == ZXPAC4C) {
+		cfg.window_size >>= cfg_win_scale;
+		cfg.min_offset  >>= cfg_win_scale;
 	}
 
     trg->merge_hunks = trg_merge_hunks;
