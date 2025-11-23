@@ -93,8 +93,6 @@ template <typename Derived> class lz_cost {
     Derived& impl(void) {
         return *static_cast<Derived*>(this);
     }
-    int m_debug_level;
-    bool m_verbose;
 protected:
     const lz_config* m_lz_config;
     int m_max_len;
@@ -108,8 +106,6 @@ protected:
 
 public:
     lz_cost(const lz_config* p_cfg):
-        m_debug_level(DEBUG_LEVEL_NONE), 
-        m_verbose(false),
         m_lz_config(p_cfg) {
             m_max_bits = 0;
             int mask = 1;
@@ -119,9 +115,6 @@ public:
                 ++m_max_bits;
                 mask = mask * 2 + 1;
             }
-        
-			m_debug_level = p_cfg->debug_level;
-			m_verbose = p_cfg->verbose;
 		}
     virtual ~lz_cost() {}
 
@@ -160,20 +153,6 @@ public:
     }
     int get_literal_tag(const char* literals, int length, char& byte_tag, int& bit_tag) {
         return impl().impl_get_literal_tag(literals,length,byte_tag,bit_tag);
-    }
-    
-    // Implementation within the base class
-    void set_debug_level(int level) {
-        m_debug_level = level;
-    }
-    int get_debug_level(void) {
-        return m_debug_level;
-    }
-    void enable_verbose(bool enable) {
-        m_verbose = enable;
-    }
-    bool verbose(void) {
-        return m_verbose;
     }
 };
 

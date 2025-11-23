@@ -91,7 +91,7 @@ int zxpac4c_cost::impl_get_offset_tag(int offset, char& literal, int& bit_tag)
 	literal = offset & ((1 << min_offset_bits) - 1);
 	m_tans_offset.encode(sym,k,b);
 
-    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+    if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
         std::cerr << "tANS offset: 0x" << std::hex << std::setfill('0') << std::setw(2)
 				  << std::right << static_cast<uint32_t>(literal & 0xff)
 				  << ", " << min_offset_bits << ", " 
@@ -99,7 +99,7 @@ int zxpac4c_cost::impl_get_offset_tag(int offset, char& literal, int& bit_tag)
 				  << " (" << std::setw(6) << offset << "), "
 				  << std::setw(2) << len_bits
                   << ", k: " << static_cast<int>(k) << ", b: 0x"
-				  << std::hex << std::setfill('0') << b;
+				  << std::hex << std::setfill('0') << b << std::dec;
     }
 
     bit_tag = b << len_bits;
@@ -123,13 +123,13 @@ int zxpac4c_cost::impl_get_length_tag(int length, int& bit_tag)
 	len_bits = impl_get_length_bits(encode_length);
     m_tans_match.encode(len_bits,k,b);
 
-    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+    if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
         std::cerr << std::dec;
         std::cerr << "tANS length: "
 				  << std::right << std::dec << std::setw(3) << std::setfill(' ')
                   << encode_length << " (" << std::setw(3) << length << "), " << len_bits
                   << ", k: " << static_cast<int>(k) << ", b: 0x"
-				  << std::hex << std::setfill('0') << b;
+				  << std::hex << std::setfill('0') << b << std::dec;
     }
 
     bit_tag = b << len_bits;
@@ -156,12 +156,12 @@ int zxpac4c_cost::impl_get_literal_tag(const char* literals, int length, char& b
     len_bits = impl_get_length_bits(encode_length);
     m_tans_literal.encode(len_bits,k,b);
 
-    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+    if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
         std::cerr << std::dec;
         std::cerr << "tANS literal: " << std::left << std::dec
                   << encode_length << " (" << length << ") -> " << len_bits
                   << ", k: " << static_cast<int>(k) << ", b: 0x" 
-				  << std::hex << std::setfill('0') << b;
+				  << std::hex << std::setfill('0') << b << std::dec;
     }
 
     // tag is 0
@@ -453,9 +453,6 @@ void zxpac4c_cost::set_tans_symbol_freqs(int type, uint8_t* freqs, int len)
     default:
         assert(NULL == "Unknown tANS type");
     }
-
-	std::cout << "***** " << local_len << len << "\n";
-
 
     if (freqs == NULL) {
         ::memset(local_freq,0,local_len);
