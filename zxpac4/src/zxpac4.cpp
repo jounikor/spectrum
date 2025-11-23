@@ -67,10 +67,10 @@ int zxpac4::lz_search_matches(char* buf, int len, int interval)
     
     m_cost.init_cost(m_cost_array,0,len,m_lz_config->initial_pmr_offset);
 
-    if (verbose()) {
+    if (m_lz_config->verbose) {
         std::cout << "Finding all matches" << std::endl;
     }
-    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+    if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
         std::cerr << ">- Match debugging phase --------------------------------------------------------\n";
         std::cerr << "  file pos: asc (hx) -> offset:length(s) or 'no macth'\n";
     }
@@ -87,7 +87,7 @@ int zxpac4::lz_search_matches(char* buf, int len, int interval)
         //        just stop searching and fill match length worth of the cost array
         //        manually..
 
-        if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+        if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
             std::cerr << std::setw(10) << std::dec << std::setfill(' ') << pos << ": '"
                 << (std::isprint(buf[pos]) ? buf[pos] : ' ')
                 << "' (" << std::setw(2) << std::setfill('0') << std::hex << (buf[pos] & 0xff)
@@ -132,10 +132,10 @@ int zxpac4::lz_parse(const char* buf, int len, int interval)
     // Unused at the moment..
     (void)interval;
 
-    if (verbose()) {
+    if (m_lz_config->verbose) {
         std::cout << "Calculating arrival costs" << std::endl;
     }
-    if (verbose()) {
+    if (m_lz_config->verbose) {
         std::cout << "Building list of optimally parsed matches" << std::endl;
     }
     
@@ -182,7 +182,7 @@ int zxpac4::lz_parse(const char* buf, int len, int interval)
         std::cerr << pos << ", " << m_cost_array[0].num_literals << ", " 
             << m_cost_array[1].num_literals << std::endl;
     }
-    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+    if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
         std::cerr << ">- Cost debugging phase ------------------------------------------------------" << std::endl;
         std::cerr << "  file pos: asc (hx) #lit (pmroff) offset:len  arri_cost ->     nxtpos pmr" << std::endl;
         pos = 0;
@@ -215,7 +215,7 @@ int zxpac4::lz_parse(const char* buf, int len, int interval)
         }
     }
     
-    if (get_debug_level() > DEBUG_LEVEL_NONE) {
+    if (m_lz_config->debug_level > DEBUG_LEVEL_NONE) {
         std::cerr << ">- Show final selected -------------------------------------------------------" << std::endl;
         std::cerr << "     file pos: asc (hx) #lit (pmroff) offset:len  arri_cost ->     nxtpos pmr    " << std::endl;
         pos = m_cost_array[0].next;
@@ -311,7 +311,7 @@ int zxpac4::encode_history(const char* buf, char* p_out, int len, int pos)
     // store compressed file..
     if (m_lz_config->is_ascii) {
         last_literal_ptr = pb.byte(literal<<1);
-        if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+        if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
             std::cerr << "O: Initial literal -> last_ptr = " 
                 << last_literal_ptr - p_out << " -> " << literal << "\n";
         }
@@ -319,7 +319,7 @@ int zxpac4::encode_history(const char* buf, char* p_out, int len, int pos)
         pb.byte(literal);
         last_literal_ptr = NULL;
         
-        if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+        if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
             std::cerr << "O: Initial literal -> last_ptr = NULL -> " 
                 << literal << "\n";
         }
@@ -332,19 +332,19 @@ int zxpac4::encode_history(const char* buf, char* p_out, int len, int pos)
 
         if (offset == 0 && length == 1) {
             // encode raw literal
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+            if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "O: Literal ";
             }
             if (m_lz_config->is_ascii && last_literal_ptr) {
                 // Unnecessary..
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "last_ptr = " << std::dec << last_literal_ptr-p_out;
                 }
                 *last_literal_ptr &= 0xfe;
             } else {
                 pb.bits(0,1);
 
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "bits(0,1)";
                 }
             }
@@ -353,21 +353,21 @@ int zxpac4::encode_history(const char* buf, char* p_out, int len, int pos)
             } else {
                 pb.byte(literal);
             }
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+            if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << " -> " << std::hex << literal << "\n";
             }
         } else {
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+            if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "O: Match ";
             }
             if (m_lz_config->is_ascii && last_literal_ptr) {
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "last_ptr = " << std::dec << last_literal_ptr-p_out;
                 }
                 
                 *last_literal_ptr |= 0x01;
             } else {
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "bits(1,1)";
                 }
 
@@ -375,7 +375,7 @@ int zxpac4::encode_history(const char* buf, char* p_out, int len, int pos)
             }
             if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
                 // encode match PMR or literal PMR
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", PMR bits(1,1) Length " << length;
                 }
 
@@ -383,12 +383,12 @@ int zxpac4::encode_history(const char* buf, char* p_out, int len, int pos)
                 n = m_cost.get_length_tag(length,tag);
                 pb.bits(tag,n);
             
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", bits " << n << "\n";
                 }
             } else {
                 // encode match
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << std::dec << ", Offset " << offset << ", Length " << length;
                 }
                 
@@ -402,7 +402,7 @@ int zxpac4::encode_history(const char* buf, char* p_out, int len, int pos)
                 n = m_cost.get_length_tag(length-1,tag);
                 pb.bits(tag,n);
                 
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", bits " << m+n+8+1 << "\n";
                 }
             }
@@ -425,7 +425,7 @@ int zxpac4::encode_history(const char* buf, char* p_out, int len, int pos)
     }
 
     if (m_lz_config->preshift_last_ascii_literal && last_literal_ptr) {
-        if (get_debug_level() > DEBUG_LEVEL_NONE) {
+        if (m_lz_config->debug_level > DEBUG_LEVEL_NONE) {
             std::cerr << "Last literal preshifted\n";
         }
         *last_literal_ptr >>= 1;

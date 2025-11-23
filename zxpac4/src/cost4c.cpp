@@ -98,7 +98,8 @@ int zxpac4c_cost::impl_get_offset_tag(int offset, char& literal, int& bit_tag)
 				  << std::dec << std::setw(6) << std::setfill(' ') << encode_offset
 				  << " (" << std::setw(6) << offset << "), "
 				  << std::setw(2) << len_bits
-                  << ", k: " << static_cast<int>(k) << ", b: " << std::setw(2) << b;
+                  << ", k: " << static_cast<int>(k) << ", b: 0x"
+				  << std::hex << std::setfill('0') << b;
     }
 
     bit_tag = b << len_bits;
@@ -127,7 +128,8 @@ int zxpac4c_cost::impl_get_length_tag(int length, int& bit_tag)
         std::cerr << "tANS length: "
 				  << std::right << std::dec << std::setw(3) << std::setfill(' ')
                   << encode_length << " (" << std::setw(3) << length << "), " << len_bits
-                  << ", k: " << static_cast<int>(k) << ", b: " << std::setw(2) << b;
+                  << ", k: " << static_cast<int>(k) << ", b: 0x"
+				  << std::hex << std::setfill('0') << b;
     }
 
     bit_tag = b << len_bits;
@@ -158,7 +160,8 @@ int zxpac4c_cost::impl_get_literal_tag(const char* literals, int length, char& b
         std::cerr << std::dec;
         std::cerr << "tANS literal: " << std::left << std::dec
                   << encode_length << " (" << length << ") -> " << len_bits
-                  << ", k: " << static_cast<int>(k) << ", b: " << b;
+                  << ", k: " << static_cast<int>(k) << ", b: 0x" 
+				  << std::hex << std::setfill('0') << b;
     }
 
     // tag is 0
@@ -203,7 +206,7 @@ int zxpac4c_cost::impl_get_literal_bits(char literal, bool is_ascii)
     (void)literal;
     (void)is_ascii;
     // somewhat a straight shortcut..
-    return 8;
+    return 7;
 }
 
 /**
@@ -228,27 +231,29 @@ int zxpac4c_cost::impl_literal_cost(int pos, cost* c, const char* buf)
     int offset = p_ctx->offset;
     int num_literals = p_ctx->num_literals;
 
-    if (pos >= p_ctx->pmr_offset && (buf[pos-p_ctx->pmr_offset] == buf[pos])) {
+    if (pos >= p_ctx->pmr_offset && (buf[pos - p_ctx->pmr_offset] == buf[pos])) {
         // PMR of length 1 
         offset = p_ctx->pmr_offset;
         num_literals = 1;
-        new_cost += predict_tans_cost(TANS_LITERAL_RUN_SYMS,num_literals);
+		new_cost += 4;
     } else {
         // get the cost of the new literal
         new_cost += impl_get_literal_bits(buf[pos],false);
-        // get the cost of literal run encoding
-        new_cost += impl_get_length_bits(num_literals+1);
         if (num_literals > 0) {
             // substract the previous literal run encoding.. since this is delta..
             new_cost -= impl_get_length_bits(num_literals);
         }
         ++num_literals;
-        new_cost += predict_tans_cost(TANS_LITERAL_RUN_SYMS,num_literals);
 
         // mark as a literal run instead of a PMR with length 1
         offset = 0;
     }
-    if (p_ctx[1].arrival_cost >= new_cost) {
+
+    // get the cost of literal run encoding
+    new_cost += impl_get_length_bits(num_literals);
+    new_cost += predict_tans_cost(TANS_LITERAL_RUN_SYMS,num_literals);
+
+	if (p_ctx[1].arrival_cost >= new_cost) {
         p_ctx[1].arrival_cost = new_cost;
         p_ctx[1].length = 1;
         p_ctx[1].offset = offset;
@@ -299,8 +304,10 @@ int zxpac4c_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset,
     new_cost = p_ctx->arrival_cost + 1;
     
     if (pos >= pmr_offset && offset == pmr_offset) {
-        offset = 0;
+        // We have a PMR match
+		offset = 0;
     } else {
+		// Just a normal match. Update the PMR offset
         pmr_offset = offset;
     }
 
@@ -345,17 +352,6 @@ int zxpac4c_cost::impl_init_cost(cost* p_ctx, int sta, int len, int pmr)
     for (n = sta+1; n < len+1; n++) {
         p_ctx[n].arrival_cost = LZ_MAX_COST;
         p_ctx[n].num_literals = 0;
-    }
-    
-    // Initialize tANS symbol frequencies
-    for (n = 0; n < TANS_NUM_LITERAL_SYM; n++) {
-        m_literal_sym_freq[n] = 0;
-    }
-    for (n = 0; n < TANS_NUM_MATCH_SYM; n++) {
-        m_match_sym_freq[n] = 0;
-    }
-    for (n = 0; n < TANS_NUM_OFFSET_SYM; n++) {
-        m_offset_sym_freq[n] = 0;
     }
 
     return 0;
@@ -457,6 +453,9 @@ void zxpac4c_cost::set_tans_symbol_freqs(int type, uint8_t* freqs, int len)
     default:
         assert(NULL == "Unknown tANS type");
     }
+
+	std::cout << "***** " << local_len << len << "\n";
+
 
     if (freqs == NULL) {
         ::memset(local_freq,0,local_len);

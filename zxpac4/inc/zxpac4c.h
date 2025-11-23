@@ -78,7 +78,7 @@
 #define ZXPAC4C_MATCH_MIN					2
 #define ZXPAC4C_MATCH_MAX					255
 #define ZXPAC4C_MATCH_GOOD					63
-#define ZXPAC4C_OFFSET_MATCH2_THRESHOLD		1024
+#define ZXPAC4C_OFFSET_MATCH2_THRESHOLD		512
 #define ZXPAC4C_OFFSET_MATCH3_THRESHOLD		4096
 #define ZXPAC4C_WINDOW_MAX					131072
 #define ZXPAC4C_HEADER_SIZE					4
@@ -111,6 +111,8 @@ public:
     void lz_cost_array_done(void);
     bool is_ascii(void) { return m_lz_config->is_ascii; }
     bool only_better(void) { return m_lz_config->only_better_matches; }
+
+	void preload_tans(int type, uint8_t* freqs=NULL, int len=0);
 };
 
 

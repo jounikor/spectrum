@@ -194,13 +194,9 @@ protected:
     int m_num_pmr_matches;
     // debugs and configs
     const lz_config* m_lz_config;
-    int m_debug_level;
-    bool m_verbose;
     int m_security_distance;
 public:
     lz_base(const lz_config* p_cfg): m_lz_config(p_cfg), 
-        m_debug_level(DEBUG_LEVEL_NONE), 
-        m_verbose(false),
         m_security_distance(0) { }
     virtual ~lz_base(void) { }
 
@@ -222,18 +218,6 @@ public:
     virtual int lz_encode(char* buf, int len, char* outb, std::ofstream* ofs) = 0;
     
     // Methods implemented within the base class
-    void set_debug_level(int level) {
-        m_debug_level = level;
-    }
-    int get_debug_level(void) {
-        return m_debug_level;
-    }
-    void enable_verbose(bool enable) {
-        m_verbose = enable;
-    }
-    bool verbose(void) {
-        return m_verbose;
-    }
     int get_num_literals(void) const {
         return m_num_literals;
     }

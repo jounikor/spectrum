@@ -593,7 +593,7 @@ int main(int argc, char** argv)
     optind = 2;
 
     // 
-	while ((n = getopt_long(argc, argv, "Em:g:c:e:B:i:s:p:hPvdDa:A:OMrRb:n:lL:S:w:", longopts, NULL)) != -1) {
+	while ((n = getopt_long(argc, argv, "Em:g:c:e:B:i:s:p:hPvdDa:A:OMrRbn:lL:S:w:", longopts, NULL)) != -1) {
 		switch (n) {
             case 'O':   // --overlay
                 trg_overlay = true;
@@ -863,8 +863,10 @@ int main(int argc, char** argv)
     }
    
     cfg.algorithm = cfg_algo;
-    lz->set_debug_level(cfg_debug_level);
-    lz->enable_verbose(cfg_verbose_on);
+    
+	// *FIX* these are redundant
+	//lz->set_debug_level(cfg_debug_level);
+    //lz->enable_verbose(cfg_verbose_on);
     
     if (cfg_verbose_on) {
         std::cout << "Loading from file '" << cfg_infile_name << "'\n";

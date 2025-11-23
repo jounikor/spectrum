@@ -94,6 +94,7 @@ int hash3::impl_find_matches(const char *buf, int pos, int len, bool only_better
     const char* n;
     const char* e;
 
+
     if (low < 0) {
         low = 0;
     }
@@ -118,7 +119,7 @@ int hash3::impl_find_matches(const char *buf, int pos, int len, bool only_better
         assert(length <= m_max_match);
 
         if (length >= m_min_match) {
-            if (only_better_matches) {
+			if (only_better_matches) {
                 if (length > best) {
                     best = length;
                 } else {

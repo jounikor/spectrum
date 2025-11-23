@@ -66,12 +66,12 @@ int zxpac4c::lz_search_matches(char* buf, int len, int interval)
     
     m_cost.init_cost(m_cost_array,0,len,m_lz_config->initial_pmr_offset);
 
-    if (verbose()) {
+    if (m_lz_config->verbose) {
         std::cout << "Finding all matches" << std::endl;
     }
 
     // find matches..
-    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+    if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
         std::cerr << ">- Match debugging phase --------------------------------------------------------\n";
         std::cerr << "  file pos: asc (hx) -> offset:length(s) or 'no macth'\n";
     }
@@ -84,7 +84,7 @@ int zxpac4c::lz_search_matches(char* buf, int len, int interval)
         // the number of found matches.
         num = m_lz.find_matches(buf,pos,len-pos,m_lz_config->only_better_matches);
 
-        if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+        if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
             std::cerr << std::setw(10) << std::dec << std::setfill(' ') << pos << ": '"
                 << (std::isprint(buf[pos]) ? buf[pos] : ' ')
                 << "' (" << std::setw(2) << std::setfill('0') << std::hex << (buf[pos] & 0xff)
@@ -136,10 +136,10 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
     // Unused at the moment..
     (void)interval;
 
-    if (verbose()) {
+    if (m_lz_config->verbose) {
         std::cout << "Calculating arrival costs" << std::endl;
     }
-    if (verbose()) {
+    if (m_lz_config->verbose) {
         std::cout << "Building list of optimally parsed matches" << std::endl;
     }
     
@@ -188,15 +188,15 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
                 // The decompressor cannot handle back to back PMRs, thus we must kill
                 // one PMR literal and include it into previous PMR match or create a
                 // PMR match with length 2.
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "previous_was_literal " << previous_was_pmr << " and pos " << pos << std::endl;
                 }
                 if (m_cost_array[previous_was_pmr].length > 1) {
-                    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                    if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                         std::cerr << "PMR match" << std::endl;
                     }
                 } else {
-                    if (get_debug_level() > DEBUG_LEVEL_NORMAL) { 
+                    if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) { 
                         std::cerr << "PMR literal" << std::endl;
                     }
                     --m_num_pmr_literals;
@@ -233,7 +233,7 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
     }
 
 
-    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+    if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
         std::cerr << ">- Cost debugging phase ------------------------------------------------------" << std::endl;
         std::cerr << "  file pos: asc (hx) #lit (pmroff) offset:len  arri_cost ->     nxtpos pmr" << std::endl;
         pos = 0;
@@ -265,7 +265,7 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
             ++pos;
         }
     }
-    if (get_debug_level() > DEBUG_LEVEL_NONE) {
+    if (m_lz_config->debug_level > DEBUG_LEVEL_NONE) {
         std::cerr << ">- Show final selected -------------------------------------------------------" << std::endl;
         std::cerr << "     file pos: asc (hx) #lit (pmroff) offset:len  arri_cost ->     nxtpos pmr    " << std::endl;
         pos = m_cost_array[0].next;
@@ -300,14 +300,9 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
         } while (pos > 0);
     }
     assert(m_cost_array[1].num_literals >= 1);
-    
-    // Init tANS symbold freqs.. these could have be preloaded..
-    m_cost.set_tans_symbol_freqs(TANS_LITERAL_RUN_SYMS);
-    m_cost.set_tans_symbol_freqs(TANS_LENGTH_SYMS);
-    m_cost.set_tans_symbol_freqs(TANS_OFFSET_SYMS);
     pos = 0;
 
-    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+    if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
         std::cerr << "** TANS DEBUG OUTPUT **\n";
     }
 
@@ -315,17 +310,15 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
         length = m_cost_array[pos].length;
         offset = m_cost_array[pos].offset;
    
-        if (get_debug_level() > DEBUG_LEVEL_NORMAL) { 
+        if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) { 
             std::cerr << "pos: " << std::setw(8) << std::left << pos << " ";
         }
-
-
         if (offset == 0 && length == 1) {
             // Literal run
             num_literals = m_cost_array[pos].num_literals;
 			sym = m_cost.impl_get_length_bits(num_literals);
 
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+            if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "LITRUN_SYMS " << std::setw(8) << std::right << num_literals 
                           << ":" << std::left << sym << "\n";
             }
@@ -335,13 +328,13 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
             // Match of some kind.. 
             sym = m_cost.impl_get_length_bits(length);
             m_cost.inc_tans_symbol_freq(TANS_LENGTH_SYMS,sym); 
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+            if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "LENGTH_SYMS " << std::setw(8) << std::right << length 
                           << ":" << std::left << sym;
             }
             if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
                 // This is a PMR match
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", PMR offset\n";
                 }
             } else {
@@ -354,7 +347,7 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
 				}
 
                 m_cost.inc_tans_symbol_freq(TANS_OFFSET_SYMS,sym);
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", OFFSET_SYMS " << std::setw(8) << std::right
                               << offset << ":" << std::left << sym << "\n";
                 }
@@ -365,7 +358,7 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
     // Build tANS tables
     m_cost.build_tans_tables();
     
-    if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+    if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
         m_cost.dump(TANS_LITERAL_RUN_SYMS);
         m_cost.dump(TANS_LENGTH_SYMS);
         m_cost.dump(TANS_OFFSET_SYMS);
@@ -381,6 +374,11 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
  *
  */
 
+void zxpac4c::preload_tans(int type, uint8_t* freqs, int len)
+{
+}
+
+
 const cost* zxpac4c::lz_cost_array_get(int len)
 {
     if (len < 1) {
@@ -389,6 +387,11 @@ const cost* zxpac4c::lz_cost_array_get(int len)
     lz_cost_array_done();
     m_cost_array = m_cost.alloc_cost(len,m_lz_config->max_chain); 
     m_alloc_len = len;
+
+	// Init tANS symbold freqs.. these could have be preloaded..
+    m_cost.set_tans_symbol_freqs(TANS_LITERAL_RUN_SYMS);
+    m_cost.set_tans_symbol_freqs(TANS_LENGTH_SYMS);
+    m_cost.set_tans_symbol_freqs(TANS_OFFSET_SYMS);
 
     return m_cost_array;
 }
@@ -440,15 +443,15 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             run_length = m_cost_array[pos--].num_literals;
             
 			// pos is now fixed to point into the buf
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+            if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "O: Literal run of " << run_length;
             }
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+            if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << ", bits(0,1), ";
             }
             n = m_cost.impl_get_literal_tag(buf+pos,run_length,byte_tag,tag);
 
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+            if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << ", tag 0x" << std::hex << tag << "," << std::dec << n;
             }
             if (run_length > 255) {
@@ -459,10 +462,10 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             pb.bits(0,1);
             pb.bits(tag,n);
 
-            for (n = 0; n < run_length; n++) {
+            for (m = 0; m < run_length; m++) {
                 pb.byte(buf[pos++]);
             }
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+            if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << " ('" << (std::isprint(literal) ? literal : '.');
 				std::cerr << "') -> total " << std::dec << 1+n+run_length*8 << "\n";
             }
@@ -470,17 +473,17 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             n = 0;
 
 			if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "O: PMR Match, ";
                 }
                 tag = 0;
             } else {
                 tag = 1;
-                if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+                if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "O: Match, ";
                 }
             }   
-            if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+            if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "bits("<< tag << ",1), ";
             }
             
@@ -493,7 +496,7 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
 				pb.bits(tag,n);
 				n += min_offset_bits;
 
-				if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+				if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
 					std::cerr << ", ";
 				}
             }
@@ -502,7 +505,7 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             m = m_cost.get_length_tag(length,tag);
             pb.bits(tag,m);
 
-			if (get_debug_level() > DEBUG_LEVEL_NORMAL) {
+			if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
 				std::cerr << " -> total " << 1+m+n << "\n";
 			}
         }
