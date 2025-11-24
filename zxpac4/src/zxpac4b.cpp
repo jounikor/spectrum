@@ -155,7 +155,11 @@ int zxpac4b::lz_parse(const char* buf, int len, int interval)
 
         // Collect statistics..
         if (offset == 0 && length > 1) {
-            ++m_num_pmr_matches;
+            //
+			// *FIX* There's a bug here. A PMR after PMR is allowed, which is not
+			// possible to decode. See zxpac4c how to fix it.
+			//
+			++m_num_pmr_matches;
             ++m_num_matches;
             m_num_matched_bytes += length;
             previous_was_pmr = pos;

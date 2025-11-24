@@ -99,7 +99,8 @@ int zxpac4c_cost::impl_get_offset_tag(int offset, char& literal, int& bit_tag)
 				  << " (" << std::setw(6) << offset << "), "
 				  << std::setw(2) << len_bits
                   << ", k: " << static_cast<int>(k) << ", b: 0x"
-				  << std::hex << std::setfill('0') << b << std::dec;
+				  <<std::setw(2) << std::right << std::hex << std::setfill('0') << b
+				  << std::dec;
     }
 
     bit_tag = b << len_bits;
@@ -129,7 +130,8 @@ int zxpac4c_cost::impl_get_length_tag(int length, int& bit_tag)
 				  << std::right << std::dec << std::setw(3) << std::setfill(' ')
                   << encode_length << " (" << std::setw(3) << length << "), " << len_bits
                   << ", k: " << static_cast<int>(k) << ", b: 0x"
-				  << std::hex << std::setfill('0') << b << std::dec;
+				  << std::setw(2) << std::right << std::hex << std::setfill('0') << b
+				  << std::dec;
     }
 
     bit_tag = b << len_bits;
@@ -161,7 +163,8 @@ int zxpac4c_cost::impl_get_literal_tag(const char* literals, int length, char& b
         std::cerr << "tANS literal: " << std::left << std::dec
                   << encode_length << " (" << length << ") -> " << len_bits
                   << ", k: " << static_cast<int>(k) << ", b: 0x" 
-				  << std::hex << std::setfill('0') << b << std::dec;
+				  << std::setw(2) << std::right << std::hex << std::setfill('0') << b
+				  << std::dec;
     }
 
     // tag is 0
@@ -320,7 +323,7 @@ int zxpac4c_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset,
     new_cost += get_length_bits(length);
     new_cost += predict_tans_cost(TANS_LENGTH_SYMS,length);
 
-    if (p_ctx[length].arrival_cost >= new_cost) {
+    if (p_ctx[length].arrival_cost > new_cost) {
         p_ctx[length].offset       = offset;
         p_ctx[length].pmr_offset   = pmr_offset;
         p_ctx[length].arrival_cost = new_cost;

@@ -174,11 +174,17 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
         // Case 3) offset = 0 && length > 1 -> PMR match encoded as a literal run
         if (offset == 0 && length > 1) {
             // A normal PMR
-            ++m_num_pmr_matches;
-            ++m_num_matches;
+			if (previous_was_pmr > 0) {
+				// Last PMR match length >= 255.. join with this one previous PMR and skip current
+				next = previous_was_pmr;
+				m_cost_array[previous_was_pmr].length += length;
+			} else {
+				previous_was_pmr = pos;
+				next = pos;
+				++m_num_pmr_matches;
+				++m_num_matches;
+			}
             m_num_matched_bytes += length;
-            previous_was_pmr = pos;
-            next = pos;
         // Case 2) offset > 0 && length = 1 -> PMR match with length 1 encoded as lireal run
         } else if (offset > 0 && length == 1) {
             if (previous_was_pmr > 0) {
@@ -326,9 +332,14 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
             pos = pos + num_literals - 1;
 		} else {
             // Match of some kind.. 
-            sym = m_cost.impl_get_length_bits(length);
+			if (length > m_lz_config->max_match) {
+				length = m_lz_config->max_match;
+			}
+
+			sym = m_cost.impl_get_length_bits(length);
             m_cost.inc_tans_symbol_freq(TANS_LENGTH_SYMS,sym); 
-            if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
+            
+			if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "LENGTH_SYMS " << std::setw(8) << std::right << length 
                           << ":" << std::left << sym;
             }
@@ -452,7 +463,9 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             n = m_cost.impl_get_literal_tag(buf+pos,run_length,byte_tag,tag);
 
             if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
-                std::cerr << ", tag 0x" << std::hex << tag << "," << std::dec << n;
+                std::cerr << ", tag 0x"
+						  << std::right << std::setw(2) << std::hex << std::setfill('0') << tag 
+						  << "," << std::dec << n;
             }
             if (run_length > 255) {
 				// *FIX* this needs to be corrected with handling for > 255
@@ -502,8 +515,28 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             }
 
             // encode match or PMR match length
-            m = m_cost.get_length_tag(length,tag);
+			int encode_length;
+            if (length > m_lz_config->max_match) {
+				// If match length > maximum match length supported by tANS tag encoder
+				// then encode "mag tag" and the rest with a run of bytes (0-255)..
+				encode_length = m_lz_config->max_match;
+			} else {
+				encode_length = length;
+			}
+
+			m = m_cost.get_length_tag(encode_length,tag);
             pb.bits(tag,m);
+
+			if (length >= m_lz_config->max_match) {
+				length -= m_lz_config->max_match;
+
+				do {
+					encode_length = length >= 255 ? 255 : length;
+					pb.byte(encode_length);
+					length -= encode_length;
+					m += 8;
+				} while (encode_length == 255);
+			}
 
 			if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
 				std::cerr << " -> total " << 1+m+n << "\n";

@@ -23,7 +23,7 @@ template<class T, int M>
 class tans_encoder : public ans_base {
     int* Ls_;
     T (*next_state_)[M];
-    uint8_t (*k_)[M];
+    T (*k_)[M];
     T* symbol_last_;
     int Ls_len_;
     T symbol_to_k_[M];
@@ -173,7 +173,7 @@ void tans_encoder<T,M>::buildEncodingTables(void)
 {
     symbol_last_ = new (std::nothrow) T[Ls_len_];
     next_state_ = reinterpret_cast<T(*)[M]>(new (std::nothrow) T[M * Ls_len_]);
-    k_ = reinterpret_cast<T(*)[M]>(new (std::nothrow) uint8_t[M * Ls_len_]);
+    k_ = reinterpret_cast<T(*)[M]>(new (std::nothrow) T[M * Ls_len_]);
 
     T (*k)[M] = reinterpret_cast<T(*)[M]>(k_);
     T (*next_state)[M] = reinterpret_cast<T(*)[M]>(next_state_);

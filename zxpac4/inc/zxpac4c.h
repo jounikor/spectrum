@@ -54,7 +54,7 @@
   5 + [5] = 32 -> 64          // nnnnn
   6 + [6] = 64 -> 127         // nnnnnn
   7 + [7] = 128 -> 254        // nnnnnnn
-  7 + [7] = 255 + n*[8] until [8] less than 255
+  7 + [7] = 255 + n*[8] until [8] less than 255		; note! not implemented yet.
   
  offset tANS symbols from 0 to 8
   
@@ -81,6 +81,7 @@
 #define ZXPAC4C_OFFSET_MATCH2_THRESHOLD		512
 #define ZXPAC4C_OFFSET_MATCH3_THRESHOLD		4096
 #define ZXPAC4C_WINDOW_MAX					131072
+#define ZXPAC4C_OFFSET_MIN					256
 #define ZXPAC4C_HEADER_SIZE					4
 #define ZXPAC4C_LITRUN_MAX					255
 
