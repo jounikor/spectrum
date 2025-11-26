@@ -48,10 +48,12 @@ set(COMMON_SRC  src/cost4.cpp
                 src/cost4_32k.cpp
                 src/cost4b.cpp
                 src/cost4c.cpp
+                src/cost4d.cpp
                 src/zxpac4.cpp
                 src/zxpac4_32k.cpp
                 src/zxpac4b.cpp
                 src/zxpac4c.cpp
+                src/zxpac4d.cpp
                 src/hash.cpp
                 src/main.cpp
                 src/hunk.cpp
@@ -68,7 +70,10 @@ set(COMMON_SRC  src/cost4.cpp
                 inc/cost4_32k.h
                 inc/zxpac4b.h
                 inc/zxpac4c.h
+                inc/zxpac4d.h
                 inc/cost4b.h
+                inc/cost4c.h
+                inc/cost4d.h
                 inc/lz_base.h
                 inc/hash.h
                 inc/hunk.h

@@ -26,6 +26,7 @@
 #include "zxpac4_32k.h"
 #include "zxpac4b.h"
 #include "zxpac4c.h"
+#include "zxpac4d.h"
 #include "lz_util.h"
 #include "lz_base.h"
 #include "hunk.h"
@@ -62,8 +63,9 @@
 #define ZXPAC4B             1
 #define ZXPAC4_32K          2
 #define ZXPAC4C             3
+#define ZXPAC4D             4
 #define ZXPAC_DEFAULT       ZXPAC4
-#define ZXPAC_MAX           ZXPAC4C+1
+#define ZXPAC_MAX           ZXPAC4D+1
 
 
 static const char *algo_names[] = {
@@ -71,6 +73,7 @@ static const char *algo_names[] = {
     "zxpac4b",
     "zxpac4_32k",
     "zxpac4c",
+    "zxpac4d",
 };
 
 
@@ -141,7 +144,8 @@ static void usage(char *prg, const targets::target* trg)
               << "                          0=zxpac4     LZSS, 128K window\n"
               << "                          1=xzpac4b    LZSS, literal runs, 128K window\n"
               << "                          2=zxpac4_32k Same as zxpac4 with 32K window\n"
-              << "                          3=zxpac4c    LZSS, literal runs, 16/32/64/128K window, tANS backend\n";
+              << "                          3=zxpac4c    LZSS, literal runs, 16/32/64/128K window, tANS backend\n"
+              << "                          4=zxpac4d    LZSS, 16/32/64/128K window, tANS backend\n";
     std::cerr << "  --preshift,-P         Preshift the last ASCII literal (requires 'asc' target):\n";
     std::cerr << "  --abs,-A load,jump    Self-extracting decruncher parameters for absolute address location.\n";
     std::cerr << "  --merge-hunks,-M      Merge hunks (Amiga target).\n";
@@ -169,7 +173,7 @@ static targets::target my_targets[] = {
     {   "asc",
         "Draft: 7-bit ASCII only target. 8-bit input causes an error.",
         (1<<24) - 1,
-        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K | 1<<ZXPAC4C,
+        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K | 1<<ZXPAC4C | 1<<ZXPAC4D,
         ZXPAC4,
         0,
         0x0,
@@ -184,7 +188,7 @@ static targets::target my_targets[] = {
     {   "bin",
         "Draft: 8-bit binary data target.",
         (1<<24) - 1,
-        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K | 1<<ZXPAC4C,
+        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K | 1<<ZXPAC4C | 1<<ZXPAC4D,
         ZXPAC4,
         0,
         0x0,
@@ -200,7 +204,7 @@ static targets::target my_targets[] = {
         "Draft: A TAP file contains a decompressor and runs the compressed program.",
         (1<<16) - 1,
         1<<ZXPAC4_32K,
-        ZXPAC4_32K | 1<<ZXPAC4C,
+        ZXPAC4_32K | 1<<ZXPAC4C | 1<<ZXPAC4D,
         255,
         0x0,
         0x0,
@@ -214,7 +218,7 @@ static targets::target my_targets[] = {
     {   "bbc",
         "Draft: BBC Model A/B self-extracting executable file.",
         (1<<16) - 1,
-        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K,
+        1<<ZXPAC4 | 1<<ZXPAC4B | 1<<ZXPAC4_32K | 1<<ZXPAC4D | 1<<ZXPAC4C,
         ZXPAC4_32K,
         255,
         0x0,
@@ -229,7 +233,7 @@ static targets::target my_targets[] = {
     {   "ami",
         "Amiga compressed executable.",
         (1<<24) - 1,
-        1<<ZXPAC4 | 1<<ZXPAC4_32K | 1<<ZXPAC4C,
+        1<<ZXPAC4 | 1<<ZXPAC4_32K | 1<<ZXPAC4C | 1<<ZXPAC4D,
         ZXPAC4,
         0,
         0x0,        // load address
@@ -304,7 +308,22 @@ static const lz_config algos[] {
         LZ_CFG_NSUP,    // is_ascii
         LZ_CFG_FALSE|LZ_CFG_CONST,          // preshift_last_ascii_literal
         false           // verbose
-    }
+    },
+    // ZXPAC4D - max 128K window, literal runs, 
+    {   ZXPAC4D_WINDOW_MAX,  ZXPAC4D_OFFSET_MIN,
+		DEF_CHAIN, ZXPAC4D_MATCH_MIN, ZXPAC4D_MATCH_MAX, ZXPAC4D_MATCH_GOOD,
+        1,				// maximum literal run length
+		DEF_BACKWARD_STEPS, ZXPAC4D_OFFSET_MATCH2_THRESHOLD, ZXPAC4D_OFFSET_MATCH3_THRESHOLD,
+        ZXPAC4D_INIT_PMR_OFFSET,
+        DEBUG_LEVEL_NONE,
+        ZXPAC4D,
+        false,          // only_better_matches
+        LZ_CFG_TRUE|LZ_CFG_CONST,           // reverse_file
+        LZ_CFG_TRUE|LZ_CFG_CONST,           // reverse_encoded
+        LZ_CFG_NSUP,    // is_ascii
+        LZ_CFG_FALSE|LZ_CFG_CONST,          // preshift_last_ascii_literal
+        false           // verbose
+    },
 };
 
 #define LZ_TARGET_SIZE static_cast<int>((sizeof(my_targets)/sizeof(targets::target)))
@@ -788,7 +807,7 @@ int main(int argc, char** argv)
 	}
 
 	// Check for the window scaling
-	if (cfg_algo == ZXPAC4C) {
+	if (cfg_algo == ZXPAC4C || cfg_algo == ZXPAC4D) {
 		cfg.window_size >>= cfg_win_scale;
 		cfg.min_offset  >>= cfg_win_scale;
 	}
@@ -848,6 +867,9 @@ int main(int argc, char** argv)
             break;
         case ZXPAC4C:
             lz = new zxpac4c(&cfg); 
+            break;
+        case ZXPAC4D:
+            lz = new zxpac4d(&cfg); 
             break;
         case ZXPAC4:
         default:
