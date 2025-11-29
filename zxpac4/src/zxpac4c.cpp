@@ -428,6 +428,7 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
     int header_size_to_sub;
     char byte_tag;
 	int min_offset_bits = log2(m_lz_config->min_offset);
+	int encode_length;
 
     m_security_distance = 0;
     
@@ -460,27 +461,41 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << ", bits(0,1), ";
             }
-            n = m_cost.impl_get_literal_tag(buf+pos,run_length,byte_tag,tag);
+            if (run_length > m_lz_config->max_literal_run) {
+                encode_length = m_lz_config->max_literal_run;
+            } else {
+                encode_length = run_length;
+            }
+
+            n = m_cost.impl_get_literal_tag(buf+pos,encode_length,byte_tag,tag);
 
             if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << ", tag 0x"
 						  << std::right << std::setw(2) << std::hex << std::setfill('0') << tag 
 						  << "," << std::dec << n;
             }
-            if (run_length > 255) {
-				// *FIX* this needs to be corrected with handling for > 255
-                std::cerr << "\n**Error: cannot compress this file. Too long literal run." << std::endl;
-                return -1;
-            }
+            
             pb.bits(0,1);
             pb.bits(tag,n);
 
+			if (run_length >= m_lz_config->max_literal_run) {
+				run_length -= m_lz_config->max_literal_run;
+
+				do {
+					encode_length = length >= 255 ? 255 : length;
+					pb.byte(encode_length);
+					length -= encode_length;
+					n += 8;
+				} while (encode_length == 255);
+			}
+
             for (m = 0; m < run_length; m++) {
                 pb.byte(buf[pos++]);
+                n += 8;
             }
             if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << " ('" << (std::isprint(literal) ? literal : '.');
-				std::cerr << "') -> total " << std::dec << 1+n+run_length*8 << "\n";
+				std::cerr << "') -> total " << std::dec << 1+n+run_length << "\n";
             }
         } else {
             n = 0;
@@ -515,7 +530,6 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             }
 
             // encode match or PMR match length
-			int encode_length;
             if (length > m_lz_config->max_match) {
 				// If match length > maximum match length supported by tANS tag encoder
 				// then encode "mag tag" and the rest with a run of bytes (0-255)..

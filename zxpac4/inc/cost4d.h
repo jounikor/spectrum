@@ -18,8 +18,8 @@
 
 #define TANS_NUM_MATCH_SYM      8
 #define TANS_NUM_OFFSET_SYM     10
-#define TANS4D_SIZE_MATCH         128
-#define TANS4D_SIZE_OFFSET        128
+#define TANS4D_SIZE_MATCH       64
+#define TANS4D_SIZE_OFFSET      64
 
 #define TANS_LENGTH_SYMS        1
 #define TANS_OFFSET_SYMS        2

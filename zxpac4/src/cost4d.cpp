@@ -147,8 +147,8 @@ int zxpac4d_cost::impl_get_literal_tag(const char* literals, int length, char& b
     (void)literals;
     (void)byte_tag;
 	(void)length;
-	(void)bit_tag;
 	assert(0);
+	bit_tag = 0;
     return 1;
 }
 
