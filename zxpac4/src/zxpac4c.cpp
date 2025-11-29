@@ -477,14 +477,15 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             
             pb.bits(0,1);
             pb.bits(tag,n);
+            m = run_length;
 
-			if (run_length >= m_lz_config->max_literal_run) {
-				run_length -= m_lz_config->max_literal_run;
+			if (m >= m_lz_config->max_literal_run) {
+				m -= m_lz_config->max_literal_run;
 
 				do {
-					encode_length = length >= 255 ? 255 : length;
+					encode_length = m >= 255 ? 255 : m;
 					pb.byte(encode_length);
-					length -= encode_length;
+					m -= encode_length;
 					n += 8;
 				} while (encode_length == 255);
 			}

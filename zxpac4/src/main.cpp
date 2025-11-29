@@ -385,6 +385,7 @@ void list(const char* argv, const targets::target* trg)
             std::cout << "  Minimum match length: " << algos[i].min_match << "\n";
             std::cout << "  Maximum match length: " << algos[i].max_match << "\n";
             std::cout << "  Default good match length: " << algos[i].good_match << "\n";
+            std::cout << "  Maximum literal run length: " << algos[i].max_literal_run << "\n";
             std::cout << "  Default PMR offset: " << algos[i].initial_pmr_offset << "\n";
             if (algos[i].reverse_encoded & LZ_CFG_TRUE) {
                 std::cout << "  Backwards decompression ";
