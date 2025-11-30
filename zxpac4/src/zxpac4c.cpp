@@ -559,24 +559,37 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
 			}
         }
         
-        // Insert tANS Ls tables into the output..
+        // Insert tANS Ls tables into the output using K=2 bits Rice encoding
         //
 
         rice_encoder<2> rice;
+        const int* syms;
+        uint32_t s;
+        int sbits;
+
         // Encode literal run table
-        for (n = 0; n < TANS_NUM_LITERAL_SYM; n++) {
+        syms = m_cost.get_tans_scaled_symbol_freqs(TANS_LITERAL_RUN_SYMS,m);
+        for (n = 0; n < m; n++) {
+            s = syms[n] & 0xff;
+            sbits = rice.encode_value(s);
+            pb.bits(s,sbits);
         }
 
         // Encode match length table
-        for (n = 0; n < TANS_NUM_MATCH_SYM; n++) {
+        syms = m_cost.get_tans_scaled_symbol_freqs(TANS_LENGTH_SYMS,m);
+        for (n = 0; n < m; n++) {
+            s = syms[n] & 0xff;
+            sbits = rice.encode_value(s);
+            pb.bits(s,sbits);
         }
         
         // Encode Offset table
-        for (n = 0; n < TANS_NUM_OFFSET_SYM; n++) {
+        syms = m_cost.get_tans_scaled_symbol_freqs(TANS_OFFSET_SYMS,m);
+        for (n = 0; n < m; n++) {
+            s = syms[n] & 0xff;
+            sbits = rice.encode_value(s);
+            pb.bits(s,sbits);
         }
-
-
-
 
         //
         n = pb.size();
