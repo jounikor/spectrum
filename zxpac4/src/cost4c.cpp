@@ -474,36 +474,28 @@ void zxpac4c_cost::build_tans_tables(void)
     m_tans_offset.init_tans(m_offset_sym_freq,TANS_NUM_OFFSET_SYM);
 }
 
-int zxpac4c_cost::get_tans_scaled_symbol_freqs(int type, uint8_t* freqs, int len)
+const int* zxpac4c_cost::get_tans_scaled_symbol_freqs(int type, int& m)
 {
-    int n,m;
     const int* p;
 
     switch (type) {
     case TANS_LITERAL_RUN_SYMS:
-        assert(len >= m_tans_literal.get_Ls_len());
         m = m_tans_literal.get_Ls_len();
         p = m_tans_literal.get_scaled_Ls();
         break;
     case TANS_LENGTH_SYMS:
-        assert(len >= m_tans_match.get_Ls_len());
         m = m_tans_match.get_Ls_len();
         p = m_tans_match.get_scaled_Ls();
         break;
     case TANS_OFFSET_SYMS:
-        assert(len >= m_tans_offset.get_Ls_len());
         m = m_tans_offset.get_Ls_len();
         p = m_tans_offset.get_scaled_Ls();
         break;
     default:
-        return -1;
+        return NULL;
     }
 
-    for (n = 0; n < m; n++) {
-        freqs[n] = p[n];
-    }
-
-    return m;
+    return p;
 }
 
 void zxpac4c_cost::dump(int type)

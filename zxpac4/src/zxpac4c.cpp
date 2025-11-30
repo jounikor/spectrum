@@ -16,6 +16,7 @@
 #include <cstring>
 #include "zxpac4c.h"
 #include "lz_util.h"
+#include "rice_encoder.h"
 
 #include <cctype>
 #include <cassert>
@@ -558,6 +559,26 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
 			}
         }
         
+        // Insert tANS Ls tables into the output..
+        //
+
+        rice_encoder<2> rice;
+        // Encode literal run table
+        for (n = 0; n < TANS_NUM_LITERAL_SYM; n++) {
+        }
+
+        // Encode match length table
+        for (n = 0; n < TANS_NUM_MATCH_SYM; n++) {
+        }
+        
+        // Encode Offset table
+        for (n = 0; n < TANS_NUM_OFFSET_SYM; n++) {
+        }
+
+
+
+
+        //
         n = pb.size();
 
         if (n >= len) {

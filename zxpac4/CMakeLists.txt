@@ -82,6 +82,7 @@ set(COMMON_SRC  src/cost4.cpp
 
                 inc/ans.h
                 inc/tans_encoder.h
+                inc/rice_encoder.h
 
                 z80/z80_offsets.h
 )
