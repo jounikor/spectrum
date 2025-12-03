@@ -444,6 +444,51 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
     pb.byte(len >> 16);
     pb.byte(len >> 8);
     pb.byte(len >> 0);
+        
+    // Insert tANS Ls tables into the output using K=2 bits Rice encoding
+    rice_encoder<2> rice;
+    const int* syms;
+    uint32_t s;
+    int sbits;
+
+    offset = pb.size();
+    length = 0;
+
+
+    // Encode literal run table
+    syms = m_cost.get_tans_scaled_symbol_freqs(TANS_LITERAL_RUN_SYMS,m);
+    length += m;
+    for (n = 0; n < m; n++) {
+        s = syms[n] & 0xff;
+        sbits = rice.encode_value(s);
+        pb.bits(s,sbits);
+    }
+
+    // Encode match length table
+    syms = m_cost.get_tans_scaled_symbol_freqs(TANS_LENGTH_SYMS,m);
+    length += m;
+    for (n = 0; n < m; n++) {
+        s = syms[n] & 0xff;
+        sbits = rice.encode_value(s);
+        pb.bits(s,sbits);
+    }
+        
+    // Encode Offset table
+    syms = m_cost.get_tans_scaled_symbol_freqs(TANS_OFFSET_SYMS,m);
+    length += m;
+    for (n = 0; n < m; n++) {
+        s = syms[n] & 0xff;
+        sbits = rice.encode_value(s);
+        pb.bits(s,sbits);
+    }
+    
+    pos = pb.size();
+    if (m_lz_config->verbose) {
+        std::cout << "Encoded " << length << " bytes of tANS tables to "
+                  << pos-offset << " bytes\n";
+    }
+
+    //
     pos = 0;
     
     while ((pos = m_cost_array[pos].next)) {
@@ -559,37 +604,6 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
 			}
         }
         
-        // Insert tANS Ls tables into the output using K=2 bits Rice encoding
-        //
-
-        rice_encoder<2> rice;
-        const int* syms;
-        uint32_t s;
-        int sbits;
-
-        // Encode literal run table
-        syms = m_cost.get_tans_scaled_symbol_freqs(TANS_LITERAL_RUN_SYMS,m);
-        for (n = 0; n < m; n++) {
-            s = syms[n] & 0xff;
-            sbits = rice.encode_value(s);
-            pb.bits(s,sbits);
-        }
-
-        // Encode match length table
-        syms = m_cost.get_tans_scaled_symbol_freqs(TANS_LENGTH_SYMS,m);
-        for (n = 0; n < m; n++) {
-            s = syms[n] & 0xff;
-            sbits = rice.encode_value(s);
-            pb.bits(s,sbits);
-        }
-        
-        // Encode Offset table
-        syms = m_cost.get_tans_scaled_symbol_freqs(TANS_OFFSET_SYMS,m);
-        for (n = 0; n < m; n++) {
-            s = syms[n] & 0xff;
-            sbits = rice.encode_value(s);
-            pb.bits(s,sbits);
-        }
 
         //
         n = pb.size();
