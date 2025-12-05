@@ -301,7 +301,7 @@ int zxpac4d::lz_parse(const char* buf, int len, int interval)
 			}
 
 			sym = m_cost.impl_get_length_bits(length);
-            m_cost.inc_tans_symbol_freq(TANS_LENGTH_SYMS,sym); 
+            m_cost.inc_tans_symbol_freq(TANS4D_LENGTH_SYMS,sym); 
             
 			if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "LENGTH_SYMS " << std::setw(8) << std::right << length 
@@ -321,7 +321,7 @@ int zxpac4d::lz_parse(const char* buf, int len, int interval)
 					sym = sym - min_offset_bits + 1;	
 				}
 
-                m_cost.inc_tans_symbol_freq(TANS_OFFSET_SYMS,sym);
+                m_cost.inc_tans_symbol_freq(TANS4D_OFFSET_SYMS,sym);
                 if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", OFFSET_SYMS " << std::setw(8) << std::right
                               << offset << ":" << std::left << sym << "\n";
@@ -334,8 +334,8 @@ int zxpac4d::lz_parse(const char* buf, int len, int interval)
     m_cost.build_tans_tables();
     
     if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
-        m_cost.dump(TANS_LENGTH_SYMS);
-        m_cost.dump(TANS_OFFSET_SYMS);
+        m_cost.dump(TANS4D_LENGTH_SYMS);
+        m_cost.dump(TANS4D_OFFSET_SYMS);
     }
     return 0;
 }
@@ -363,8 +363,8 @@ const cost* zxpac4d::lz_cost_array_get(int len)
     m_alloc_len = len;
 
 	// Init tANS symbold freqs.. these could have be preloaded..
-    m_cost.set_tans_symbol_freqs(TANS_LENGTH_SYMS);
-    m_cost.set_tans_symbol_freqs(TANS_OFFSET_SYMS);
+    m_cost.set_tans_symbol_freqs(TANS4D_LENGTH_SYMS);
+    m_cost.set_tans_symbol_freqs(TANS4D_OFFSET_SYMS);
 
     return m_cost_array;
 }

@@ -9,7 +9,10 @@
 ;
 ;
 
-TANS_NUM_FREQS      equ     8+8+10
+TANS_NUM_FREQS  equ     8+8+10
+INITIAL_STATE   equ     3
+SPREAD_STEP     equ     5
+
 
 
 
@@ -19,10 +22,18 @@ TANS_NUM_FREQS      equ     8+8+10
 main:
         
 
+        ld      de,$8000
+        ld      a,INITIAL_STATE
         ld      hl,test_data_end-1
-        ld      de,tans_arrays
-        ld      c,$80
+        ld      L_table,ix
+
+        ld      b,8
         call    decode_tans_freqs
+        ld      b,8
+        call    decode_tans_freqs
+        ld      b,10
+        call    decode_tans_freqs
+
         ret
 
 ;
@@ -65,11 +76,10 @@ _no_reload2:
         adc     a,a
         djnz    _get_two_bits
 
-        ; store frequency
+        ; store frequency.. DE must be 256 bytes aligned and
+        ; arrays start from a 256 byte boundary
         ld      (de),a
-        inc     de
-        ld      a,e
-        cp      TANS_NUM_FREQS
+        dec     e
         jr nz,  _rice_loop
         
         ret

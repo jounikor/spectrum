@@ -202,6 +202,7 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
                     if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                         std::cerr << "PMR match" << std::endl;
                     }
+                    assert("SHOULD NOT HAPPEN" == NULL);
                 } else {
                     if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) { 
                         std::cerr << "PMR literal" << std::endl;
@@ -227,10 +228,14 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
             next = pos;
         // Case 1) offset > 0 && length > 1 -> normal match
         } else {
-            previous_was_pmr = 0;
-            ++m_num_matches;
-            m_num_matched_bytes += length;
+            if (previous_was_pmr > 0) {
+                // We cannot have 2 PMRs in a row.. So make this PMR match a normal
+                m_cost_array[pos].offset = m_cost_array[pos].pmr_offset;
+            }
             next = pos;
+            m_num_matched_bytes += length;
+            ++m_num_matches;
+            previous_was_pmr = 0;
         }
         if (pos == len) {
             m_cost_array[pos].next = 0;
@@ -429,7 +434,6 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
     int header_size_to_sub;
     char byte_tag;
 	int min_offset_bits = log2(m_lz_config->min_offset);
-	int encode_length;
 
     m_security_distance = 0;
     
@@ -508,12 +512,10 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
                 std::cerr << ", bits(0,1), ";
             }
             if (run_length > m_lz_config->max_literal_run) {
-                encode_length = m_lz_config->max_literal_run;
-            } else {
-                encode_length = run_length;
+                return -1;
             }
-
-            n = m_cost.impl_get_literal_tag(buf+pos,encode_length,byte_tag,tag);
+            
+            n = m_cost.impl_get_literal_tag(buf+pos,length,byte_tag,tag);
 
             if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << ", tag 0x"
@@ -523,18 +525,6 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             
             pb.bits(0,1);
             pb.bits(tag,n);
-            m = run_length;
-
-			if (m >= m_lz_config->max_literal_run) {
-				m -= m_lz_config->max_literal_run;
-
-				do {
-					encode_length = m >= 255 ? 255 : m;
-					pb.byte(encode_length);
-					m -= encode_length;
-					n += 8;
-				} while (encode_length == 255);
-			}
 
             for (m = 0; m < run_length; m++) {
                 pb.byte(buf[pos++]);
@@ -577,27 +567,12 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             }
 
             // encode match or PMR match length
-            if (length > m_lz_config->max_match) {
-				// If match length > maximum match length supported by tANS tag encoder
-				// then encode "mag tag" and the rest with a run of bytes (0-255)..
-				encode_length = m_lz_config->max_match;
-			} else {
-				encode_length = length;
-			}
+			if (length > m_lz_config->max_match) {
+                return -1;
+            }
 
-			m = m_cost.get_length_tag(encode_length,tag);
+            m = m_cost.get_length_tag(length,tag);
             pb.bits(tag,m);
-
-			if (length >= m_lz_config->max_match) {
-				length -= m_lz_config->max_match;
-
-				do {
-					encode_length = length >= 255 ? 255 : length;
-					pb.byte(encode_length);
-					length -= encode_length;
-					m += 8;
-				} while (encode_length == 255);
-			}
 
 			if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
 				std::cerr << " -> total " << 1+m+n << "\n";

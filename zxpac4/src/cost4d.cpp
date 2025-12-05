@@ -19,7 +19,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "cost4c.h"
+#include "cost4d.h"
 #include "zxpac4d.h"
 
 /**
@@ -219,7 +219,7 @@ int zxpac4d_cost::impl_literal_cost(int pos, cost* c, const char* buf)
 		
 		// get the cost of match length encoding
 		new_cost += impl_get_length_bits(num_literals);
-		new_cost += predict_tans_cost(TANS_LENGTH_SYMS,num_literals);
+		new_cost += predict_tans_cost(TANS4D_LENGTH_SYMS,num_literals);
     } else {
         // get the cost of the new literal
         new_cost += impl_get_literal_bits(buf[pos],false);
@@ -289,11 +289,11 @@ int zxpac4d_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset,
     // weight of offset encoding 
 	if (offset > 0) {
 		new_cost += get_offset_bits(offset);
-		new_cost += predict_tans_cost(TANS_OFFSET_SYMS,offset); 
+		new_cost += predict_tans_cost(TANS4D_OFFSET_SYMS,offset); 
 	}
 	// weight of length encoding 
     new_cost += get_length_bits(length);
-    new_cost += predict_tans_cost(TANS_LENGTH_SYMS,length);
+    new_cost += predict_tans_cost(TANS4D_LENGTH_SYMS,length);
 
     if (p_ctx[length].arrival_cost > new_cost) {
         p_ctx[length].offset       = offset;
@@ -366,10 +366,10 @@ int zxpac4d_cost::predict_tans_cost(int type, int value)
     // For now just static costs.. subject to change..
 
     switch (type) {
-    case TANS_LENGTH_SYMS:
-        return TANS_LENGTH_COST;
-    case TANS_OFFSET_SYMS:
-        return TANS_OFFSET_COST;
+    case TANS4D_LENGTH_SYMS:
+        return 0;
+    case TANS4D_OFFSET_SYMS:
+        return 0;
     default:
         assert(0);
     }
@@ -379,9 +379,9 @@ int zxpac4d_cost::predict_tans_cost(int type, int value)
 ans_state_t zxpac4d_cost::get_tans_state(int type)
 { 
     switch (type) {
-    case TANS_LENGTH_SYMS:
+    case TANS4D_LENGTH_SYMS:
         return m_tans_match.get_state();
-    case TANS_OFFSET_SYMS:
+    case TANS4D_OFFSET_SYMS:
         return m_tans_offset.get_state();
     default:
         return -1;
@@ -391,9 +391,9 @@ ans_state_t zxpac4d_cost::get_tans_state(int type)
 int zxpac4d_cost::inc_tans_symbol_freq(int type, uint8_t symbol)
 {
     switch (type) {
-    case TANS_LENGTH_SYMS:
+    case TANS4D_LENGTH_SYMS:
         return ++m_match_sym_freq[symbol];
-    case TANS_OFFSET_SYMS:
+    case TANS4D_OFFSET_SYMS:
         return ++m_offset_sym_freq[symbol];
     default:
         assert(NULL == "Unknown tANS type");
@@ -407,11 +407,11 @@ void zxpac4d_cost::set_tans_symbol_freqs(int type, uint8_t* freqs, int len)
     int local_len;
 
     switch (type) {
-    case TANS_LENGTH_SYMS:
+    case TANS4D_LENGTH_SYMS:
         local_freq = m_match_sym_freq;
         local_len = sizeof(m_match_sym_freq);
         break;
-    case TANS_OFFSET_SYMS:
+    case TANS4D_OFFSET_SYMS:
         local_freq = m_offset_sym_freq;
         local_len = sizeof(m_offset_sym_freq);
         break;
@@ -431,8 +431,8 @@ void zxpac4d_cost::set_tans_symbol_freqs(int type, uint8_t* freqs, int len)
 
 void zxpac4d_cost::build_tans_tables(void)
 {
-    m_tans_match.init_tans(m_match_sym_freq,TANS_NUM_MATCH_SYM);
-    m_tans_offset.init_tans(m_offset_sym_freq,TANS_NUM_OFFSET_SYM);
+    m_tans_match.init_tans(m_match_sym_freq,TANS4D_NUM_MATCH_SYM);
+    m_tans_offset.init_tans(m_offset_sym_freq,TANS4D_NUM_OFFSET_SYM);
 }
 
 int zxpac4d_cost::get_tans_scaled_symbol_freqs(int type, uint8_t* freqs, int len)
@@ -441,12 +441,12 @@ int zxpac4d_cost::get_tans_scaled_symbol_freqs(int type, uint8_t* freqs, int len
     const int* p;
 
     switch (type) {
-    case TANS_LENGTH_SYMS:
+    case TANS4D_LENGTH_SYMS:
         assert(len >= m_tans_match.get_Ls_len());
         m = m_tans_match.get_Ls_len();
         p = m_tans_match.get_scaled_Ls();
         break;
-    case TANS_OFFSET_SYMS:
+    case TANS4D_OFFSET_SYMS:
         assert(len >= m_tans_offset.get_Ls_len());
         m = m_tans_offset.get_Ls_len();
         p = m_tans_offset.get_scaled_Ls();
@@ -465,11 +465,11 @@ int zxpac4d_cost::get_tans_scaled_symbol_freqs(int type, uint8_t* freqs, int len
 void zxpac4d_cost::dump(int type)
 {
     switch (type) {
-    case TANS_LENGTH_SYMS:
+    case TANS4D_LENGTH_SYMS:
         std::cerr << "** TANS_LENGTH_SYMS -----";
         m_tans_match.dump();
         break;
-    case TANS_OFFSET_SYMS:
+    case TANS4D_OFFSET_SYMS:
         std::cerr << "** TANS_OFFSET_SYMS -----";
         m_tans_offset.dump();
         break;

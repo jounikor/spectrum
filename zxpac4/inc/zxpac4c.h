@@ -1,7 +1,7 @@
 /**
  * @file zxpac4c.h
  * @brief ZX Pac v4c with 32K window class definitions
- * @author Jouni 'Mr.SpivKorhonen
+ * @author Jouni 'Mr.Spiv' Korhonen
  * @version 0.14
  * @date summer 2025
  * @copyright The Unlicense
@@ -41,8 +41,9 @@
   4 + [4] = 16 -> 31          // nnnn
   5 + [5] = 32 -> 64          // nnnnn
   6 + [6] = 64 -> 127         // nnnnnn
-  7 + [7] = 128 -> 254        // nnnnnnn
-  7 + [7] = 255 + n*[8] until [8] less than 255
+  7 + [7] = 128 -> 255        // nnnnnnn
+  8 + [8] = 256 -> 511
+  9 + [9] = 512 -> 1023
 
 
  literal run len tANS symbols from 0 to 8
@@ -53,8 +54,9 @@
   4 + [4] = 16 -> 31          // nnnn
   5 + [5] = 32 -> 64          // nnnnn
   6 + [6] = 64 -> 127         // nnnnnn
-  7 + [7] = 128 -> 254        // nnnnnnn
-  7 + [7] = 255 + n*[8] until [8] less than 255		; note! not implemented yet.
+  7 + [7] = 128 -> 255        // nnnnnnn
+  8 + [8] = 256 -> 511
+  9 + [9] = 512 -> 1023
   
  offset tANS symbols from 0 to 8
   
@@ -76,14 +78,14 @@
 
 #define ZXPAC4C_INIT_PMR_OFFSET				5 
 #define ZXPAC4C_MATCH_MIN					2
-#define ZXPAC4C_MATCH_MAX					255
+#define ZXPAC4C_MATCH_MAX					1023
 #define ZXPAC4C_MATCH_GOOD					63
 #define ZXPAC4C_OFFSET_MATCH2_THRESHOLD		512
 #define ZXPAC4C_OFFSET_MATCH3_THRESHOLD		4096
 #define ZXPAC4C_WINDOW_MAX					131072
 #define ZXPAC4C_OFFSET_MIN					256
 #define ZXPAC4C_HEADER_SIZE					4
-#define ZXPAC4C_LITRUN_MAX					255
+#define ZXPAC4C_LITRUN_MAX					1023
 
 /**
  * @class matches utils.h

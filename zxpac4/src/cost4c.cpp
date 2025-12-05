@@ -395,11 +395,11 @@ int zxpac4c_cost::predict_tans_cost(int type, int value)
 
     switch (type) {
     case TANS_LITERAL_RUN_SYMS:
-        return TANS_LITERAL_RUN_COST; 
+        return 1;
     case TANS_LENGTH_SYMS:
-        return TANS_LENGTH_COST;
+        return 0;
     case TANS_OFFSET_SYMS:
-        return TANS_OFFSET_COST;
+        return 0;
     default:
         assert(0);
     }
