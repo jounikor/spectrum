@@ -459,6 +459,9 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
     length = 0;
 
 
+
+    // *FIX* MUST also encode the last (initial) state into the file
+
     // Encode literal run table
     syms = m_cost.get_tans_scaled_symbol_freqs(TANS_LITERAL_RUN_SYMS,m);
     length += m;
@@ -512,6 +515,10 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
                 std::cerr << ", bits(0,1), ";
             }
             if (run_length > m_lz_config->max_literal_run) {
+                if (m_lz_config->verbose) {
+                    std::cout << "**Error: cannot handle literal run > " << m_lz_config->max_literal_run
+                              << " bytes\n";
+                }
                 return -1;
             }
             
@@ -568,6 +575,10 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
 
             // encode match or PMR match length
 			if (length > m_lz_config->max_match) {
+                if (m_lz_config->verbose) {
+                    std::cout << "**Parsing Error:  match longet than " << m_lz_config->max_match
+                              << " bytes\n";
+                }
                 return -1;
             }
 
