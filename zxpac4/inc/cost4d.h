@@ -16,13 +16,13 @@
 
 // tANS specific information..
 
-#define TANS4D_NUM_MATCH_SYM      8
-#define TANS4D_NUM_OFFSET_SYM     10
-#define TANS4D_SIZE_MATCH       64
-#define TANS4D_SIZE_OFFSET      64
+#define TANS4D_NUM_MATCH_SYM    10
+#define TANS4D_NUM_OFFSET_SYM	10
+#define TANS4D_SIZE_MATCH		32
+#define TANS4D_SIZE_OFFSET		32
 
-#define TANS4D_LENGTH_SYMS        1
-#define TANS4D_OFFSET_SYMS        2
+#define TANS4D_LENGTH_SYMS      1
+#define TANS4D_OFFSET_SYMS      2
 
 class zxpac4d_cost: public lz_cost<zxpac4d_cost> {
     // tANS symbol frequencies
@@ -57,7 +57,7 @@ public:
     void build_tans_tables(void);
     int inc_tans_symbol_freq(int type, uint8_t symbol);
     void set_tans_symbol_freqs(int type, uint8_t* freqs=NULL, int len=0);
-    int get_tans_scaled_symbol_freqs(int type, uint8_t* freqs, int len);
+    const int* get_tans_scaled_symbol_freqs(int type, int& len);
 
     int predict_tans_cost(int type, int value);
     void dump(int type);

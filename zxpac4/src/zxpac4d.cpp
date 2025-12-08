@@ -16,6 +16,7 @@
 #include <cstring>
 #include "zxpac4d.h"
 #include "lz_util.h"
+#include "rice_encoder.h"
 
 #include <cctype>
 #include <cassert>
@@ -130,7 +131,6 @@ int zxpac4d::lz_parse(const char* buf, int len, int interval)
     int next;
     int num_literals;
     int sym;
-    int previous_was_pmr;
 	int min_offset_bits = log2(m_lz_config->min_offset);
 
     // Unused at the moment..
@@ -145,7 +145,6 @@ int zxpac4d::lz_parse(const char* buf, int len, int interval)
     
     pos = len;
     num_literals = 1;
-    previous_was_pmr = 0;
 
     // Fix the links of selected cost nodes
     while (pos > 0) {
@@ -168,40 +167,18 @@ int zxpac4d::lz_parse(const char* buf, int len, int interval)
             // reset literal..
             num_literals = 1;
         }
-
-        // Collect statistics.. and fix back-to-back PMR cases..
-        
         // Case 3) offset = 0 && length > 1 -> PMR match encoded as a literal run
         if (offset == 0 && length > 1) {
             // A normal PMR
-			if (previous_was_pmr > 0 && (m_cost_array[previous_was_pmr].length + length) < (65535+255)) {
-				// Last PMR match length >= 255.. join with this one previous PMR and skip current
-				// if the total length is < 65535+255
-				next = previous_was_pmr;
-				m_cost_array[previous_was_pmr].length += length;
-			} else {
-				previous_was_pmr = pos;
-				next = pos;
-				++m_num_pmr_matches;
-				++m_num_matches;
-			}
-            m_num_matched_bytes += length;
+			next = pos;
         // Case 2) offset > 0 && length = 1 -> PMR match with length 1 encoded as lireal run
         } else if (offset > 0 && length == 1) {
-            ++m_num_pmr_literals;
-            ++m_num_literals;
             next = pos;
-            previous_was_pmr = 0;
         // Case 4) offset = 0 && length = 1 -> literal
         } else if (offset == 0 && length == 1) {
-            previous_was_pmr = 0;
-            ++m_num_literals;
             next = pos;
         // Case 1) offset > 0 && length > 1 -> normal match
         } else {
-            previous_was_pmr = 0;
-            ++m_num_matches;
-            m_num_matched_bytes += length;
             next = pos;
         }
         if (pos == len) {
@@ -295,11 +272,6 @@ int zxpac4d::lz_parse(const char* buf, int len, int interval)
         if (offset == 0 && length == 1) {
             // Literals we skip..
 		} else {
-            // Match of some kind.. 
-			if (length > m_lz_config->max_match) {
-				length = m_lz_config->max_match;
-			}
-
 			sym = m_cost.impl_get_length_bits(length);
             m_cost.inc_tans_symbol_freq(TANS4D_LENGTH_SYMS,sym); 
             
@@ -385,11 +357,10 @@ int zxpac4d::encode_history(const char* buf, char* p_out, int len, int pos)
     int length;
     int offset;
     int m,n;
-    int run_length;
     putbits_history pb(p_out);
     int header_size_to_sub;
-    char byte_tag;
 	int min_offset_bits = log2(m_lz_config->min_offset);
+	int literal_size = 0;
 
     m_security_distance = 0;
     
@@ -404,12 +375,50 @@ int zxpac4d::encode_history(const char* buf, char* p_out, int len, int pos)
     pb.byte(len >> 16);
     pb.byte(len >> 8);
     pb.byte(len >> 0);
-    pos = 0;
     
+	// Insert tANS Ls tables into the output using K=2 bits Rice encoding
+    rice_encoder<2> rice;
+    const int* syms;
+    uint32_t s;
+    int sbits;
+
+    offset = pb.size();
+    length = 0;
+
+    // Encode match length table
+	pb.byte(m_cost.get_tans_state(TANS4D_LENGTH_SYMS));
+    syms = m_cost.get_tans_scaled_symbol_freqs(TANS4D_LENGTH_SYMS,m);
+    length += m;
+    for (n = 0; n < m; n++) {
+        s = syms[n] & 0xff;
+        sbits = rice.encode_value(s);
+        pb.bits(s,sbits);
+    }
+        
+    // Encode Offset table
+	pb.byte(m_cost.get_tans_state(TANS4D_OFFSET_SYMS));
+    syms = m_cost.get_tans_scaled_symbol_freqs(TANS4D_OFFSET_SYMS,m);
+    length += m;
+    for (n = 0; n < m; n++) {
+        s = syms[n] & 0xff;
+        sbits = rice.encode_value(s);
+        pb.bits(s,sbits);
+    }
+    
+    pos = pb.size();
+    if (m_lz_config->verbose) {
+        std::cout << "Encoded " << length << " bytes of tANS tables to "
+                  << pos-offset << " bytes\n";
+    }
+
+    pos = 0;
+
     while ((pos = m_cost_array[pos].next)) {
         length = m_cost_array[pos].length;
         offset = m_cost_array[pos].offset;
 		literal = buf[pos-1];
+
+		assert(length <= m_lz_config->max_match);
 
         if (offset == 0 && length == 1) {
             if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
@@ -428,7 +437,10 @@ int zxpac4d::encode_history(const char* buf, char* p_out, int len, int pos)
                 std::cerr << " ('" << (std::isprint(literal) ? literal : '.');
 				std::cerr << "') -> total " << std::dec << 1+8 << "\n";
             }
-        } else {
+			
+			++m_num_literals;
+			literal_size += 9;
+		} else {
             n = 0;
 
 			if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
@@ -436,11 +448,19 @@ int zxpac4d::encode_history(const char* buf, char* p_out, int len, int pos)
                     std::cerr << "O: PMR Match, ";
                 }
                 tag = 0;
-            } else {
+				
+				if (length == 1) {
+					++m_num_pmr_literals;
+				} else { 
+					++m_num_pmr_matches;
+				}
+			} else {
                 tag = 1;
                 if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "O: Match, ";
                 }
+
+				++m_num_matches;
             }   
             if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "bits(1" << tag << ",2), ";
@@ -461,28 +481,16 @@ int zxpac4d::encode_history(const char* buf, char* p_out, int len, int pos)
             }
 
             // encode match or PMR match length
-			int encode_length;
-            if (length > m_lz_config->max_match) {
-				// If match length > maximum match length supported by tANS tag encoder
-				// then encode "mag tag" and the rest with a run of bytes (0-255)..
-				encode_length = m_lz_config->max_match;
-			} else {
-				encode_length = length;
-			}
-
-			m = m_cost.get_length_tag(encode_length,tag);
+			m = m_cost.get_length_tag(length,tag);
             pb.bits(tag,m);
 
-			if (length >= m_lz_config->max_match) {
-				length -= m_lz_config->max_match;
-				assert(length < 65536);
-				pb.byte(length >> 8);
-				pb.byte(length);
-				m += 16;
+			if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
+				std::cerr << " -> total " << 2+m+n << "\n";
 			}
 
-			if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
-				std::cerr << " -> total " << 1+m+n << "\n";
+			m_num_matched_bytes += length;
+			if (length == 1) {
+				literal_size = literal_size + 2 + m + n;
 			}
         }
         
@@ -500,6 +508,10 @@ int zxpac4d::encode_history(const char* buf, char* p_out, int len, int pos)
             }
         }
     }
+	if (m_lz_config->verbose) {
+		std::cout << "Encoding literal took " << literal_size << " bits, "
+				  << ((literal_size+7)/8) << " bytes\n";
+	}
 
     n = pb.flush() - p_out;
     return n;

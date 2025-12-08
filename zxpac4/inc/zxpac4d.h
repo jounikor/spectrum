@@ -1,7 +1,7 @@
 /**
  * @file zxpac4d.h
  * @brief ZX Pac v4c with 32K window class definitions
- * @author Jouni 'Mr.SpivKorhonen
+ * @author Jouni 'Mr.Spiv' Korhonen
  * @version 0.14
  * @date summer 2025
  * @copyright The Unlicense
@@ -21,17 +21,15 @@
 #include "cost4d.h"
 
 /**
- The binary encoding of zxpac4d format:
+ The binary encoding of zxpac4c format:
 @verbatim
 
-  Literal 
-  0 + literal 
-
-  PMR 
-  1+0 + matchlen
+  Literal after a match:
+  0 + literal
 
   Match:
-  1+1 + matchlen + offset_high_bits + lower_8_bits_as_a_byte
+  1 + 0 + matchlen + offset_high_bits
+  1 + 1 + matchlen
 
  matchlen tANS symbols from 0 to 8
   0 + [0] = 1                 // for PMR literal
@@ -41,11 +39,12 @@
   4 + [4] = 16 -> 31          // nnnn
   5 + [5] = 32 -> 64          // nnnnn
   6 + [6] = 64 -> 127         // nnnnnn
-  7 + [7] = 128 -> 254        // nnnnnnn
-  7 + [7] = 255 + [8] + [8]	  // nnnnnnnnnnnnnnnn + 255 i.e. 65790
+  7 + [7] = 128 -> 255        // nnnnnnn
+  8 + [8] = 256 -> 511
+  9 + [9] = 512 -> 1023
 
 
- literal 
+ literal run len tANS symbols from 0 to 8
   0 + [0] = 1                 // 
   1 + [1] = 2 -> 3            // n
   2 + [2] = 4 -> 7            // nn
@@ -53,12 +52,13 @@
   4 + [4] = 16 -> 31          // nnnn
   5 + [5] = 32 -> 64          // nnnnn
   6 + [6] = 64 -> 127         // nnnnnn
-  7 + [7] = 128 -> 254        // nnnnnnn
-  7 + [7] = 255 + n*[8] until [8] less than 255		; note! not implemented yet.
+  7 + [7] = 128 -> 255        // nnnnnnn
+  8 + [8] = 256 -> 511
+  9 + [9] = 512 -> 1023
   
  offset tANS symbols from 0 to 8
   
-  0 + [0] =     1 -> 255      // always encoded
+  0 + [0] =     1 -> 255      // <- encoded as a byte
   1 + [1] =   256 -> 511      // n
   2 + [2] =   512 -> 1023     // nn
   3 + [3] =  1024 -> 2047     // nnn
@@ -76,7 +76,7 @@
 
 #define ZXPAC4D_INIT_PMR_OFFSET				5 
 #define ZXPAC4D_MATCH_MIN					2
-#define ZXPAC4D_MATCH_MAX					255
+#define ZXPAC4D_MATCH_MAX					1023
 #define ZXPAC4D_MATCH_GOOD					63
 #define ZXPAC4D_OFFSET_MATCH2_THRESHOLD		512
 #define ZXPAC4D_OFFSET_MATCH3_THRESHOLD		4096

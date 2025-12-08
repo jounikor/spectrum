@@ -312,7 +312,7 @@ static const lz_config algos[] {
     // ZXPAC4D - max 128K window, literal runs, 
     {   ZXPAC4D_WINDOW_MAX,  ZXPAC4D_OFFSET_MIN,
 		DEF_CHAIN, ZXPAC4D_MATCH_MIN, ZXPAC4D_MATCH_MAX, ZXPAC4D_MATCH_GOOD,
-        1,				// maximum literal run length
+        ZXPAC4D_LITRUN_MAX,				// maximum literal run length
 		DEF_BACKWARD_STEPS, ZXPAC4D_OFFSET_MATCH2_THRESHOLD, ZXPAC4D_OFFSET_MATCH3_THRESHOLD,
         ZXPAC4D_INIT_PMR_OFFSET,
         DEBUG_LEVEL_NONE,

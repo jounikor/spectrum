@@ -169,23 +169,11 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
             // reset literal..
             num_literals = 1;
         }
-
-        // Collect statistics.. and fix back-to-back PMR cases..
-        
         // Case 3) offset = 0 && length > 1 -> PMR match encoded as a literal run
         if (offset == 0 && length > 1) {
             // A normal PMR
-			if (previous_was_pmr > 0) {
-				// Last PMR match length >= 255.. join with this one previous PMR and skip current
-				next = previous_was_pmr;
-				m_cost_array[previous_was_pmr].length += length;
-			} else {
-				previous_was_pmr = pos;
-				next = pos;
-				++m_num_pmr_matches;
-				++m_num_matches;
-			}
-            m_num_matched_bytes += length;
+			previous_was_pmr = pos;
+			next = pos;
         // Case 2) offset > 0 && length = 1 -> PMR match with length 1 encoded as lireal run
         } else if (offset > 0 && length == 1) {
             if (previous_was_pmr > 0) {
@@ -207,34 +195,22 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
                     if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) { 
                         std::cerr << "PMR literal" << std::endl;
                     }
-                    --m_num_pmr_literals;
-                    --m_num_literals;
                 }
                 // Skip this PMR and add in into the previous
                 ++m_cost_array[previous_was_pmr].length;
                 m_cost_array[previous_was_pmr].offset = 0;
-                ++m_num_matched_bytes;
                 next = previous_was_pmr;
             } else {
-                ++m_num_pmr_literals;
-                ++m_num_literals;
                 next = pos;
             }
             previous_was_pmr = pos;
         // Case 4) offset = 0 && length = 1 -> literal
         } else if (offset == 0 && length == 1) {
             previous_was_pmr = 0;
-            ++m_num_literals;
             next = pos;
         // Case 1) offset > 0 && length > 1 -> normal match
         } else {
-            if (previous_was_pmr > 0) {
-                // We cannot have 2 PMRs in a row.. So make this PMR match a normal
-                m_cost_array[pos].offset = m_cost_array[pos].pmr_offset;
-            }
             next = pos;
-            m_num_matched_bytes += length;
-            ++m_num_matches;
             previous_was_pmr = 0;
         }
         if (pos == len) {
@@ -336,12 +312,9 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
             }
             m_cost.inc_tans_symbol_freq(TANS_LITERAL_RUN_SYMS,sym);
             pos = pos + num_literals - 1;
-		} else {
-            // Match of some kind.. 
-			if (length > m_lz_config->max_match) {
-				length = m_lz_config->max_match;
-			}
+			previous_was_pmr = 0;
 
+		} else {
 			sym = m_cost.impl_get_length_bits(length);
             m_cost.inc_tans_symbol_freq(TANS_LENGTH_SYMS,sym); 
             
@@ -350,12 +323,12 @@ int zxpac4c::lz_parse(const char* buf, int len, int interval)
                           << ":" << std::left << sym;
             }
             if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
-                // This is a PMR match
+				// This is a PMR match
                 if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << ", PMR offset\n";
                 }
-            } else {
-                // This is a normal match
+			} else {
+				// Encide a normal match
                 sym = m_cost.impl_get_offset_bits(offset);
 				if (offset < m_lz_config->min_offset) {
 					sym = 0;
@@ -435,6 +408,9 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
     char byte_tag;
 	int min_offset_bits = log2(m_lz_config->min_offset);
 
+	int	literal_size = 0;
+
+
     m_security_distance = 0;
     
     if (m_lz_config->reverse_encoded) {
@@ -458,12 +434,9 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
     offset = pb.size();
     length = 0;
 
-
-
-    // *FIX* MUST also encode the last (initial) state into the file
-
     // Encode literal run table
-    syms = m_cost.get_tans_scaled_symbol_freqs(TANS_LITERAL_RUN_SYMS,m);
+	pb.byte(m_cost.get_tans_state(TANS_LITERAL_RUN_SYMS));
+	syms = m_cost.get_tans_scaled_symbol_freqs(TANS_LITERAL_RUN_SYMS,m);
     length += m;
     for (n = 0; n < m; n++) {
         s = syms[n] & 0xff;
@@ -472,6 +445,7 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
     }
 
     // Encode match length table
+	pb.byte(m_cost.get_tans_state(TANS_LENGTH_SYMS));
     syms = m_cost.get_tans_scaled_symbol_freqs(TANS_LENGTH_SYMS,m);
     length += m;
     for (n = 0; n < m; n++) {
@@ -481,6 +455,7 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
     }
         
     // Encode Offset table
+	pb.byte(m_cost.get_tans_state(TANS_OFFSET_SYMS));
     syms = m_cost.get_tans_scaled_symbol_freqs(TANS_OFFSET_SYMS,m);
     length += m;
     for (n = 0; n < m; n++) {
@@ -497,7 +472,9 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
 
     //
     pos = 0;
-    
+	
+	bool previous_was_pmr = false;
+
     while ((pos = m_cost_array[pos].next)) {
         length = m_cost_array[pos].length;
         offset = m_cost_array[pos].offset;
@@ -515,14 +492,12 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
                 std::cerr << ", bits(0,1), ";
             }
             if (run_length > m_lz_config->max_literal_run) {
-                if (m_lz_config->verbose) {
-                    std::cout << "**Error: cannot handle literal run > " << m_lz_config->max_literal_run
-                              << " bytes\n";
-                }
+                std::cout << "**Error: cannot handle literal run > " << m_lz_config->max_literal_run
+                          << " bytes\n";
                 return -1;
             }
             
-            n = m_cost.impl_get_literal_tag(buf+pos,length,byte_tag,tag);
+            n = m_cost.impl_get_literal_tag(buf+pos,run_length,byte_tag,tag);
 
             if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << ", tag 0x"
@@ -539,29 +514,62 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             }
             if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << " ('" << (std::isprint(literal) ? literal : '.');
-				std::cerr << "') -> total " << std::dec << 1+n+run_length << "\n";
+				std::cerr << "') -> total " << std::dec << 1+n;
+				
+				if ((run_length * 9) > (1+n)) {
+					std::cerr << " *";
+				} else if ((run_length * 9) == (1+n)) {
+					std::cerr << " !";
+				}
+				std::cerr << "\n";
             }
-        } else {
+
+			// PMR handling
+			previous_was_pmr = false;
+
+			// update statistics
+			m_num_literals += run_length;
+			literal_size = literal_size + 1+n;
+		} else {
             n = 0;
 
-			if ((offset == 0 && length > 1) || (offset > 0 && length == 1)) {
+			if (((offset == 0 && length > 1) || (offset > 0 && length == 1)) && !previous_was_pmr) {
                 if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "O: PMR Match, ";
                 }
                 tag = 0;
+
+				// Handle PMR check
+				previous_was_pmr = true;
+
+				// Update statistics
+				if (length == 1) {
+					++m_num_pmr_literals;
+				} else {
+					++m_num_pmr_matches;
+				}
             } else {
+				previous_was_pmr = false;
                 tag = 1;
                 if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                     std::cerr << "O: Match, ";
                 }
+
+				// Update statistics
+				++m_num_matches;
             }   
             if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
                 std::cerr << "bits("<< tag << ",1), ";
             }
             
 			pb.bits(tag,1);
-            
+
 			if (tag == 1) {
+				if (offset == 0) {
+					// Cannot encode two PMR in a row..
+					offset = m_cost_array[pos].pmr_offset;
+				}
+
                 // encode offset if this was a normal match
 				n = m_cost.get_offset_tag(offset,literal,tag);
 				pb.bits(literal,min_offset_bits);
@@ -588,7 +596,14 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
 			if (m_lz_config->debug_level > DEBUG_LEVEL_NORMAL) {
 				std::cerr << " -> total " << 1+m+n << "\n";
 			}
-        }
+
+			// Update statistics
+			m_num_matched_bytes += length;
+        
+			if (length == 1) {
+				literal_size = literal_size + 1 + m + n;
+			}
+		}
         
 
         //
@@ -606,6 +621,12 @@ int zxpac4c::encode_history(const char* buf, char* p_out, int len, int pos)
             }
         }
     }
+
+
+	if (m_lz_config->verbose) {
+		std::cout << "Encoding literal took " << literal_size << " bits, "
+				  << ((literal_size+7)/8) << " bytes\n";
+	}
 
     n = pb.flush() - p_out;
     return n;
