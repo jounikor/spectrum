@@ -36,15 +36,23 @@
  * @brief A structure to hold match-length pairs for a LZ string matching engine.
  */
 
+#define MAX_NUM_OF_PMR          1   // Override this in your code if needed
+
+
 struct cost {
     int32_t next;
     int32_t offset;
     int32_t length;
-    int32_t pmr_offset;         ///< tbd
+    int32_t pmr_offsets[MAX_NUM_OF_PMR];
     uint32_t arrival_cost;
     int16_t num_literals;       ///< Number of consequtive literal up to this match node.
     bool last_was_literal;
 };
+
+#define pmr_offset  pmr_offsets[0]
+
+
+
 
 /**
  * @struct lz_config lz_base.h inc/lz_base.h

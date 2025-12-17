@@ -300,7 +300,7 @@ int zxpac4_32k_cost::impl_match_cost(int pos, cost* c, const char* buf, int offs
     cost* p_ctx = &c[pos];
     bool pmr_found = false;
     uint32_t new_cost;
-    int pmr_offset; 
+    int local_pmr_offset; 
     int encode_length;
     int tag_cost;
     int n;
@@ -312,14 +312,14 @@ int zxpac4_32k_cost::impl_match_cost(int pos, cost* c, const char* buf, int offs
     }
 
     new_cost = p_ctx->arrival_cost + tag_cost;
-    pmr_offset = p_ctx->pmr_offset; 
+    local_pmr_offset = p_ctx->pmr_offset; 
 
-    if (offset == pmr_offset) {
+    if (offset == local_pmr_offset) {
         pmr_found = true;
         offset = 0;
         encode_length = length;
     } else {
-        pmr_offset = offset;
+        local_pmr_offset = offset;
         encode_length = length - 1;
     }
 
@@ -330,19 +330,19 @@ int zxpac4_32k_cost::impl_match_cost(int pos, cost* c, const char* buf, int offs
             
     if (p_ctx[length].arrival_cost > new_cost) {
         p_ctx[length].offset       = offset;
-        p_ctx[length].pmr_offset   = pmr_offset;
+        p_ctx[length].pmr_offset   = local_pmr_offset;
         p_ctx[length].arrival_cost = new_cost;
         p_ctx[length].length       = length;
         p_ctx[length].last_was_literal = false;
     }
 
-    pmr_offset = p_ctx->pmr_offset;
+    local_pmr_offset = p_ctx->pmr_offset;
 
-    if (pmr_found == false && pos >= pmr_offset) {
+    if (pmr_found == false && pos >= local_pmr_offset) {
         int max_match = lz_get_config()->max_match; 
 
         n = pos < m_max_len - max_match ? max_match : m_max_len - pos;
-        length = check_match(&buf[pos],&buf[pos-pmr_offset],n);
+        length = check_match(&buf[pos],&buf[pos-local_pmr_offset],n);
         assert(length <= max_match);
 
         if (length >= lz_get_config()->min_match) {
@@ -352,7 +352,7 @@ int zxpac4_32k_cost::impl_match_cost(int pos, cost* c, const char* buf, int offs
             if (p_ctx[length].arrival_cost >= new_cost) {
             //std::cerr << "PMR at " << pos << ", " << pmr_offset << ", " << length << "\n";
                 p_ctx[length].offset       = 0;
-                p_ctx[length].pmr_offset   = pmr_offset;
+                p_ctx[length].pmr_offset   = local_pmr_offset;
                 p_ctx[length].arrival_cost = new_cost;
                 p_ctx[length].length       = length;
                 p_ctx[length].last_was_literal = false;

@@ -292,7 +292,7 @@ int zxpac4c_cost::impl_literal_cost(int pos, cost* c, const char* buf)
 int zxpac4c_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset, int length)
 {
     cost* p_ctx = &c[pos];
-    int pmr_offset; 
+    int local_pmr_offset; 
     uint32_t new_cost;
 
     (void)buf;
@@ -303,15 +303,15 @@ int zxpac4c_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset,
     assert(length > 0);
 
     // Tag cost is 1 bit as a baseline..
-    pmr_offset = p_ctx->pmr_offset; 
+    local_pmr_offset = p_ctx->pmr_offset; 
     new_cost = p_ctx->arrival_cost + 1;
     
-    if (pos >= pmr_offset && offset == pmr_offset) {
+    if (pos >= local_pmr_offset && offset == local_pmr_offset) {
         // We have a PMR match
 		offset = 0;
     } else {
 		// Just a normal match. Update the PMR offset
-        pmr_offset = offset;
+        local_pmr_offset = offset;
     }
 
     // weight of offset encoding 
@@ -325,7 +325,7 @@ int zxpac4c_cost::impl_match_cost(int pos, cost* c, const char* buf, int offset,
 
     if (p_ctx[length].arrival_cost > new_cost) {
         p_ctx[length].offset       = offset;
-        p_ctx[length].pmr_offset   = pmr_offset;
+        p_ctx[length].pmr_offset   = local_pmr_offset;
         p_ctx[length].arrival_cost = new_cost;
         p_ctx[length].length       = length;
         p_ctx[length].num_literals = 0;
