@@ -19,38 +19,28 @@ import math
 #  - Target decoder architecture is Z80
 #
 
-
-
-
-
-#F =   [3,3,2]                  # M = 8
-#F =   [12288,12288,8192]       # M = 32768
-F =   [24576,24576,16384]       # M = 65536
-
-L_BYTE_BOUND = 1 << 14
+L_BIT_LOW = 0x8000
 
 # Propabiliry of 0.5
-prop_of_1   = int(128)
+INIT_PROP_FOR_0 = int(10)
 
-# Max sum of freq, and propability of 1.0
-M           = int(256)
 
-# Throttle modem update rate
+# Throttle model update rate
 UPDATE_RATE = 4
-
 
 #
 def update_propability(prop,bit):
-    if (bit == 0):
+    print(f"update: {prop}, {bit}")
+    if (bit == 1):
         update = (256 - prop) >> UPDATE_RATE
             
         if (update == 0):
             update = 1
 
-        prop = prop + update
+        prop = prop - update
 
-        if (prop > 255):
-            prop = 255
+        if (prop <= 0):
+            prop = 1
 
     else:
         update = prop >> UPDATE_RATE
@@ -58,29 +48,35 @@ def update_propability(prop,bit):
         if (update == 0):
             update = 1
 
-        prop = prop - update
+        prop = prop + update
 
-        if (prop == 0):
-            prop = 1;
+        if (prop > 255):
+            prop = 255;
 
+
+    print(f"  updated: {update}, {prop}")
     return prop
 
 
 def encode(out,state,bit):
-    state_max = ((L_BYTE_BOUND // M) << 8) * Fi     # Becomes a shift if M is pow_of_2
-    while (state >= state_max):
-        print(f"  renorm 0x{state & 0xff:02x}")
-        out.append(state & 0xff)
-        state >>= 8
+	if (bit == 0):
+		Fi = prop_of_0
+		Ci = 0
+	else:
+		Fi = 256 - prop_of_0
+		Ci = prop_of_0
 
-    # encode
-    new_state = 0
-    d = state // Fi
-    r = state % Fi
-    Ci = C[symbol]
+	state_max = ((L_BIT_LOW >> 8) << 1) * Fi
+	while (state >= state_max):
+		print(f"  renorm 0x{state:04x} - {state & 1:d} ->",end=" ")
+		out.append(state & 0x01)
+		state >>= 1
+		print(f"0x{state:04x}")
 
-    new_state = d * M + Ci + r
-    return new_state
+	new_state = ((state // Fi) << 8) + Ci + (state % Fi)
+	return new_state
+
+
 
 def decode(out,state):
     # decode
@@ -88,84 +84,58 @@ def decode(out,state):
     r = state & 255
 
     # s = freq_to_index(r)
-    if (r < prop_of_1):
+    if (r < prop_of_0):
         s = 0
+        Fs = prop_of_0
         Is = 0
     else:
         s = 1
-        Is = prop_of_1
+        Fs = 256 - prop_of_0
+        Is = prop_of_0
 
     # Fs = F[s]
     # Is = C[s]
 
     # If Fs is pow_of_2 then d*Fs becomes a d<<log2(Fs)
     # new_state = d * Fs + r - Is
-    new_state = (d * prop_of_1) + r - Is  
-
-
+    new_state = (d * Fs) + r - Is  
 
     # renorm
-    while (new_state < L_BYTE_BOUND):
-        b = out.pop() & 0xff
-        new_state = (new_state << 8) | b
-        print(f"  renorm 0x{b:02x}")
+    while (new_state < L_BIT_LOW):
+        b = out.pop() & 0x01
+        print(f"  renorm 0x{new_state:04x} + {b:d} ->", end=" ")
+        new_state = (new_state << 1) | b
+        print(f"0x{new_state:04x}")
 
     return s,new_state
 
-def init_cum_freq(freq: []) -> []:
-    cum_freq = []
-    tmp_freq = 0;
-
-    for n in freq:
-        cum_freq.append(tmp_freq)
-        tmp_freq += n
-
-    cum_freq.append(tmp_freq)
-    return cum_freq
-
-
-def freq_to_index(r):
-    symbol = 0
-
-    while (r >= C[symbol+1]):
-        symbol += 1
-
-    return symbol
-
-
-def get_M(freq_array):
-    return sum(freq_array)
-
-
-
 if (__name__ == "__main__"):
-
-    S = [0,1,0,2,2,0,2,1,2,1,2,1,1,1,1,1,0,1,0,2,1,2,2,2,1,2,0,2,0,2,0,0,0,0]
+    S = [0,1,0,1,1,0,1,1,1,1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,0,1,0,1,0,0,0,0]
     O = []
     out = []
 
-    C = init_cum_freq(F)
-    M = get_M(F)
-    print(C)
-    print(M)
-
-
-    state = L_BYTE_BOUND
-    print(S)
+	# initialize
+    state = L_BIT_LOW
+    global prop_of_0
+    prop_of_0 = INIT_PROP_FOR_0
 
     for symbol in reversed(S):
         state = encode(out,state,symbol)
-        #print(f"Input: {symbol} and state: 0x{state:x}");
+        print(f"Input: {symbol}, state: 0x{state:x}, prop_of_0: 0x{prop_of_0:x}");
+        #prop_of_0 = update_propability(prop_of_0,symbol)
 
-    print(f"Final state: 0x{state:x}\n")
+
+    print(f"Final state: 0x{state:x}, final prop_of_0: 0x{prop_of_0:x}\n")
     print(out)
 
     O = []
+    prop_of_0 = INIT_PROP_FOR_0
 
     for i in range(S.__len__()):
         symbol,state = decode(out,state)
-        #print(f"Output: {symbol} and state: 0x{state:x}");
+        print(f"Output: {symbol} and state: 0x{state:x}");
         O.append(symbol)
+        #prop_of_0 = update_propability(prop_of_0,symbol)
 
     print(O)
 
