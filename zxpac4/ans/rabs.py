@@ -115,50 +115,50 @@ def encode(out: [],state: int,bit: int,prop_of_0: int ) -> int:
 
 #
 def decode(out: [],state: int,prop_of_0: int) -> (int,int):
-	# decode
-	d = state // M
-	r = state & (M - 1)
+    # decode
+    d = state // M
+    r = state & (M - 1)
 
-	if (r < prop_of_0):
-		s = 0
-		Fs = prop_of_0
-		Is = 0
-	else:
-		s = 1
-		Fs = M - prop_of_0
-		Is = prop_of_0
+    if (r < prop_of_0):
+        s = 0
+        Fs = prop_of_0
+        Is = 0
+    else:
+        s = 1
+        Fs = M - prop_of_0
+        Is = prop_of_0
     
-	# Fs = F[s]
-	# Is = C[s]
-	#
-	# Thinking Z80 implementation.. assume:
-	#  HL = state
-	#  D  = Fs
-	#  E  = Is
-	#
-	# Then new_state = mul_8x8_to_16(H,D) + L - E
-	new_state = (d * Fs) + r - Is  
+    # Fs = F[s]
+    # Is = C[s]
+    #
+    # Thinking Z80 implementation.. assume:
+    #  HL = state
+    #  D  = Fs
+    #  E  = Is
+    #
+    # Then new_state = mul_8x8_to_16(H,D) + L - E
+    new_state = (d * Fs) + r - Is  
 
-	# renorm.. thinking Z80 implementation and assuming:
-	#  L_BITS = 1
-	#  HL = new_state
-	#  A  = bit buffer
-	# then the below renorm while loop could be something like:
+    # renorm.. thinking Z80 implementation and assuming:
+    #  L_BITS = 1
+    #  HL = new_state
+    #  A  = bit buffer
+    # then the below renorm while loop could be something like:
     #
     #  _first_test:
     #           BIT    7,H
     #           JR NZ, _done
     #  _while:
-	#           ADD    A,A   
+    #           ADD    A,A   
     #           ADC    HL,HL
     #           JP P,  _while
-	#  _done:
-	#
+    #  _done:
+    #
     while (new_state < L_BIT_LOW):
-		b = out.pop() & L_BITS_MASK
-		new_state = (new_state << L_BITS) | b
+        b = out.pop() & L_BITS_MASK
+        new_state = (new_state << L_BITS) | b
 
-	return s,new_state
+    return s,new_state
 
 #
 if (__name__ == "__main__"):
