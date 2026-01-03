@@ -1,16 +1,13 @@
 # 
 # (c) 2025-6 Jouni 'Mr.Spiv' Korhonen
 #
-# This example code implements streaming urBS binary encoder and decoder.
+# This example code implements streaming rABS binary encoder and decoder.
 # The renormalization part has been 'optimized' for 8-bit architectures
 #
-
-import math
-
 #
 # Some technical and design choices:
 #  - Maximum frequency is 256
-#  - Adaptive modelling has been learning rate based on
+#  - Adaptive modelling has learning rate based on
 #    https://fgiesen.wordpress.com/2015/05/26/models-for-adaptive-arithmetic-coding/
 #  - In modelling only the probability of 1 is maintained and
 #    uses 1 byte i.e. the range is [1..255] per context
@@ -18,23 +15,60 @@ import math
 #    https://yupferris.github.io/blog/2019/02/11/rANS-on-6502.html
 #  - Target decoder architecture is Z80
 #
+# How this rABS implementation works? First it is designed for end to start
+# decompression. The end to start decompression is practical for inplace
+# decompression when the compressed file and the decompressed file areas
+# overlap ~entirely, which is a common requirement for low end platform
+# "demo" compressors.
+#
+# Since the alphabet is only 0 and 1, we can cut corners on few things:
+#  - We need to maintain only one symbol frequency/propability value for
+#    "qll" two symbols. Either the frequenxy/propability of 0 or 1, The
+#    choise is up to you. I used the frequenxy/propability of 0.
+#  - We do not need to calculate or maintain cumulative propabilities.
+#    It is either 0 or the maintained frequenxy/propability of a single
+#    symbol.
+#
+# Set initial propability for 0 bit prop_of_0 to e.g. 0.5 (50%).
+# Assume binary symbols:
+#  S = [1,   1,   0,   1,   1,   1,   0,   0]
+#       <----------------------------------- update model from end to start.
+#  P = [0.4, 0.5, 0.4, 0.5, 0.6, 0.7, 0.6, 0.5] <- example prop_of_0
+# Set intial state to L_BIT_LOW.
+#  S = [...                                 ] 
+#       -----------------------------------> encode from start to end using
+#                                            propabilities from previous round
+# After rABS encoding we have final state after the last symbol, whose
+# propability is the known initial 0.5.
+# Now we can easily decode rABS output from end to start with a known final
+# state and update symbol propabilities dynamically as we go..
+#
+
 
 # M must be a power of two.. and in this case also fixed to 256
 M = 256
 
-# L is selected so that we can check against a 16 bit register sign bit
-L_BIT_LOW = 0x8000
+# L can be selected so that we can check against a 16-bit register sign bit.
+# The state must always reside between [L_BIT_LOW,0xffff] 
+# The L_BITS defines how many bits are output/input at once.
+# TODO: If 16-bit overflow can be used in case of L_BIT_LOW and state
+#       maintenance? That would be good for 8-bit CPU targets.
+L_BITS = 1
+L_BITS_MASK = (1 << L_BITS) - 1
+L_BIT_LOW = 0x10000 >> L_BITS
 
 # Initial propabiliry of 0.5
-INIT_PROP_FOR_0 = int(128)
+INIT_PROP_FOR_0 = 128
 
 # Throttle model update rate
-UPDATE_RATE = 4
+UPDATE_RATE = 5
 
+# The model used here is "too simple" but serves for educational purposes.
+# The model update rate/speed can be controlled with UPDATE_RATE.
+# The symbol propability is between [1,255]
 #
-def update_propability(prop: int ,bit: int ) -> int:
-	#print(f"update: {prop}, {bit}")
-	if (bit == 1):
+def update_propability(prop: int ,symbol: int ) -> int:
+	if (symbol == 1):
 		update = (M - prop) >> UPDATE_RATE
             
 		if (update == 0):
@@ -55,12 +89,10 @@ def update_propability(prop: int ,bit: int ) -> int:
 		if (prop >= M):
 			prop = M - 1;
 
-	#print(f"  updated: {update}, {prop}")
 	return prop
 
 #
 def encode(out: [],state: int,bit: int,prop_of_0: int ) -> int:
-
 	if (bit == 0):
 		Fi = prop_of_0
 		Ci = 0
@@ -68,44 +100,58 @@ def encode(out: [],state: int,bit: int,prop_of_0: int ) -> int:
 		Fi = M - prop_of_0
 		Ci = prop_of_0
 	
-	state_max = ((L_BIT_LOW // M) << 1) * Fi
+	# Fi = a symbol propability/frequency
+	# Ci = cumulative propability/frequency for a synbol
+
+	state_max = ((L_BIT_LOW // M) << L_BITS) * Fi
 	while (state >= state_max):
-		out.append(state & 0x01)
-		state >>= 1
+		out.append(state & L_BITS_MASK)
+		state >>= L_BITS
 
 	new_state = ((state // Fi) * M) + Ci + (state % Fi)
 	return new_state
 
 #
 def decode(out: [],state: int,prop_of_0: int) -> (int,int):
-    # decode
-    d = state // M
-    r = state & (M - 1)
+	# decode
+	d = state // M
+	r = state & (M - 1)
 
-    # s = freq_to_index(r)
-    if (r < prop_of_0):
-        s = 0
-        Fs = prop_of_0
-        Is = 0
-    else:
-        s = 1
-        Fs = M - prop_of_0
-        Is = prop_of_0
+	if (r < prop_of_0):
+		s = 0
+		Fs = prop_of_0
+		Is = 0
+	else:
+		s = 1
+		Fs = M - prop_of_0
+		Is = prop_of_0
     
-    # Fs = F[s]
-    # Is = C[s]
+	# Fs = F[s]
+	# Is = C[s]
+	#
+	# Thinking Z80 implementation.. assume:
+	#  HL = state
+	#  D  = Fs
+	#  E  = Is
+	#
+	# Then new_state = mul_8x8_to_16(H,D) + L - E
+	new_state = (d * Fs) + r - Is  
 
-    # If Fs is pow_of_2 then d*Fs becomes a d<<log2(Fs)
-    # new_state = d * Fs + r - Is
-    new_state = (d * Fs) + r - Is  
+	# renorm.. thinking Z80 implementation and assuming:
+	#  L_BITS = 1
+	#  HL = new_state
+	#  A  = bit buffer
+	# then the below while loop could be something like:
+	#  _loop:
+	#         TBD
+	#
+	while (new_state < L_BIT_LOW):
+		b = out.pop() & L_BITS_MASK
+		new_state = (new_state << L_BITS) | b
 
-    # renorm
-    while (new_state < L_BIT_LOW):
-        b = out.pop() & 0x01
-        new_state = (new_state << 1) | b
+	return s,new_state
 
-    return s,new_state
-
+#
 if (__name__ == "__main__"):
 	S = [0,1,0,1,1,0,1,1,1,1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,0,1,0,1,0,0,0,0]
 	O = []
@@ -144,10 +190,10 @@ if (__name__ == "__main__"):
 
 	for i in range(S.__len__()):
 		symbol,state = decode(out,state,prop_of_0)
-		O.append(symbol)
+		O.insert(0,symbol)
 		prop_of_0 = update_propability(prop_of_0,symbol)
 
-	print(f"O:", [o for o in reversed(O) if True])
+	print(f"O:", O)
 	print(f"S:", S)
 
 #/* vim: set tabstop=4:softtabstop=4:shiftwidth=4:noexpandtab */
