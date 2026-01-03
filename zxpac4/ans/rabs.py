@@ -23,25 +23,27 @@
 #
 # Since the alphabet is only 0 and 1, we can cut corners on few things:
 #  - We need to maintain only one symbol frequency/propability value for
-#    "qll" two symbols. Either the frequenxy/propability of 0 or 1, The
+#    "all" two symbols. Either the frequency/propability of 0 or 1, The
 #    choise is up to you. I used the frequenxy/propability of 0.
 #  - We do not need to calculate or maintain cumulative propabilities.
-#    It is either 0 or the maintained frequenxy/propability of a single
-#    symbol.
+#    It is either 0 or the only maintained symbol frequency/propability.
 #
 # Set initial propability for 0 bit prop_of_0 to e.g. 0.5 (50%).
 # Assume binary symbols:
-#  S = [1,   1,   0,   1,   1,   1,   0,   0]
-#       <----------------------------------- update model from end to start.
-#  P = [0.4, 0.5, 0.4, 0.5, 0.6, 0.7, 0.6, 0.5] <- example prop_of_0
+#  S = [0,   1,   0,   1,   0,   0,   0,   0]
+#       <----------------------------------- Update model from end to start.
+#  P = [128, 132, 136, 140, 144, 141, 145, 142] <- Example frequencies
+#                                                  prop_of_0 is frequency/M
 # Set intial state to L_BIT_LOW.
 #  S = [...                                 ] 
-#       -----------------------------------> encode from start to end using
-#                                            propabilities from previous round
+#       -----------------------------------> Encode from start to end, and
+#                                            pop the correcsponding symbol
+#                                            propability from the array S.
+#                                            
 # After rABS encoding we have final state after the last symbol, whose
 # propability is the known initial 0.5.
 # Now we can easily decode rABS output from end to start with a known final
-# state and update symbol propabilities dynamically as we go..
+# state and update symbol propabilities dynamically as we go...
 #
 
 
@@ -60,8 +62,8 @@ L_BIT_LOW = 0x10000 >> L_BITS
 # Initial propabiliry of 0.5
 INIT_PROP_FOR_0 = 128
 
-# Throttle model update rate
-UPDATE_RATE = 5
+# Throttle model update rate. Must be a power of two.
+UPDATE_RATE = 32
 
 # The model used here is "too simple" but serves for educational purposes.
 # The model update rate/speed can be controlled with UPDATE_RATE.
@@ -69,7 +71,7 @@ UPDATE_RATE = 5
 #
 def update_propability(prop: int ,symbol: int ) -> int:
 	if (symbol == 1):
-		update = (M - prop) >> UPDATE_RATE
+		update = (M - prop) // UPDATE_RATE
             
 		if (update == 0):
 			update = 1
@@ -79,7 +81,7 @@ def update_propability(prop: int ,symbol: int ) -> int:
 		if (prop <= 0):
 			prop = 1
 	else:
-		update = prop >> UPDATE_RATE
+		update = prop // UPDATE_RATE
 
 		if (update == 0):
 			update = 1
