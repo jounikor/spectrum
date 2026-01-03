@@ -6,18 +6,19 @@
 #
 #
 # Some technical and design choices:
-#  - Maximum frequency is 256
-#  - Adaptive modelling has learning rate based on
+#  - Adaptive modelling has a learning rate based on
 #    https://fgiesen.wordpress.com/2015/05/26/models-for-adaptive-arithmetic-coding/
-#  - In modelling only the probability of 0 or 1 is maintained and
-#    uses 1 byte i.e. the range is [1..255] per context
+#  - When modelling probabilities the symbol frequencies/propabilities of 0
+#    and 1 are maintained and a single symbol frequency/propability uses 1
+#    byte i.e. the range is [1..255] per context.
+#  - Total of symbol frequencies is 256 (for symbols 0 and 1).
 #  - I also read Ferris' great blog
 #    https://yupferris.github.io/blog/2019/02/11/rANS-on-6502.html
 #  - Target decoder architecture is Z80
 #
 # How this rABS implementation works? First it is designed for end to start
 # decompression. The end to start decompression is practical for inplace
-# decompression when the compressed file and the decompressed file areas
+# decompression where the compressed file and the decompressed file areas
 # overlap ~entirely, which is a common requirement for low end platform
 # "demo" compressors.
 #
@@ -32,6 +33,7 @@
 # Assume binary symbols:
 #  S = [0,   1,   0,   1,   0,   0,   0,   0]
 #       <----------------------------------- Update model from end to start.
+#                                            Insert frquencies into array S. 
 #  P = [128, 132, 136, 140, 144, 141, 145, 142] <- Example frequencies
 #                                                  prop_of_0 is frequency/M
 # Set intial state to L_BIT_LOW.
@@ -41,14 +43,17 @@
 #                                            propability from the array S.
 #                                            
 # After rABS encoding we have final state after the last symbol, whose
-# propability is the known initial 0.5.
+# propability is the known initial 0.5 (i.e. frequency 128).
 # Now we can easily decode rABS output from end to start with a known final
-# state and update symbol propabilities dynamically as we go...
+# state, a known initial symbol frequency/propability, and update symbol
+# propabilities dynamically as we decode...
 #
 
 
 # M must be a power of two.. and in this case also fixed to 256
 M = 256
+assert (M & (M - 1)) == 0, "M is not a power of 2"
+assert M <= 256, "M must be 256"
 
 # L can be selected so that we can check against a 16-bit register sign bit.
 # The state must always reside between [L_BIT_LOW,0xffff] 
@@ -58,12 +63,17 @@ M = 256
 L_BITS = 1
 L_BITS_MASK = (1 << L_BITS) - 1
 L_BIT_LOW = 0x10000 >> L_BITS
+assert L_BITS < 8, "L_BITS must be less than 8"
 
 # Initial propabiliry of 0.5
 INIT_PROP_FOR_0 = 128
+assert INIT_PROP_FOR_0 > 0, "INIT_PROP_FOR_0 must be greater than 1"
+assert INIT_PROP_FOR_0 < 256, "INIT_PROP_FOR_0 must be less than 256"
 
 # Throttle model update rate. Must be a power of two.
 UPDATE_RATE = 32
+assert (UPDATE_RATE & (UPDATE_RATE - 1)) == 0, "UPDATE_RATE is not a power of 2"
+assert UPDATE_RATE < 256, "UPDATE_RATE must be less than 256"
 
 # The model used here is "too simple" but serves for educational purposes.
 # The model update rate/speed can be controlled with UPDATE_RATE.
@@ -94,8 +104,8 @@ def update_propability(prop: int ,symbol: int ) -> int:
 	return prop
 
 #
-def encode(out: [],state: int,bit: int,prop_of_0: int ) -> int:
-	if (bit == 0):
+def encode(out: [],state: int, symbol: int, prop_of_0: int ) -> int:
+	if (symbol == 0):
 		Fi = prop_of_0
 		Ci = 0
 	else:
@@ -114,17 +124,17 @@ def encode(out: [],state: int,bit: int,prop_of_0: int ) -> int:
 	return new_state
 
 #
-def decode(out: [],state: int,prop_of_0: int) -> (int,int):
+def decode(out: [],state: int, prop_of_0: int) -> (int,int):
     # decode
     d = state // M
     r = state & (M - 1)
 
     if (r < prop_of_0):
-        s = 0
+        symbol = 0
         Fs = prop_of_0
         Is = 0
     else:
-        s = 1
+        symbol = 1
         Fs = M - prop_of_0
         Is = prop_of_0
     
@@ -158,7 +168,7 @@ def decode(out: [],state: int,prop_of_0: int) -> (int,int):
         b = out.pop() & L_BITS_MASK
         new_state = (new_state << L_BITS) | b
 
-    return s,new_state
+    return symbol,new_state
 
 #
 if (__name__ == "__main__"):
@@ -202,7 +212,9 @@ if (__name__ == "__main__"):
 		O.insert(0,symbol)
 		prop_of_0 = update_propability(prop_of_0,symbol)
 
+	print("Decoded")
 	print(f"O:", O)
+	print("Original input")
 	print(f"S:", S)
 
 #/* vim: set tabstop=4:softtabstop=4:shiftwidth=4:noexpandtab */
