@@ -9,7 +9,7 @@
 #  - Maximum frequency is 256
 #  - Adaptive modelling has learning rate based on
 #    https://fgiesen.wordpress.com/2015/05/26/models-for-adaptive-arithmetic-coding/
-#  - In modelling only the probability of 1 is maintained and
+#  - In modelling only the probability of 0 or 1 is maintained and
 #    uses 1 byte i.e. the range is [1..255] per context
 #  - I also read Ferris' great blog
 #    https://yupferris.github.io/blog/2019/02/11/rANS-on-6502.html
@@ -24,7 +24,7 @@
 # Since the alphabet is only 0 and 1, we can cut corners on few things:
 #  - We need to maintain only one symbol frequency/propability value for
 #    "all" two symbols. Either the frequency/propability of 0 or 1, The
-#    choise is up to you. I used the frequenxy/propability of 0.
+#    choise is up to you. I used the frequency/propability of 0.
 #  - We do not need to calculate or maintain cumulative propabilities.
 #    It is either 0 or the only maintained symbol frequency/propability.
 #
@@ -143,11 +143,18 @@ def decode(out: [],state: int,prop_of_0: int) -> (int,int):
 	#  L_BITS = 1
 	#  HL = new_state
 	#  A  = bit buffer
-	# then the below while loop could be something like:
-	#  _loop:
-	#         TBD
+	# then the below renorm while loop could be something like:
+    #
+    #  _first_test:
+    #           BIT    7,H
+    #           JR NZ, _done
+    #  _while:
+	#           ADD    A,A   
+    #           ADC    HL,HL
+    #           JP P,  _while
+	#  _done:
 	#
-	while (new_state < L_BIT_LOW):
+    while (new_state < L_BIT_LOW):
 		b = out.pop() & L_BITS_MASK
 		new_state = (new_state << L_BITS) | b
 
