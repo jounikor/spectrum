@@ -1,15 +1,17 @@
-(c) 2025 Jouni 'Mr.Spiv' Korhonen
+(c) 2025-26 Jouni 'Mr.Spiv' Korhonen
 
-Version 0.1
+Version 0.2
 
 NOTE! Testing has been minimal so there MAY BE bugs around.
 
-The two following Python3 programs implement my ANS ancoders/decoders. These
+The three following Python3 programs implement my ANS ancoders/decoders. These
 are simple and should be very readable, since they were implemented for my
 ANS concept self-learning purposes.
 
   rans.py - An example implementation of rANS encoder and decoder.
   tans.py - An example implementation of tANS encoder and decoder.
+  rabs.py - An example implementation of a binary alphabet rANS
+            encoder and decoder with a simple adaptive propability model.
 
 The following C++ (v11 should be enough) program implements tANS encoder
 and decoder template classes. These classes are purposely designed to mimic
